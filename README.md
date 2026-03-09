@@ -127,8 +127,8 @@ npm run dev
 Join our Discord server to get updates, report bugs, or just hang out with the devs!
 
 <div align="center">
-  <a href="https://discord.com/invite/ZVCB8EnRX2">
-    <img src="https://invidget.switchblade.xyz/ZVCB8EnRX2" alt="Discord Status" />
+  <a href="https://discord.gg/ZVCB8EnRX2">
+    <img src="https://img.shields.io/discord/951909987838468116?color=%237289DA&label=Lazy%20Devs&logo=discord&logoColor=white&style=for-the-badge" alt="Join Discord" />
   </a>
 </div>
 
