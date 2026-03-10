@@ -276,7 +276,8 @@ router.get('/playlists/:id/tracks', async (req, res) => {
 
 /**
  * GET /api/spotify/playlists/:id
- * Fetches full playlist metadata and tracks.
+ * Fetches full playlist metadata and tracks with pagination to bypass the 100 tracks limit.
+ * Optimized with 'fields' query to reduce payload size.
  */
 router.get('/playlists/:id', async (req, res) => {
   const { id } = req.params;
@@ -292,7 +293,44 @@ router.get('/playlists/:id', async (req, res) => {
 
     // 2. Cache Miss: Fetch from Spotify API
     console.log(`[Spotify] 🌐 Fetching playlist ${id} from live API`);
-    const data = await spotifyGet(`/playlists/${id}`);
+
+    // Use fields to limit response size. For playlist: we need id, name, description, images.
+    // For tracks: we need total, next url, and items containing the track object.
+    const playlistFields =
+      'id,name,description,images,tracks(total,next,items(track(id,name,artists,album,duration_ms)))';
+    const data = await spotifyGet(
+      `/playlists/${id}?fields=${encodeURIComponent(playlistFields)}`,
+    );
+
+    const allItems = [...(data.tracks?.items || [])];
+    let nextUrl = data.tracks?.next;
+
+    // Process pagination for large playlists loop
+    while (nextUrl) {
+      console.log(
+        `[Spotify] Fetching next batch of tracks for playlist ${id}...`,
+      );
+      const urlObj = new URL(nextUrl);
+
+      // Optimize pagination fetch with fields as well
+      const trackFields =
+        'next,items(track(id,name,artists,album,duration_ms))';
+      urlObj.searchParams.set('fields', trackFields);
+
+      const nextPath = urlObj.pathname.replace('/v1', '') + urlObj.search;
+
+      try {
+        const nextData = await spotifyGet(nextPath);
+        allItems.push(...(nextData.items || []));
+        nextUrl = nextData.next;
+      } catch (err) {
+        console.error(
+          `[Spotify] Error fetching next tracks batch for playlist ${id}:`,
+          err,
+        );
+        break; // Stop fetching on error but return what we currently have
+      }
+    }
 
     const formattedData = {
       id: data.id,
@@ -300,9 +338,7 @@ router.get('/playlists/:id', async (req, res) => {
       description: data.description,
       artworkUrl: data.images?.[0]?.url || '',
       trackCount: data.tracks?.total || 0,
-      tracks:
-        data.tracks?.items?.map((item: any) => item.track).filter(Boolean) ||
-        [],
+      tracks: allItems.map((item: any) => item.track).filter(Boolean) || [],
     };
 
     // 3. Save to Redis Cache (Expire after 1 hour = 3600 seconds)
