@@ -248,6 +248,7 @@ export default function Home() {
             title='New Releases'
             items={newReleases}
             isAlbum={true}
+            isCarousel={true}
             onPlayPlaylist={handlePlaySpotifyCollection}
           />
           <PlaylistGrid

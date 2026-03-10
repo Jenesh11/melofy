@@ -8,13 +8,19 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { TrackList, TrackItem } from '@/components/ui/TrackList';
+import { TrackCarousel } from '@/components/home/TrackCarousel';
+import { PlaylistGrid } from '@/components/home/PlaylistGrid';
+import { useSpotifyCollection } from '@/hooks/useSpotifyCollection';
 
 export default function SearchPage() {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query, 500);
   const [results, setResults] = useState<TrackItem[]>([]);
+  const [spotifyTracks, setSpotifyTracks] = useState<any[]>([]);
+  const [spotifyPlaylists, setSpotifyPlaylists] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const { handlePlaySpotifyCollection } = useSpotifyCollection();
 
   useEffect(() => {
     const savedHistory = localStorage.getItem('melofy_search_history');
@@ -55,18 +61,34 @@ export default function SearchPage() {
     const fetchResults = async () => {
       if (!debouncedQuery.trim()) {
         setResults([]);
+        setSpotifyTracks([]);
+        setSpotifyPlaylists([]);
         return;
       }
 
       setLoading(true);
       try {
-        const res = await fetch(
-          `/api/search?q=${encodeURIComponent(debouncedQuery)}`,
-        );
-        const data = await res.json();
-        if (data && data.tracks && data.tracks.length > 0) {
-          // Map Kazagumo/NodeLink track data to TrackItem
-          const mapped: TrackItem[] = data.tracks
+        const [ytRes, spotifyRes] = await Promise.allSettled([
+          fetch(`/api/search?q=${encodeURIComponent(debouncedQuery)}`),
+          fetch(
+            `/api/spotify/search?q=${encodeURIComponent(
+              debouncedQuery,
+            )}&type=track,playlist`,
+          ),
+        ]);
+
+        let ytData: any = null;
+        if (ytRes.status === 'fulfilled' && ytRes.value.ok) {
+          ytData = await ytRes.value.json();
+        }
+
+        let spotData: any = null;
+        if (spotifyRes.status === 'fulfilled' && spotifyRes.value.ok) {
+          spotData = await spotifyRes.value.json();
+        }
+
+        if (ytData && ytData.tracks && ytData.tracks.length > 0) {
+          const mapped: TrackItem[] = ytData.tracks
             .filter(Boolean)
             .map((track: any) => ({
               id: track.info?.identifier || 'unknown',
@@ -85,6 +107,14 @@ export default function SearchPage() {
           saveToHistory(debouncedQuery);
         } else {
           setResults([]);
+        }
+
+        if (spotData) {
+          setSpotifyTracks(spotData.tracks?.items?.filter(Boolean) || []);
+          setSpotifyPlaylists(spotData.playlists?.items?.filter(Boolean) || []);
+        } else {
+          setSpotifyTracks([]);
+          setSpotifyPlaylists([]);
         }
       } catch (error) {
         console.error('Search error:', error);
@@ -160,23 +190,54 @@ export default function SearchPage() {
           </motion.div>
         )}
 
-        {!loading && query && results.length === 0 && (
-          <div className='flex flex-col items-center justify-center py-24 text-muted-foreground'>
-            <h3 className='text-xl font-semibold text-foreground mb-2'>
-              No results found for &quot;{query}&quot;
-            </h3>
-            <p>
-              Please make sure your words are spelled correctly, or use less or
-              different keywords.
-            </p>
-          </div>
-        )}
+        {!loading &&
+          query &&
+          results.length === 0 &&
+          spotifyTracks.length === 0 &&
+          spotifyPlaylists.length === 0 && (
+            <div className='flex flex-col items-center justify-center py-24 text-muted-foreground'>
+              <h3 className='text-xl font-semibold text-foreground mb-2'>
+                No results found for &quot;{query}&quot;
+              </h3>
+              <p>
+                Please make sure your words are spelled correctly, or use less
+                or different keywords.
+              </p>
+            </div>
+          )}
 
-        {!loading && results.length > 0 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <TrackList tracks={results} />
-          </motion.div>
-        )}
+        {!loading &&
+          (spotifyPlaylists.length > 0 ||
+            spotifyTracks.length > 0 ||
+            results.length > 0) && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className='flex flex-col gap-4'
+            >
+              {spotifyTracks.length > 0 && (
+                <TrackCarousel title='Top Tracks' tracks={spotifyTracks} />
+              )}
+
+              {spotifyPlaylists.length > 0 && (
+                <PlaylistGrid
+                  title='Featured Playlists'
+                  items={spotifyPlaylists}
+                  isCarousel={true}
+                  onPlayPlaylist={handlePlaySpotifyCollection}
+                />
+              )}
+
+              {results.length > 0 && (
+                <div className='mt-8'>
+                  <h3 className='text-3xl font-bold text-foreground mb-6'>
+                    More Audio Results
+                  </h3>
+                  <TrackList tracks={results} />
+                </div>
+              )}
+            </motion.div>
+          )}
       </div>
     </div>
   );

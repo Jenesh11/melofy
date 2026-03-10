@@ -12,6 +12,7 @@ interface PlaylistGridProps {
   title: string;
   items: any[];
   isAlbum?: boolean;
+  isCarousel?: boolean;
   onPlayPlaylist?: (playlist: any) => void;
 }
 
@@ -19,6 +20,7 @@ export function PlaylistGrid({
   title,
   items,
   isAlbum = false,
+  isCarousel = false,
   onPlayPlaylist,
 }: PlaylistGridProps) {
   const { playInContext, currentTrack, isPlaying, pause, resume } =
@@ -95,14 +97,24 @@ export function PlaylistGrid({
           </Button>
         )}
       </div>
-      <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6'>
+      <div
+        className={
+          isCarousel
+            ? 'flex overflow-x-auto gap-6 pb-4 custom-scrollbar snap-x snap-mandatory scroll-smooth'
+            : 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6'
+        }
+      >
         {items.map((item, i) => (
           <motion.div
             key={item.id + i}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: i * 0.05 }}
-            className='flex flex-col gap-3 group cursor-pointer'
+            className={`flex flex-col gap-3 group cursor-pointer ${
+              isCarousel
+                ? 'min-w-[160px] w-[160px] md:min-w-[200px] md:w-[200px] lg:min-w-[220px] lg:w-[220px] snap-start shrink-0'
+                : ''
+            }`}
             onClick={() => router.push(`/playlist/${item.id}`)}
           >
             <div className='aspect-square rounded-[2rem] bg-muted relative overflow-hidden shadow-xl group-hover:shadow-primary/10 transition-all duration-500'>

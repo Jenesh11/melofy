@@ -11,7 +11,9 @@ async function getSpotifyToken() {
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
-    throw new Error('SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET is missing in .env');
+    throw new Error(
+      'SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET is missing in .env',
+    );
   }
 
   if (spotifyAccessToken && Date.now() < tokenExpirationTime) {
@@ -19,18 +21,16 @@ async function getSpotifyToken() {
   }
 
   const tokenUrl = 'https://accounts.spotify.com/api/token';
-  const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-
-  const response = await axios.post(
-    tokenUrl,
-    'grant_type=client_credentials',
-    {
-      headers: {
-        Authorization: `Basic ${authHeader}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    }
+  const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString(
+    'base64',
   );
+
+  const response = await axios.post(tokenUrl, 'grant_type=client_credentials', {
+    headers: {
+      Authorization: `Basic ${authHeader}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+  });
 
   spotifyAccessToken = response.data.access_token;
   tokenExpirationTime = Date.now() + (response.data.expires_in - 300) * 1000;
@@ -61,12 +61,19 @@ router.get('/trending', async (req, res) => {
   } catch (error: any) {
     // Fallback: use search API for popular tracks
     try {
-      console.log('[Spotify] Playlist fallback — using search API for trending');
-      const data = await spotifyGet(`/search?q=year:2024-2025&type=track&limit=50&market=US`);
+      console.log(
+        '[Spotify] Playlist fallback — using search API for trending',
+      );
+      const data = await spotifyGet(
+        `/search?q=year:2024-2025&type=track&limit=50&market=US`,
+      );
       // Transform to match the {track} shape expected by frontend
       res.json(data.tracks.items.map((track: any) => ({ track })));
     } catch (fallbackError: any) {
-      console.error('[Spotify] Trending error:', fallbackError?.response?.data || fallbackError.message);
+      console.error(
+        '[Spotify] Trending error:',
+        fallbackError?.response?.data || fallbackError.message,
+      );
       res.status(500).json({ error: 'Failed to fetch trending tracks' });
     }
   }
@@ -81,7 +88,10 @@ router.get('/new-releases', async (req, res) => {
     const data = await spotifyGet(`/browse/new-releases?limit=15&country=US`);
     res.json(data.albums.items);
   } catch (error: any) {
-    console.error('[Spotify] New releases error:', error?.response?.data || error.message);
+    console.error(
+      '[Spotify] New releases error:',
+      error?.response?.data || error.message,
+    );
     res.status(500).json({ error: 'Failed to fetch new releases' });
   }
 });
@@ -96,18 +106,32 @@ router.get('/recommendations', async (req, res) => {
   const mood = (req.query.mood as string) || '';
 
   // Build a smart search query to simulate content-based filtering
-  const genres = ['pop', 'hip-hop', 'r&b', 'indie', 'electronic', 'lo-fi', 'soul', 'rock'];
-  const chosenGenre = genres.includes(genre) ? genre : genres[Math.floor(Math.random() * genres.length)];
+  const genres = [
+    'pop',
+    'hip-hop',
+    'r&b',
+    'indie',
+    'electronic',
+    'lo-fi',
+    'soul',
+    'rock',
+  ];
+  const chosenGenre = genres.includes(genre)
+    ? genre
+    : genres[Math.floor(Math.random() * genres.length)];
 
-  const query = mood
-    ? `genre:${chosenGenre} ${mood}`
-    : `genre:${chosenGenre}`;
+  const query = mood ? `genre:${chosenGenre} ${mood}` : `genre:${chosenGenre}`;
 
   try {
-    const data = await spotifyGet(`/search?q=${encodeURIComponent(query)}&type=track&limit=50&market=US`);
+    const data = await spotifyGet(
+      `/search?q=${encodeURIComponent(query)}&type=track&limit=50&market=US`,
+    );
     res.json(data.tracks.items);
   } catch (error: any) {
-    console.error('[Spotify] Recommendations error:', error?.response?.data || error.message);
+    console.error(
+      '[Spotify] Recommendations error:',
+      error?.response?.data || error.message,
+    );
     res.status(500).json({ error: 'Failed to fetch recommendations' });
   }
 });
@@ -132,8 +156,8 @@ router.get('/popular-playlists', async (req, res) => {
   try {
     const results = await Promise.allSettled(
       SEARCH_QUERIES.map((q) =>
-        spotifyGet(`/search?q=${encodeURIComponent(q)}&type=playlist&limit=5`)
-      )
+        spotifyGet(`/search?q=${encodeURIComponent(q)}&type=playlist&limit=5`),
+      ),
     );
 
     const playlists = results
@@ -147,7 +171,10 @@ router.get('/popular-playlists', async (req, res) => {
 
     res.json(playlists);
   } catch (error: any) {
-    console.error('[Spotify] Popular playlists error:', error?.response?.data || error.message);
+    console.error(
+      '[Spotify] Popular playlists error:',
+      error?.response?.data || error.message,
+    );
     res.status(500).json({ error: 'Failed to fetch popular playlists' });
   }
 });
@@ -159,18 +186,27 @@ router.get('/popular-playlists', async (req, res) => {
  */
 router.get('/mixes', async (req, res) => {
   const mixQueries = [
-    { name: 'Chill Vibes', query: 'genre:chill' },
-    { name: 'Workout Energy', query: 'genre:pop workout' },
-    { name: 'Indie Focus', query: 'genre:indie' },
-    { name: 'Hip-Hop Fire', query: 'genre:hip-hop' },
-    { name: 'Acoustic Soul', query: 'genre:soul acoustic' },
+    { name: 'Chill Vibes', query: 'Chill Mix' },
+    { name: 'Workout Energy', query: 'Workout Mix' },
+    { name: 'Indie Focus', query: 'Indie Mix' },
+    { name: 'Hip-Hop Fire', query: 'Hip-Hop Mix' },
+    { name: 'Acoustic Soul', query: 'Acoustic Mix' },
+    { name: 'Lofi Beats', query: 'Lofi Mix' },
+    { name: 'Electronic Dance', query: 'EDM Mix' },
+    { name: 'R&B Grooves', query: 'R&B Mix' },
+    { name: 'Rock Anthems', query: 'Rock Mix' },
+    { name: 'Deep Focus', query: 'Deep Focus Mix' },
+    { name: 'Late Night Jazz', query: 'Late Night Jazz Mix' },
+    { name: 'Pop Hits', query: 'Pop Mix' },
   ];
 
   try {
     const results = await Promise.allSettled(
       mixQueries.map((m) =>
-        spotifyGet(`/search?q=${encodeURIComponent(m.query)}&type=playlist&limit=2&market=US`)
-      )
+        spotifyGet(
+          `/search?q=${encodeURIComponent(m.query)}&type=playlist&limit=10&market=US`,
+        ),
+      ),
     );
 
     const playlists: any[] = [];
@@ -178,15 +214,20 @@ router.get('/mixes', async (req, res) => {
       const r = results[i];
       if (r.status === 'fulfilled') {
         const items: any[] = r.value?.playlists?.items || [];
-        if (items.length > 0 && items[0]) {
-          playlists.push(items[0]);
+        const validPlaylist = items.find((p: any) => p !== null);
+        if (validPlaylist) {
+          validPlaylist.name = mixQueries[i].name;
+          playlists.push(validPlaylist);
         }
       }
     }
 
     res.json(playlists);
   } catch (error: any) {
-    console.error('[Spotify] Mixes error:', error?.response?.data || error.message);
+    console.error(
+      '[Spotify] Mixes error:',
+      error?.response?.data || error.message,
+    );
     res.status(500).json({ error: 'Failed to fetch mixes' });
   }
 });
@@ -201,7 +242,10 @@ router.get('/albums/:id/tracks', async (req, res) => {
     const data = await spotifyGet(`/albums/${id}/tracks?limit=50`);
     res.json(data);
   } catch (error: any) {
-    console.error('[Spotify] Album tracks error:', error?.response?.data || error.message);
+    console.error(
+      '[Spotify] Album tracks error:',
+      error?.response?.data || error.message,
+    );
     res.status(500).json({ error: 'Failed to fetch album tracks' });
   }
 });
@@ -216,7 +260,10 @@ router.get('/playlists/:id/tracks', async (req, res) => {
     const data = await spotifyGet(`/playlists/${id}/tracks?limit=50`);
     res.json(data);
   } catch (error: any) {
-    console.error('[Spotify] Playlist tracks error:', error?.response?.data || error.message);
+    console.error(
+      '[Spotify] Playlist tracks error:',
+      error?.response?.data || error.message,
+    );
     res.status(500).json({ error: 'Failed to fetch playlist tracks' });
   }
 });
@@ -235,10 +282,15 @@ router.get('/playlists/:id', async (req, res) => {
       description: data.description,
       artworkUrl: data.images?.[0]?.url || '',
       trackCount: data.tracks?.total || 0,
-      tracks: data.tracks?.items?.map((item: any) => item.track).filter(Boolean) || [],
+      tracks:
+        data.tracks?.items?.map((item: any) => item.track).filter(Boolean) ||
+        [],
     });
   } catch (error: any) {
-    console.error('[Spotify] Playlist details error:', error?.response?.data || error.message);
+    console.error(
+      '[Spotify] Playlist details error:',
+      error?.response?.data || error.message,
+    );
     res.status(500).json({ error: 'Failed to fetch playlist details' });
   }
 });
@@ -253,10 +305,15 @@ router.get('/search', async (req, res) => {
   if (!q) return res.status(400).json({ error: 'Missing query parameter q' });
 
   try {
-    const data = await spotifyGet(`/search?q=${encodeURIComponent(q)}&type=${type}&limit=20&market=US`);
+    const data = await spotifyGet(
+      `/search?q=${encodeURIComponent(q)}&type=${type}&limit=20&market=US`,
+    );
     res.json(data);
   } catch (error: any) {
-    console.error('[Spotify] Search error:', error?.response?.data || error.message);
+    console.error(
+      '[Spotify] Search error:',
+      error?.response?.data || error.message,
+    );
     res.status(500).json({ error: 'Failed to search Spotify' });
   }
 });
