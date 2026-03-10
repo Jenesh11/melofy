@@ -10,6 +10,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 import { ThemeProvider } from '@/lib/theme-context';
+import { cn } from '@/lib/utils';
 
 export function AppWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -64,9 +65,18 @@ function AppContent({ children }: { children: React.ReactNode }) {
         <div className='hidden md:flex h-full'>
           <Sidebar />
         </div>
-        <main className='flex-1 overflow-y-auto bg-linear-to-b from-card/30 via-background to-background custom-scrollbar relative scroll-smooth'>
-          <Topbar />
-          <div className='pb-32 md:pb-24'>{children}</div>
+        <main className='flex-1 overflow-y-auto bg-linear-to-b from-card/30 via-background to-background custom-scrollbar relative scroll-smooth flex flex-col'>
+          <div className='shrink-0'>
+            <Topbar />
+          </div>
+          <div
+            className={cn(
+              'flex flex-col flex-1',
+              pathname === '/playing' ? 'pb-0' : 'pb-32 md:pb-24',
+            )}
+          >
+            {children}
+          </div>
         </main>
       </div>
 

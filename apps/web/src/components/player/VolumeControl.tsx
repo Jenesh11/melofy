@@ -16,10 +16,7 @@ export function VolumeControl({
   onWheel,
 }: VolumeControlProps) {
   return (
-    <div
-      className='hidden md:flex items-center justify-end w-[30%] min-w-[180px] gap-2 group/volume'
-      onWheel={onWheel}
-    >
+    <div className='flex items-center gap-2 group/volume' onWheel={onWheel}>
       <Button
         variant='ghost'
         size='icon'

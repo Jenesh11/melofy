@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   ChevronDown,
   Radio,
@@ -10,12 +11,15 @@ import {
   SkipForward,
   Repeat,
   Loader2,
+  Mic2,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProgressBar } from './ProgressBar';
 import { cn } from '@/lib/utils';
 import { Track } from '@/store/usePlayerStore';
 import { motion, AnimatePresence } from 'framer-motion';
+import { SyncedLyrics } from '@/components/ui/SyncedLyrics';
 
 interface MobilePlayerProps {
   isExpanded: boolean;
@@ -64,6 +68,8 @@ export function MobilePlayer({
   toggleRepeat,
   isBuffering,
 }: MobilePlayerProps) {
+  const [showLyrics, setShowLyrics] = useState(false);
+
   if (!isExpanded) return null;
 
   return (
@@ -92,7 +98,7 @@ export function MobilePlayer({
         )}
       </AnimatePresence>
 
-      <div className='relative z-10 w-full h-full flex flex-col pt-12 pb-8 px-6 overflow-y-auto custom-scrollbar'>
+      <div className='relative z-10 w-full h-full flex flex-col pt-6 pb-8 px-6 overflow-y-auto custom-scrollbar'>
         {/* Top Header */}
         <div className='flex items-center justify-between mb-8'>
           <Button
@@ -135,7 +141,7 @@ export function MobilePlayer({
         </div>
 
         {/* Title & Artist */}
-        <div className='flex flex-col mb-8 min-w-0'>
+        <div className='flex flex-col mb-3 items-center min-w-0 text-center'>
           <h2 className='text-3xl font-black text-white truncate drop-shadow-lg tracking-tight'>
             {currentTrack.title}
           </h2>
@@ -217,7 +223,47 @@ export function MobilePlayer({
             <Repeat className='h-6 w-6' />
           </Button>
         </div>
+
+        {/* Show Lyrics Button */}
+        <Button
+          variant='ghost'
+          onClick={() => setShowLyrics(true)}
+          className='w-full h-14 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl flex items-center justify-center gap-3 text-white/90 font-bold transition-all active:scale-95'
+        >
+          <Mic2 className='h-5 w-5' />
+          <span>Show lyrics</span>
+        </Button>
       </div>
+
+      {/* Lyrics Modal */}
+      <AnimatePresence>
+        {showLyrics && (
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className='absolute inset-0 z-50 bg-black/80 backdrop-blur-3xl flex flex-col'
+          >
+            <div className='flex items-center justify-between p-6 shrink-0 border-b border-white/10'>
+              <h3 className='text-xl font-bold text-white tracking-widest uppercase'>
+                Lyrics
+              </h3>
+              <Button
+                variant='ghost'
+                size='icon'
+                onClick={() => setShowLyrics(false)}
+                className='text-white hover:bg-white/20 rounded-full'
+              >
+                <X className='h-6 w-6' />
+              </Button>
+            </div>
+            <div className='flex-1 overflow-hidden'>
+              <SyncedLyrics />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Subtle overlay texture */}
       <div className='absolute inset-0 pointer-events-none opacity-[0.03] bg-[url("https://www.transparenttextures.com/patterns/p6.png")] mix-blend-overlay z-0' />

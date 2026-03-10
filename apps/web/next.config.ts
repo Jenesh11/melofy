@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
         source: '/api/spotify/:path*',
         destination: 'http://localhost:3001/api/spotify/:path*',
       },
+      {
+        source: '/api/lyrics',
+        destination: 'http://localhost:3001/api/lyrics',
+      },
     ];
   },
 };

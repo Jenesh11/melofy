@@ -5,6 +5,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import http from 'http';
 import streamRouter from './routes/stream';
 import spotifyRouter from './routes/spotify';
+import lyricsRouter from './routes/lyrics';
 import { LavalinkManager } from 'lavalink-client';
 
 const app = express();
@@ -25,49 +26,57 @@ const io = new SocketIOServer(server, {
 });
 
 export const lavalink = new LavalinkManager({
-    nodes: [
-        {
-            authorization: process.env.LAVALINK_PASSWORD!,
-            host: process.env.LAVALINK_HOST!,
-            port: parseInt(process.env.LAVALINK_PORT!),
-            secure: process.env.LAVALINK_SECURE === "true",
-            id: process.env.LAVALINK_NAME!,
-            nodeType: "NodeLink"
-        }
-    ],
-    sendToShard: () => {},
-    client: {
-        id: "123456789012345678",
-        username: "MelofyBackend"
-    }
+  nodes: [
+    {
+      authorization: process.env.LAVALINK_PASSWORD!,
+      host: process.env.LAVALINK_HOST!,
+      port: parseInt(process.env.LAVALINK_PORT!),
+      secure: process.env.LAVALINK_SECURE === 'true',
+      id: process.env.LAVALINK_NAME!,
+      nodeType: 'NodeLink',
+    },
+  ],
+  sendToShard: () => {},
+  client: {
+    id: '123456789012345678',
+    username: 'MelofyBackend',
+  },
 });
 
-lavalink.nodeManager.on("connect", (node) => {
-    console.log(`[NodeLink] ✅ Connected to ${node.id}`);
+lavalink.nodeManager.on('connect', (node) => {
+  console.log(`[NodeLink] ✅ Connected to ${node.id}`);
 });
 
-lavalink.nodeManager.on("error", (node, error) => {
-    if (error.message.includes("ECONNREFUSED")) {
-      // Quietly handle connection refused during reconnect
-      return; 
-    }
-    console.error(`[NodeLink] ❌ Error on ${node.id}:`, error.message);
+lavalink.nodeManager.on('error', (node, error) => {
+  if (error.message.includes('ECONNREFUSED')) {
+    // Quietly handle connection refused during reconnect
+    return;
+  }
+  console.error(`[NodeLink] ❌ Error on ${node.id}:`, error.message);
 });
 
 // Reconnect state management
-const nodeReconnectState = new Map<string, { interval?: NodeJS.Timeout, attempts: number }>();
+const nodeReconnectState = new Map<
+  string,
+  { interval?: NodeJS.Timeout; attempts: number }
+>();
 
-lavalink.nodeManager.on("disconnect", (node, reason) => {
-  console.warn(`[NodeLink] ⚠️  Disconnected from ${node.id}:`, reason?.reason || reason);
-  
+lavalink.nodeManager.on('disconnect', (node, reason) => {
+  console.warn(
+    `[NodeLink] ⚠️  Disconnected from ${node.id}:`,
+    reason?.reason || reason,
+  );
+
   if (!nodeReconnectState.has(node.id)) {
     nodeReconnectState.set(node.id, { attempts: 0 });
   }
-  
+
   const state = nodeReconnectState.get(node.id)!;
   if (state.interval) return; // Already trying to reconnect
 
-  console.log(`[NodeLink] 🔄 Starting reconnection heartbeat for ${node.id}...`);
+  console.log(
+    `[NodeLink] 🔄 Starting reconnection heartbeat for ${node.id}...`,
+  );
 
   state.interval = setInterval(async () => {
     if (node.connected) {
@@ -79,10 +88,12 @@ lavalink.nodeManager.on("disconnect", (node, reason) => {
     }
 
     state.attempts++;
-    
+
     // Only log every 6th attempt (approx every 30s) to keep logs clean
     if (state.attempts === 1 || state.attempts % 6 === 0) {
-      console.log(`[NodeLink] ⏳ Node ${node.id} is offline. (Attempt ${state.attempts})`);
+      console.log(
+        `[NodeLink] ⏳ Node ${node.id} is offline. (Attempt ${state.attempts})`,
+      );
     }
 
     try {
@@ -95,11 +106,13 @@ lavalink.nodeManager.on("disconnect", (node, reason) => {
   }, 5000);
 });
 
-lavalink.init({ id: "123456789012345678", username: "MelofyBackend" });
-
+lavalink.init({ id: '123456789012345678', username: 'MelofyBackend' });
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', node: lavalink.nodeManager.nodes.size > 0 ? 'connected' : 'disconnected' });
+  res.json({
+    status: 'ok',
+    node: lavalink.nodeManager.nodes.size > 0 ? 'connected' : 'disconnected',
+  });
 });
 
 // Proxy route for streaming
@@ -108,6 +121,9 @@ app.use('/api', streamRouter);
 // Spotify API Integration Routes
 app.use('/api/spotify', spotifyRouter);
 
+// Lyrics API Route
+app.use('/api/lyrics', lyricsRouter);
+
 // Search API
 app.get('/api/search', async (req, res) => {
   const query = req.query.q as string;
@@ -115,9 +131,13 @@ app.get('/api/search', async (req, res) => {
 
   try {
     const node = lavalink.nodeManager.leastUsedNodes()[0];
-    if (!node) return res.status(500).json({ error: 'No NodeLink nodes available' });
+    if (!node)
+      return res.status(500).json({ error: 'No NodeLink nodes available' });
 
-    const result = await node.search({ query: query }, { id: "MelofyInternal" });
+    const result = await node.search(
+      { query: query },
+      { id: 'MelofyInternal' },
+    );
     res.json(result);
   } catch (error) {
     console.error('Search error:', error);
@@ -132,9 +152,13 @@ app.get('/api/recommendations', async (req, res) => {
 
   try {
     const node = lavalink.nodeManager.leastUsedNodes()[0];
-    if (!node) return res.status(500).json({ error: 'No NodeLink nodes available' });
+    if (!node)
+      return res.status(500).json({ error: 'No NodeLink nodes available' });
 
-    const result = await node.search({ query: `ytsearch: ${trackId} similar songs` }, { id: "MelofyAutoplay" });
+    const result = await node.search(
+      { query: `ytsearch: ${trackId} similar songs` },
+      { id: 'MelofyAutoplay' },
+    );
     res.json(result);
   } catch (error) {
     console.error('Recommendations error:', error);
@@ -147,14 +171,14 @@ io.on('connection', (socket) => {
   console.log(`[Socket] 👤 User connected: ${username} (${socket.id})`);
 
   socket.on('join_room', (roomId: string) => {
-    socket.rooms.forEach(room => {
+    socket.rooms.forEach((room) => {
       if (room !== socket.id) socket.leave(room);
     });
     socket.join(roomId);
     socket.data.roomId = roomId;
     console.log(`Socket ${socket.id} joined room ${roomId}`);
   });
-  
+
   socket.on('queue_update', (data) => {
     if (socket.data.roomId) {
       socket.to(socket.data.roomId).emit('queue_update', data);

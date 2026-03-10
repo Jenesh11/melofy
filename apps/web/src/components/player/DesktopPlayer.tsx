@@ -9,6 +9,7 @@ import {
   SkipForward,
   Repeat,
   Loader2,
+  Mic2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProgressBar } from './ProgressBar';
@@ -221,11 +222,20 @@ export function DesktopPlayer({
       </div>
 
       {/* Secondary Controls (Volume etc.) */}
-      <VolumeControl
-        volume={volume}
-        setVolume={setVolume}
-        onWheel={handleVolumeWheel}
-      />
+      <div className='hidden md:flex items-center justify-end w-[30%] min-w-[180px] gap-4'>
+        <Link
+          href='/playing'
+          className='text-muted-foreground hover:text-foreground transition-colors'
+          title='View Lyrics'
+        >
+          <Mic2 className='h-5 w-5' />
+        </Link>
+        <VolumeControl
+          volume={volume}
+          setVolume={setVolume}
+          onWheel={handleVolumeWheel}
+        />
+      </div>
     </div>
   );
 }

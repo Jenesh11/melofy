@@ -30,7 +30,12 @@ export function useAudioPlayback() {
   const { socket } = useSocket();
 
   const audioRef = useRef<HTMLAudioElement>(null);
-  const [currentTime, setCurrentTime] = useState(0);
+  const [currentTime, setLocalTime] = useState(0);
+
+  const setCurrentTime = useCallback((time: number) => {
+    setLocalTime(time);
+    usePlayerStore.setState({ progress: Math.floor(time * 1000) });
+  }, []);
   const [isDraggingSlider, setIsDraggingSlider] = useState(false);
   const [sliderValue, setSliderValue] = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
@@ -99,14 +104,22 @@ export function useAudioPlayback() {
         try {
           console.log(`[PlayerShell] Resolving URL for: ${currentTrack.title}`);
           const searchQuery = `${currentTrack.title} ${currentTrack.artist}`;
-          const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
+          const res = await fetch(
+            `/api/search?q=${encodeURIComponent(searchQuery)}`,
+          );
           const data = await res.json();
 
           if (data && data.tracks && data.tracks.length > 0) {
             const found = data.tracks[0];
             if (found.encoded) {
-              console.log(`[PlayerShell] URL resolved for: ${currentTrack.title}`);
-              updateTrackUrl(currentTrack.id, found.encoded, found.info.identifier);
+              console.log(
+                `[PlayerShell] URL resolved for: ${currentTrack.title}`,
+              );
+              updateTrackUrl(
+                currentTrack.id,
+                found.encoded,
+                found.info.identifier,
+              );
             }
           }
         } catch (error) {
@@ -117,7 +130,12 @@ export function useAudioPlayback() {
       }
     }
     resolveMissingUrl();
-  }, [currentTrack?.id, currentTrack?.url, currentTrack?.identifier, updateTrackUrl]);
+  }, [
+    currentTrack?.id,
+    currentTrack?.url,
+    currentTrack?.identifier,
+    updateTrackUrl,
+  ]);
 
   const stateSyncTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -128,7 +146,10 @@ export function useAudioPlayback() {
         .then((res) => res.json())
         .then((data) => {
           if (data.state) {
-            const state = typeof data.state === 'string' ? JSON.parse(data.state) : data.state;
+            const state =
+              typeof data.state === 'string'
+                ? JSON.parse(data.state)
+                : data.state;
             hydrateState({
               currentTrack: state.currentTrack,
               queue: state.queue || [],
@@ -171,7 +192,16 @@ export function useAudioPlayback() {
         body: JSON.stringify({ userId: user.uid, state: stateToSave }),
       }).catch(console.error);
     }, 2000);
-  }, [user?.uid, currentTrack, queue, isShuffle, isRepeat, volume, isPlaying, activePlaylistContext]);
+  }, [
+    user?.uid,
+    currentTrack,
+    queue,
+    isShuffle,
+    isRepeat,
+    volume,
+    isPlaying,
+    activePlaylistContext,
+  ]);
 
   const handleTogglePlay = useCallback(() => {
     if (isPlaying) {
@@ -190,16 +220,25 @@ export function useAudioPlayback() {
     if (state.isAutoplay && currentTrack && !isFetchingAutoplay) {
       setIsFetchingAutoplay(true);
       try {
-        const res = await fetch(`/api/recommendations?trackId=${encodeURIComponent(currentTrack.title + ' ' + currentTrack.artist)}`);
+        const res = await fetch(
+          `/api/recommendations?trackId=${encodeURIComponent(currentTrack.title + ' ' + currentTrack.artist)}`,
+        );
         const data = await res.json();
         if (data && data.tracks && data.tracks.length > 0) {
-          const nextTrackData = data.tracks.find((t: any) => t.info?.title !== currentTrack.title) || data.tracks[0];
+          const nextTrackData =
+            data.tracks.find(
+              (t: any) => t.info?.title !== currentTrack.title,
+            ) || data.tracks[0];
           if (nextTrackData) {
             const newTrack: Track = {
               id: nextTrackData.info?.identifier || 'unknown',
               title: nextTrackData.info?.title || 'Unknown Title',
               artist: nextTrackData.info?.author || 'Unknown Artist',
-              artworkUrl: nextTrackData.info?.artworkUrl || (nextTrackData.info?.identifier ? `https://img.youtube.com/vi/${nextTrackData.info.identifier}/maxresdefault.jpg` : ''),
+              artworkUrl:
+                nextTrackData.info?.artworkUrl ||
+                (nextTrackData.info?.identifier
+                  ? `https://img.youtube.com/vi/${nextTrackData.info.identifier}/maxresdefault.jpg`
+                  : ''),
               duration: nextTrackData.info?.duration || 0,
               url: nextTrackData.encoded,
             };
@@ -263,7 +302,10 @@ export function useAudioPlayback() {
       try {
         navigator.mediaSession.setActionHandler(action, handler);
       } catch (error) {
-        console.error(`Media session action "${action}" could not be set.`, error);
+        console.error(
+          `Media session action "${action}" could not be set.`,
+          error,
+        );
       }
     }
 
@@ -303,12 +345,15 @@ export function useAudioPlayback() {
   };
 
   const currentDisplayTimeMs = isDraggingSlider
-    ? currentTrack ? (sliderValue / 100) * currentTrack.duration : 0
+    ? currentTrack
+      ? (sliderValue / 100) * currentTrack.duration
+      : 0
     : currentTime * 1000;
 
-  const progressPercent = currentTrack && currentTrack.duration > 0
-    ? (currentDisplayTimeMs / currentTrack.duration) * 100
-    : 0;
+  const progressPercent =
+    currentTrack && currentTrack.duration > 0
+      ? (currentDisplayTimeMs / currentTrack.duration) * 100
+      : 0;
 
   const handleSeek = (value: number[]) => {
     if (audioRef.current && currentTrack) {

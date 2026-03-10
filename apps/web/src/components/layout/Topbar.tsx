@@ -21,7 +21,7 @@ export function Topbar() {
   };
 
   return (
-    <div className='h-16 flex items-center justify-between px-6 bg-background/60 backdrop-blur-3xl border-b border-border sticky top-0 z-50 transition-all duration-300'>
+    <div className='h-16 flex items-center justify-between px-6 bg-background/60 backdrop-blur-3xl border-b border-border sticky top-0 z-1 transition-all duration-300'>
       <div className='flex items-center gap-4 flex-1'>
         {/* Mobile Logo */}
         <Link
