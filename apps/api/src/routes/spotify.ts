@@ -1,7 +1,13 @@
 import { Router } from 'express';
 import axios from 'axios';
+import { Redis } from '@upstash/redis';
 
 const router = Router();
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL || '',
+  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
+});
 
 let spotifyAccessToken = '';
 let tokenExpirationTime = 0;
@@ -275,8 +281,20 @@ router.get('/playlists/:id/tracks', async (req, res) => {
 router.get('/playlists/:id', async (req, res) => {
   const { id } = req.params;
   try {
+    // 1. Check Redis Cache First
+    const cacheKey = `spotify:playlist:${id}`;
+    const cachedData = await redis.get(cacheKey);
+
+    if (cachedData) {
+      console.log(`[Spotify] ⚡ Serving playlist ${id} from Redis Cache`);
+      return res.json(cachedData);
+    }
+
+    // 2. Cache Miss: Fetch from Spotify API
+    console.log(`[Spotify] 🌐 Fetching playlist ${id} from live API`);
     const data = await spotifyGet(`/playlists/${id}`);
-    res.json({
+
+    const formattedData = {
       id: data.id,
       name: data.name,
       description: data.description,
@@ -285,7 +303,12 @@ router.get('/playlists/:id', async (req, res) => {
       tracks:
         data.tracks?.items?.map((item: any) => item.track).filter(Boolean) ||
         [],
-    });
+    };
+
+    // 3. Save to Redis Cache (Expire after 1 hour = 3600 seconds)
+    await redis.set(cacheKey, JSON.stringify(formattedData), { ex: 3600 });
+
+    res.json(formattedData);
   } catch (error: any) {
     console.error(
       '[Spotify] Playlist details error:',

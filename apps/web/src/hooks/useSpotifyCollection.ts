@@ -9,7 +9,7 @@ export function useSpotifyCollection() {
   const handlePlaySpotifyCollection = async (collection: any) => {
     try {
       setIsPlayingCollection(true);
-      
+
       const isAlbum = collection.type === 'album';
       const endpoint = isAlbum
         ? `/api/spotify/albums/${collection.id}/tracks`
@@ -32,7 +32,7 @@ export function useSpotifyCollection() {
       }));
 
       if (tracks.length > 0) {
-        playPlaylist(tracks);
+        playPlaylist(tracks, collection.id, 'spotify');
       } else {
         toast.error('No tracks found in this collection');
       }

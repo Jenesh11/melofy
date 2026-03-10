@@ -9,6 +9,7 @@
   "dependencies": {
     "@discordjs/opus": "^0.10.0",
     "@spotify/web-api-ts-sdk": "^1.2.0",
+    "@upstash/redis": "^1.36.4",
     "axios": "^1.13.6",
     "cors": "^2.8.5",
     "express": "^4.19.0",

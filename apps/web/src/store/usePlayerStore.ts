@@ -1,13 +1,13 @@
 import { create } from 'zustand';
 
 export interface Track {
-  id: string;      // Spotify ID or internal ID
+  id: string; // Spotify ID or internal ID
   identifier?: string; // YouTube Video ID (e.g. Y_BXtthvuaA)
   title: string;
   artist: string;
   artworkUrl: string;
   duration: number; // in milliseconds
-  url?: string;     // NodeLink encoded track string
+  url?: string; // NodeLink encoded track string
 }
 
 interface PlayerState {
@@ -21,7 +21,9 @@ interface PlayerState {
   isRepeat: boolean;
   isAutoplay: boolean;
   activePlaylistContext: Track[] | null;
-  
+  activeCollectionId: string | null;
+  activeCollectionType: 'spotify' | 'custom' | null;
+
   // Actions
   play: (track: Track) => void;
   /** Play a track within a context (e.g. a carousel section). Sets the remaining tracks as queue. */
@@ -32,7 +34,11 @@ interface PlayerState {
   setProgress: (progress: number) => void;
   addToQueue: (track: Track) => void;
   setQueue: (tracks: Track[]) => void;
-  playPlaylist: (tracks: Track[]) => void;
+  playPlaylist: (
+    tracks: Track[],
+    collectionId?: string,
+    collectionType?: 'spotify' | 'custom',
+  ) => void;
   playNext: () => void;
   playPrevious: () => void;
   toggleShuffle: () => void;
@@ -54,26 +60,37 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   isRepeat: false,
   isAutoplay: false,
   activePlaylistContext: null,
+  activeCollectionId: null,
+  activeCollectionType: null,
 
-  play: (track) => set((state) => ({ 
-    history: state.currentTrack ? [...state.history, state.currentTrack] : state.history,
-    currentTrack: track, 
-    isPlaying: true,
-    progress: 0,
-    queue: [], // explicitly clear the queue on single manual play 
-    activePlaylistContext: null, // clear context on manual individual play
-  })),
+  play: (track) =>
+    set((state) => ({
+      history: state.currentTrack
+        ? [...state.history, state.currentTrack]
+        : state.history,
+      currentTrack: track,
+      isPlaying: true,
+      progress: 0,
+      queue: [], // explicitly clear the queue on single manual play
+      activePlaylistContext: null, // clear context on manual individual play
+      activeCollectionId: null,
+      activeCollectionType: null,
+    })),
 
   playInContext: (track, allTracks) => {
     const trackIndex = allTracks.findIndex(
-      (t) => t.id === track.id || t.title === track.title
+      (t) => t.id === track.id || t.title === track.title,
     );
     const remaining = trackIndex >= 0 ? allTracks.slice(trackIndex + 1) : [];
     set((state) => ({
-      history: state.currentTrack ? [...state.history, state.currentTrack] : state.history,
+      history: state.currentTrack
+        ? [...state.history, state.currentTrack]
+        : state.history,
       currentTrack: track,
       queue: remaining,
       activePlaylistContext: allTracks,
+      activeCollectionId: null,
+      activeCollectionType: null,
       isPlaying: true,
       progress: 0,
     }));
@@ -85,20 +102,24 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   setProgress: (progress) => set({ progress }),
   addToQueue: (track) => set((state) => ({ queue: [...state.queue, track] })),
   setQueue: (tracks) => set({ queue: tracks }),
-  playPlaylist: (tracks) => {
+  playPlaylist: (tracks, collectionId, collectionType) => {
     if (tracks.length === 0) return;
     set((state) => ({
-      history: state.currentTrack ? [...state.history, state.currentTrack] : state.history,
+      history: state.currentTrack
+        ? [...state.history, state.currentTrack]
+        : state.history,
       currentTrack: tracks[0],
       queue: tracks.slice(1),
       activePlaylistContext: tracks,
+      activeCollectionId: collectionId || null,
+      activeCollectionType: collectionType || null,
       isPlaying: true,
-      progress: 0
+      progress: 0,
     }));
   },
   playNext: () => {
     const { queue, currentTrack, history, isRepeat, isShuffle } = get();
-    
+
     // Handle repeat state
     if (isRepeat && currentTrack) {
       set({ progress: 0, isPlaying: true });
@@ -107,16 +128,16 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
     if (queue.length > 0) {
       let nextTrackIndex = 0;
-      
+
       // Handle shuffle state
       if (isShuffle && queue.length > 1) {
         nextTrackIndex = Math.floor(Math.random() * queue.length);
       }
-      
+
       const nextTrack = queue[nextTrackIndex];
       const newQueue = [...queue];
       newQueue.splice(nextTrackIndex, 1);
-      
+
       set({
         history: currentTrack ? [...history, currentTrack] : history,
         currentTrack: nextTrack,
@@ -127,14 +148,20 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     } else {
       // Reached the end of the queue
       const { activePlaylistContext } = get();
-      
+
       // If we are in a playlist context and repeat is on, loop the context
-      if (activePlaylistContext && activePlaylistContext.length > 0 && isRepeat) {
+      if (
+        activePlaylistContext &&
+        activePlaylistContext.length > 0 &&
+        isRepeat
+      ) {
         let firstTrack = activePlaylistContext[0];
         let remainingTracks = activePlaylistContext.slice(1);
-        
+
         if (isShuffle) {
-          const randomIndex = Math.floor(Math.random() * activePlaylistContext.length);
+          const randomIndex = Math.floor(
+            Math.random() * activePlaylistContext.length,
+          );
           firstTrack = activePlaylistContext[randomIndex];
           remainingTracks = [...activePlaylistContext];
           remainingTracks.splice(randomIndex, 1);
@@ -145,16 +172,16 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
           currentTrack: firstTrack,
           queue: remainingTracks,
           isPlaying: true,
-          progress: 0
+          progress: 0,
         });
         return;
       }
 
-      set({ 
+      set({
         history: currentTrack ? [...history, currentTrack] : history,
-        currentTrack: null, 
-        isPlaying: false, 
-        progress: 0 
+        currentTrack: null,
+        isPlaying: false,
+        progress: 0,
       });
     }
   },
@@ -180,20 +207,21 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const { currentTrack, queue } = get();
     // Update current track if it matches
     if (currentTrack && currentTrack.id === id) {
-      set({ 
-        currentTrack: { 
-          ...currentTrack, 
-          url, 
-          identifier: identifier || currentTrack.identifier 
-        } 
+      set({
+        currentTrack: {
+          ...currentTrack,
+          url,
+          identifier: identifier || currentTrack.identifier,
+        },
       });
     }
     // Also update in queue if it exists there
-    const newQueue = queue.map((t) => 
-      t.id === id ? { ...t, url, identifier: identifier || t.identifier } : t
+    const newQueue = queue.map((t) =>
+      t.id === id ? { ...t, url, identifier: identifier || t.identifier } : t,
     );
     set({ queue: newQueue });
   },
-  hydrateState: (newState) => set((state) => ({ ...state, ...newState, isPlaying: false })), // Always start paused on reload
+  hydrateState: (newState) =>
+    set((state) => ({ ...state, ...newState, isPlaying: false })), // Always start paused on reload
   setPlaying: (isPlaying) => set({ isPlaying }),
 }));

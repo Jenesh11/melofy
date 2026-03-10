@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Play, Music2, Loader2, ChevronLeft } from 'lucide-react';
+import { Play, Music2, Loader2, ChevronLeft, Heart, Check } from 'lucide-react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { getPlaylistById, Playlist } from '@/lib/firebase/playlists';
 import { usePlayerStore, Track as PlayerTrack } from '@/store/usePlayerStore';
+import { useLibraryStore } from '@/store/useLibraryStore';
 import { Button } from '@/components/ui/button';
 import { TrackList, TrackItem } from '@/components/ui/TrackList';
 import Link from 'next/link';
@@ -15,6 +16,9 @@ export default function PlaylistPage() {
   const id = params.id as string;
   const { user } = useAuth();
   const { playPlaylist } = usePlayerStore();
+  const { isSaved, addPlaylist, removePlaylist } = useLibraryStore();
+
+  const saved = isSaved(id);
 
   const [playlist, setPlaylist] = useState<any>(null); // Use any to support both Firebase and Spotify shapes
   const [isLoading, setIsLoading] = useState(true);
@@ -117,7 +121,21 @@ export default function PlaylistPage() {
       duration: t.duration,
       url: t.encoded,
     }));
-    playPlaylist(tracksToPlay);
+    playPlaylist(tracksToPlay, id, isSpotifySource ? 'spotify' : 'custom');
+  };
+
+  const handleToggleSave = () => {
+    if (saved) {
+      removePlaylist(id);
+    } else {
+      addPlaylist({
+        id: id,
+        name: playlist.name,
+        artworkUrl: playlist.artworkUrl || playlist.images?.[0]?.url || '',
+        type: isSpotifySource ? 'spotify' : 'custom',
+        trackCount: playlist.trackCount || playlist.tracks?.length || 0,
+      });
+    }
   };
 
   return (
@@ -169,9 +187,26 @@ export default function PlaylistPage() {
         >
           <Play className='h-6 w-6 fill-current' />
         </Button>
-        <p className='text-muted-foreground text-sm font-light italic'>
-          Play the entire collection
-        </p>
+
+        {isSpotifySource && (
+          <Button
+            variant='outline'
+            size='icon'
+            className={`h-12 w-12 rounded-full border-2 transition-all ${
+              saved
+                ? 'border-primary text-primary hover:bg-primary/10'
+                : 'border-muted-foreground/30 text-muted-foreground hover:border-foreground hover:text-foreground'
+            }`}
+            onClick={handleToggleSave}
+            title={saved ? 'Remove from Library' : 'Save to Library'}
+          >
+            {saved ? (
+              <Check className='h-6 w-6' strokeWidth={3} />
+            ) : (
+              <Heart className='h-6 w-6' />
+            )}
+          </Button>
+        )}
       </div>
 
       <TrackList tracks={trackItems} />
