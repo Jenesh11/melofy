@@ -80,7 +80,7 @@ export function DesktopPlayer({
     >
       {/* Current Track Info */}
       <Link
-        href={`/track/${currentTrack.id}`}
+        href='/playing'
         className='flex items-center flex-1 md:flex-none md:w-[30%] md:min-w-[180px] gap-3 cursor-pointer group/info overflow-hidden pl-1 md:pl-0'
         onClick={(e) => {
           if (window.innerWidth < 768) {

@@ -1,26 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Search as SearchIcon, Loader2, X, Clock, Flame } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Search as SearchIcon, Play, Loader2 } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
-import { usePlayerStore, Track } from '@/store/usePlayerStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { X, Clock, Flame } from 'lucide-react';
-
-interface SearchResult {
-  tracks: any[];
-  // Other fields from kazagumo like playlistName, etc.
-}
+import { TrackList, TrackItem } from '@/components/ui/TrackList';
 
 export default function SearchPage() {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query, 500);
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<TrackItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
-  const { play, addToQueue } = usePlayerStore();
 
   useEffect(() => {
     const savedHistory = localStorage.getItem('melofy_search_history');
@@ -71,7 +65,23 @@ export default function SearchPage() {
         );
         const data = await res.json();
         if (data && data.tracks && data.tracks.length > 0) {
-          setResults(data.tracks);
+          // Map Kazagumo/NodeLink track data to TrackItem
+          const mapped: TrackItem[] = data.tracks
+            .filter(Boolean)
+            .map((track: any) => ({
+              id: track.info?.identifier || 'unknown',
+              title: track.info?.title || 'Unknown Title',
+              artist: track.info?.author || 'Unknown Artist',
+              artworkUrl:
+                track.info?.artworkUrl ||
+                (track.info?.identifier
+                  ? `https://img.youtube.com/vi/${track.info.identifier}/mqdefault.jpg`
+                  : ''),
+              duration: track.info?.duration || 0,
+              album: track.info?.author || '',
+              encoded: track.encoded,
+            }));
+          setResults(mapped);
           saveToHistory(debouncedQuery);
         } else {
           setResults([]);
@@ -86,25 +96,8 @@ export default function SearchPage() {
     fetchResults();
   }, [debouncedQuery]);
 
-  const handlePlayTrack = (trackData: any) => {
-    // Map lavalink-client track data to our local Track interface
-    const track: Track = {
-      id: trackData.info?.identifier || 'unknown',
-      title: trackData.info?.title || 'Unknown Title',
-      artist: trackData.info?.author || 'Unknown Artist',
-      artworkUrl:
-        trackData.info?.artworkUrl ||
-        (trackData.info?.identifier
-          ? `https://img.youtube.com/vi/${trackData.info.identifier}/maxresdefault.jpg`
-          : ''),
-      duration: trackData.info?.duration || 0,
-      url: trackData.encoded,
-    };
-    play(track);
-  };
-
   return (
-    <div className='p-8 h-full flex flex-col'>
+    <div className='p-4 md:p-8 h-full flex flex-col'>
       <div className='relative max-w-2xl mb-8'>
         <SearchIcon className='absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground' />
         <Input
@@ -170,7 +163,7 @@ export default function SearchPage() {
         {!loading && query && results.length === 0 && (
           <div className='flex flex-col items-center justify-center py-24 text-muted-foreground'>
             <h3 className='text-xl font-semibold text-foreground mb-2'>
-              No results found for "{query}"
+              No results found for &quot;{query}&quot;
             </h3>
             <p>
               Please make sure your words are spelled correctly, or use less or
@@ -180,57 +173,8 @@ export default function SearchPage() {
         )}
 
         {!loading && results.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
-          >
-            {results.map((track, i) => {
-              if (!track) return null;
-              const artwork =
-                track.info?.artworkUrl ||
-                (track.info?.identifier
-                  ? `https://img.youtube.com/vi/${track.info.identifier}/mqdefault.jpg`
-                  : '');
-              return (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  key={`${track.info?.identifier || i}-${i}`}
-                  className='group relative bg-card/50 hover:bg-card p-4 rounded-xl transition-all duration-300 cursor-pointer flex flex-col items-start gap-4 hover:shadow-2xl hover:shadow-primary/20 border border-border/50'
-                >
-                  <div className='relative w-full aspect-square rounded-md overflow-hidden bg-muted shadow-lg'>
-                    <img
-                      src={artwork}
-                      alt={track.title || 'Unknown Title'}
-                      loading='lazy'
-                      className='object-cover w-full h-full group-hover:scale-105 transition-transform duration-500'
-                    />
-                    <div className='absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
-                      <Button
-                        size='icon'
-                        className='h-12 w-12 rounded-full bg-primary text-primary-foreground hover:scale-105 transition-transform'
-                        onClick={(e: React.MouseEvent) => {
-                          e.stopPropagation();
-                          handlePlayTrack(track);
-                        }}
-                      >
-                        <Play className='h-6 w-6 ml-1 fill-current' />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className='flex flex-col w-full'>
-                    <h4 className='text-foreground font-semibold truncate text-base'>
-                      {track.info?.title || 'Unknown Title'}
-                    </h4>
-                    <p className='text-sm text-muted-foreground truncate'>
-                      {track.info?.author || 'Unknown Artist'}
-                    </p>
-                  </div>
-                </motion.div>
-              );
-            })}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <TrackList tracks={results} />
           </motion.div>
         )}
       </div>

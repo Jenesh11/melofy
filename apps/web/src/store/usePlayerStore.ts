@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 
 export interface Track {
-  id: string;
+  id: string;      // Spotify ID or internal ID
+  identifier?: string; // YouTube Video ID (e.g. Y_BXtthvuaA)
   title: string;
   artist: string;
   artworkUrl: string;
   duration: number; // in milliseconds
-  url?: string;
+  url?: string;     // NodeLink encoded track string
 }
 
 interface PlayerState {
@@ -23,6 +24,8 @@ interface PlayerState {
   
   // Actions
   play: (track: Track) => void;
+  /** Play a track within a context (e.g. a carousel section). Sets the remaining tracks as queue. */
+  playInContext: (track: Track, allTracks: Track[]) => void;
   pause: () => void;
   resume: () => void;
   setVolume: (volume: number) => void;
@@ -35,6 +38,7 @@ interface PlayerState {
   toggleShuffle: () => void;
   toggleRepeat: () => void;
   toggleAutoplay: () => void;
+  updateTrackUrl: (id: string, url: string, identifier?: string) => void;
   hydrateState: (state: Partial<PlayerState>) => void;
   setPlaying: (isPlaying: boolean) => void;
 }
@@ -59,6 +63,22 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     queue: [], // explicitly clear the queue on single manual play 
     activePlaylistContext: null, // clear context on manual individual play
   })),
+
+  playInContext: (track, allTracks) => {
+    const trackIndex = allTracks.findIndex(
+      (t) => t.id === track.id || t.title === track.title
+    );
+    const remaining = trackIndex >= 0 ? allTracks.slice(trackIndex + 1) : [];
+    set((state) => ({
+      history: state.currentTrack ? [...state.history, state.currentTrack] : state.history,
+      currentTrack: track,
+      queue: remaining,
+      activePlaylistContext: allTracks,
+      isPlaying: true,
+      progress: 0,
+    }));
+  },
+
   pause: () => set({ isPlaying: false }),
   resume: () => set({ isPlaying: true }),
   setVolume: (volume) => set({ volume }),
@@ -156,6 +176,24 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   toggleShuffle: () => set((state) => ({ isShuffle: !state.isShuffle })),
   toggleRepeat: () => set((state) => ({ isRepeat: !state.isRepeat })),
   toggleAutoplay: () => set((state) => ({ isAutoplay: !state.isAutoplay })),
+  updateTrackUrl: (id, url, identifier) => {
+    const { currentTrack, queue } = get();
+    // Update current track if it matches
+    if (currentTrack && currentTrack.id === id) {
+      set({ 
+        currentTrack: { 
+          ...currentTrack, 
+          url, 
+          identifier: identifier || currentTrack.identifier 
+        } 
+      });
+    }
+    // Also update in queue if it exists there
+    const newQueue = queue.map((t) => 
+      t.id === id ? { ...t, url, identifier: identifier || t.identifier } : t
+    );
+    set({ queue: newQueue });
+  },
   hydrateState: (newState) => set((state) => ({ ...state, ...newState, isPlaying: false })), // Always start paused on reload
   setPlaying: (isPlaying) => set({ isPlaying }),
 }));

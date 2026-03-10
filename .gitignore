@@ -44,3 +44,4 @@ ehthumbs.db
 coverage/
 .vercel
 next-env.d.ts
+/Nodelink

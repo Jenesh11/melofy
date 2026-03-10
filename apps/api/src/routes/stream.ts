@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { lavalink } from '../index';
+import http from 'http';
+import https from 'https';
+import { URL } from 'url';
 
 const router = Router();
 
@@ -17,78 +20,96 @@ router.get('/stream', async (req, res) => {
     }
 
     const protocol = node.options.secure ? 'https' : 'http';
-    const nodeUrl = `${protocol}://${node.options.host}:${node.options.port}/v4/loadstream?encodedTrack=${encodeURIComponent(trackUrl)}`;
+    const nodeUrl = `${protocol}://${node.options.host}:${node.options.port}`;
+    const auth = node.options.authorization;
 
-    console.log(`[Stream API] Fetching PCM stream from NodeLink: ${nodeUrl}`);
+    // 1. Resolve CDN URL from NodeLink /v4/trackstream
+    const resolveUrl = `${nodeUrl}/v4/trackstream?encodedTrack=${encodeURIComponent(trackUrl)}`;
+    console.log(`[Relay] Resolving CDN for: ${trackUrl.substring(0, 20)}...`);
 
-    const streamResponse = await fetch(nodeUrl, {
-        headers: {
-            'Authorization': node.options.authorization
-        }
+    const requester = nodeUrl.startsWith('https') ? https : http;
+
+    requester.get(
+      resolveUrl,
+      { headers: { Authorization: auth } },
+      (resolveRes) => {
+        let data = '';
+        resolveRes.on('data', (chunk) => (data += chunk));
+        resolveRes.on('end', () => {
+          try {
+            const parsedData = JSON.parse(data);
+            const cdnUrl = parsedData.url;
+            
+            if (!cdnUrl) {
+                console.error('[Relay] No CDN URL found in response:', data);
+                return res.status(500).send('Failed to resolve CDN stream URL');
+            }
+
+            // 2. Proxy to CDN with Redirect and Range Support
+            const proxyWithRedirects = (currentUrl: string, depth = 0) => {
+              if (depth > 5) {
+                console.error('[Relay] Too many redirects');
+                return res.status(500).send('Too many redirects');
+              }
+
+              const parsedUrl = new URL(currentUrl);
+              const requester = parsedUrl.protocol === 'https:' ? https : http;
+              
+              const options = {
+                hostname: parsedUrl.hostname,
+                port: parsedUrl.port,
+                path: parsedUrl.pathname + parsedUrl.search,
+                headers: {
+                  Range: req.headers.range || 'bytes=0-',
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                  'Accept': '*/*',
+                }
+              };
+
+              const cdnReq = requester.request(options, (cdnRes) => {
+                if (cdnRes.statusCode && cdnRes.statusCode >= 300 && cdnRes.statusCode < 400 && cdnRes.headers.location) {
+                  console.log(`[Relay] Following redirect to: ${cdnRes.headers.location.substring(0, 50)}...`);
+                  return proxyWithRedirects(cdnRes.headers.location, depth + 1);
+                }
+
+                console.log(`[Relay] Upstream Status: ${cdnRes.statusCode} | Type: ${cdnRes.headers['content-type']} | Range: ${req.headers.range || 'all'}`);
+
+                // Forward essential range-discovery headers
+                res.status(cdnRes.statusCode || 200).set({
+                  'Content-Type': cdnRes.headers['content-type'] || 'audio/webm',
+                  'Content-Range': cdnRes.headers['content-range'] || '',
+                  'Accept-Ranges': 'bytes',
+                  'Content-Length': cdnRes.headers['content-length'] || '',
+                  'Cache-Control': 'no-cache'
+                });
+
+                cdnRes.pipe(res);
+              });
+
+              cdnReq.on('error', (e) => {
+                console.error('[Relay] CDN Proxy Error:', e.message);
+                if (!res.headersSent) res.status(500).send('CDN Proxy Error');
+              });
+
+              // Handle client disconnect
+              req.on('close', () => {
+                cdnReq.destroy();
+              });
+
+              cdnReq.end();
+            };
+
+            proxyWithRedirects(cdnUrl);
+          } catch (e: any) {
+            console.error('[Relay] Parse Error:', e.message);
+            if (!res.headersSent) res.status(500).send('Resolution Failed');
+          }
+        });
+      }
+    ).on('error', (e) => {
+      console.error('[Relay] NodeLink Request Error:', e.message);
+      if (!res.headersSent) res.status(500).send('NodeLink Connection Error');
     });
-
-    if (!streamResponse || !streamResponse.ok || !streamResponse.body) {
-        console.error(`[Stream API] NodeLink Error: ${streamResponse?.status} ${streamResponse?.statusText}`);
-        return res.status(500).send('Failed to retrieve direct stream from NodeLink');
-    }
-
-    // Set appropriate headers for an MP3 stream
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Transfer-Encoding', 'chunked');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-
-    const { spawn } = require('child_process');
-    const { Readable } = require('stream');
-
-    // Transcode PCM (s16le, 48kHz, 2ch) to MP3 using FFmpeg
-    const ffmpeg = spawn('ffmpeg', [
-        '-loglevel', 'error',
-        '-f', 's16le',      // Input format: Signed 16-bit Little Endian PCM
-        '-ar', '48000',     // Input sample rate: 48kHz
-        '-ac', '2',         // Input channels: 2
-        '-i', 'pipe:0',     // Read from stdin
-        '-f', 'mp3',        // Output format: MP3
-        '-b:a', '128k',     // Bitrate: 128kbps
-        'pipe:1'            // Write to stdout
-    ]);
-
-    // Handle FFmpeg stderr
-    ffmpeg.stderr.on('data', (data: any) => {
-        console.error(`[FFmpeg Error] ${data}`);
-    });
-
-    // Handle process termination
-    ffmpeg.on('close', (code: number) => {
-        if (code !== 0 && code !== null) {
-            console.error(`[FFmpeg] Process exited with code ${code}`);
-        }
-    });
-
-    // Handle client disconnect
-    res.on('close', () => {
-        console.log('[Stream API] Client disconnected, killing FFmpeg process');
-        ffmpeg.kill('SIGKILL');
-    });
-
-    // Convert Web ReadableStream to Node Readable and pipe through FFmpeg
-    const pcmNodeStream = Readable.fromWeb(streamResponse.body as any);
-
-    // Handle EPIPE errors (happens when FFmpeg or client closes the pipe)
-    ffmpeg.stdin.on('error', (err: any) => {
-        if (err.code === 'EPIPE') return;
-        console.error(`[FFmpeg stdin Error] ${err}`);
-    });
-
-    ffmpeg.stdout.on('error', (err: any) => {
-        if (err.code === 'EPIPE') return;
-        console.error(`[FFmpeg stdout Error] ${err}`);
-    });
-
-    pcmNodeStream.pipe(ffmpeg.stdin);
-    ffmpeg.stdout.pipe(res);
-
-    console.log(`[Stream API] Successfully started streaming and transcoding`);
 
   } catch (error) {
     console.error('Stream routing error:', error);

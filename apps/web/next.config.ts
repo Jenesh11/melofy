@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
         source: '/socket.io/:path*',
         destination: 'http://localhost:3001/socket.io/:path*',
       },
+      {
+        source: '/api/spotify/:path*',
+        destination: 'http://localhost:3001/api/spotify/:path*',
+      },
     ];
   },
 };

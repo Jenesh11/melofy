@@ -4,6 +4,7 @@ import cors from 'cors';
 import { Server as SocketIOServer } from 'socket.io';
 import http from 'http';
 import streamRouter from './routes/stream';
+import spotifyRouter from './routes/spotify';
 import { LavalinkManager } from 'lavalink-client';
 
 const app = express();
@@ -103,6 +104,9 @@ app.get('/health', (req, res) => {
 
 // Proxy route for streaming
 app.use('/api', streamRouter);
+
+// Spotify API Integration Routes
+app.use('/api/spotify', spotifyRouter);
 
 // Search API
 app.get('/api/search', async (req, res) => {

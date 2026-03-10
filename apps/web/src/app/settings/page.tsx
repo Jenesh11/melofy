@@ -3,7 +3,16 @@
 import { useAuth } from '@/lib/firebase/auth-context';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { User, LogOut, Mail, Calendar, Sun, Moon, Laptop } from 'lucide-react';
+import {
+  User,
+  LogOut,
+  Mail,
+  Calendar,
+  Sun,
+  Moon,
+  Laptop,
+  ChevronLeft,
+} from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/lib/theme-context';
@@ -41,6 +50,14 @@ export default function SettingsPage() {
         animate={{ opacity: 1, y: 0 }}
         className='mb-12'
       >
+        <Button
+          variant='ghost'
+          onClick={() => router.back()}
+          className='mb-6 -ml-4 text-muted-foreground hover:text-foreground'
+        >
+          <ChevronLeft className='mr-2 h-4 w-4' />
+          Back
+        </Button>
         <h1 className='text-4xl font-bold text-foreground mb-2'>Settings</h1>
         <p className='text-muted-foreground'>
           Manage your profile and preferences.
