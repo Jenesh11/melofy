@@ -135,6 +135,7 @@ export default function SearchPage() {
           placeholder='What do you want to listen to?'
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          autoFocus
         />
       </div>
 

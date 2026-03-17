@@ -66,7 +66,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
           <Sidebar />
         </div>
         <main className='flex-1 overflow-y-auto bg-linear-to-b from-card/30 via-background to-background custom-scrollbar relative scroll-smooth flex flex-col'>
-          <div className='shrink-0'>
+          <div className='shrink-0 sticky top-0 z-50'>
             <Topbar />
           </div>
           <div
