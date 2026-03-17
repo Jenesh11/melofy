@@ -32,8 +32,14 @@ export function ImportPlaylistCard({
     setImportSuccess(false);
 
     try {
+      const token = await user.getIdToken();
       const response = await fetch(
         `/api/search?q=${encodeURIComponent(importUrl)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
       );
       const data = await response.json();
 

@@ -28,6 +28,11 @@ export function useAudioPlayback() {
   } = usePlayerStore();
   const { user } = useAuth();
   const { socket } = useSocket();
+  const getAuthHeader = useCallback(async () => {
+    if (!user) return null;
+    const token = await user.getIdToken();
+    return { Authorization: `Bearer ${token}` };
+  }, [user]);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const [currentTime, setLocalTime] = useState(0);
@@ -106,6 +111,9 @@ export function useAudioPlayback() {
           const searchQuery = `${currentTrack.title} ${currentTrack.artist}`;
           const res = await fetch(
             `/api/search?q=${encodeURIComponent(searchQuery)}`,
+            {
+              headers: (await getAuthHeader()) || {},
+            },
           );
           const data = await res.json();
 
@@ -135,6 +143,7 @@ export function useAudioPlayback() {
     currentTrack?.url,
     currentTrack?.identifier,
     updateTrackUrl,
+    getAuthHeader,
   ]);
 
   const stateSyncTimer = useRef<NodeJS.Timeout | null>(null);
@@ -142,9 +151,14 @@ export function useAudioPlayback() {
   // Load state from Redis on mount
   useEffect(() => {
     if (user?.uid) {
-      fetch(`/api/player-state?userId=${user.uid}`)
-        .then((res) => res.json())
+      getAuthHeader()
+        .then((headers) => {
+          if (!headers) return null;
+          return fetch('/api/player-state', { headers });
+        })
+        .then((res) => (res ? res.json() : null))
         .then((data) => {
+          if (!data) return;
           if (data.state) {
             const state =
               typeof data.state === 'string'
@@ -168,7 +182,7 @@ export function useAudioPlayback() {
         })
         .catch(console.error);
     }
-  }, [user?.uid, hydrateState]);
+  }, [user?.uid, hydrateState, getAuthHeader, setCurrentTime]);
 
   // Save state to Redis on changes
   useEffect(() => {
@@ -186,11 +200,19 @@ export function useAudioPlayback() {
         currentTime: audioRef.current?.currentTime || 0,
         activePlaylistContext,
       };
-      fetch('/api/player-state', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, state: stateToSave }),
-      }).catch(console.error);
+      getAuthHeader()
+        .then((authHeaders) => {
+          if (!authHeaders) return;
+          return fetch('/api/player-state', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...authHeaders,
+            },
+            body: JSON.stringify({ state: stateToSave }),
+          });
+        })
+        .catch(console.error);
     }, 2000);
   }, [
     user?.uid,
@@ -201,6 +223,7 @@ export function useAudioPlayback() {
     volume,
     isPlaying,
     activePlaylistContext,
+    getAuthHeader,
   ]);
 
   const handleTogglePlay = useCallback(() => {
@@ -222,6 +245,9 @@ export function useAudioPlayback() {
       try {
         const res = await fetch(
           `/api/recommendations?trackId=${encodeURIComponent(currentTrack.title + ' ' + currentTrack.artist)}`,
+          {
+            headers: (await getAuthHeader()) || {},
+          },
         );
         const data = await res.json();
         if (data && data.tracks && data.tracks.length > 0) {
@@ -251,7 +277,7 @@ export function useAudioPlayback() {
         setIsFetchingAutoplay(false);
       }
     }
-  }, [currentTrack, isFetchingAutoplay]);
+  }, [currentTrack, isFetchingAutoplay, getAuthHeader]);
 
   const handleSkipNext = useCallback(async () => {
     const { isRepeat } = usePlayerStore.getState();

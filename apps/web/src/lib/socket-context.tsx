@@ -24,33 +24,56 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
 
   useEffect(() => {
-    const socketInstance = io('/', {
-      transports: ['websocket'],
-      auth: {
-        username: user?.displayName || 'Guest',
-      },
-    });
+    let activeSocket: Socket | null = null;
+    let cancelled = false;
 
-    socketInstance.on('connect', () => {
-      console.log('Connected to Audio Backend socket server');
-      setIsConnected(true);
-    });
+    if (!user) {
+      setSocket(null);
+      setIsConnected(false);
+      return;
+    }
 
-    socketInstance.on('disconnect', () => {
-      console.log('Disconnected from Audio Backend socket server');
+    const connectSocket = async () => {
+      const token = await user.getIdToken();
+      if (cancelled) return;
+
+      const socketInstance = io('/', {
+        transports: ['websocket'],
+        auth: {
+          token,
+        },
+      });
+
+      socketInstance.on('connect', () => {
+        console.log('Connected to Audio Backend socket server');
+        setIsConnected(true);
+      });
+
+      socketInstance.on('disconnect', () => {
+        console.log('Disconnected from Audio Backend socket server');
+        setIsConnected(false);
+      });
+
+      activeSocket = socketInstance;
+      setSocket(socketInstance);
+    };
+
+    connectSocket().catch((error) => {
+      console.error('Failed to establish socket connection:', error);
       setIsConnected(false);
     });
 
-    setSocket(socketInstance);
-
     return () => {
-      socketInstance.disconnect();
+      cancelled = true;
+      activeSocket?.disconnect();
+      setSocket(null);
+      setIsConnected(false);
     };
-  }, [user?.displayName]);
+  }, [user]);
 
   useEffect(() => {
     if (isConnected && socket) {
-      const roomId = user?.uid || socket.id;
+      const roomId = user?.uid;
       if (roomId) {
         socket.emit('join_room', roomId);
       }

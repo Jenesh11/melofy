@@ -1,27 +1,85 @@
 import 'dotenv/config';
 import express from 'express';
-import cors from 'cors';
+import cors, { type CorsOptions } from 'cors';
 import { Server as SocketIOServer } from 'socket.io';
 import http from 'http';
 import streamRouter from './routes/stream';
 import spotifyRouter from './routes/spotify';
 import lyricsRouter from './routes/lyrics';
 import { LavalinkManager } from 'lavalink-client';
+import { requireFirebaseAuth, verifyFirebaseIdToken } from './lib/firebaseAuth';
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+app.set('trust proxy', 1);
 
-// Log all incoming requests
-app.use((req, res, next) => {
-  console.log(`[HTTP] ${req.method} ${req.url}`);
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const corsOptions: CorsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error('CORS origin not allowed'));
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '1mb' }));
+
+const requestBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function createRateLimiter(maxRequests: number, windowMs: number) {
+  return (
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const key = `${ip}:${req.path}`;
+    const now = Date.now();
+    const existing = requestBuckets.get(key);
+
+    if (!existing || now > existing.resetAt) {
+      requestBuckets.set(key, { count: 1, resetAt: now + windowMs });
+      next();
+      return;
+    }
+
+    if (existing.count >= maxRequests) {
+      const retryAfter = Math.ceil((existing.resetAt - now) / 1000);
+      res.setHeader('Retry-After', retryAfter.toString());
+      res.status(429).json({ error: 'Too many requests' });
+      return;
+    }
+
+    existing.count += 1;
+    requestBuckets.set(key, existing);
+    next();
+  };
+}
+
+const publicRateLimit = createRateLimiter(120, 60_000);
+const privateRateLimit = createRateLimiter(90, 60_000);
+const streamRateLimit = createRateLimiter(30, 60_000);
+
+app.use((req, _res, next) => {
+  console.log(`[HTTP] ${req.method} ${req.path}`);
   next();
 });
 
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {
   cors: {
-    origin: '*',
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 
@@ -44,43 +102,36 @@ export const lavalink = new LavalinkManager({
 });
 
 lavalink.nodeManager.on('connect', (node) => {
-  console.log(`[NodeLink] ✅ Connected to ${node.id}`);
+  console.log(`[NodeLink] Connected to ${node.id}`);
 });
 
 lavalink.nodeManager.on('error', (node, error) => {
   if (error.message.includes('ECONNREFUSED')) {
-    // Quietly handle connection refused during reconnect
     return;
   }
-  console.error(`[NodeLink] ❌ Error on ${node.id}:`, error.message);
+  console.error(`[NodeLink] Error on ${node.id}:`, error.message);
 });
 
-// Reconnect state management
 const nodeReconnectState = new Map<
   string,
   { interval?: NodeJS.Timeout; attempts: number }
 >();
 
 lavalink.nodeManager.on('disconnect', (node, reason) => {
-  console.warn(
-    `[NodeLink] ⚠️  Disconnected from ${node.id}:`,
-    reason?.reason || reason,
-  );
+  console.warn(`[NodeLink] Disconnected from ${node.id}:`, reason?.reason || reason);
 
   if (!nodeReconnectState.has(node.id)) {
     nodeReconnectState.set(node.id, { attempts: 0 });
   }
 
   const state = nodeReconnectState.get(node.id)!;
-  if (state.interval) return; // Already trying to reconnect
+  if (state.interval) return;
 
-  console.log(
-    `[NodeLink] 🔄 Starting reconnection heartbeat for ${node.id}...`,
-  );
+  console.log(`[NodeLink] Starting reconnection heartbeat for ${node.id}...`);
 
   state.interval = setInterval(async () => {
     if (node.connected) {
-      console.log(`[NodeLink] ✨ Reconnection successful for ${node.id}`);
+      console.log(`[NodeLink] Reconnection successful for ${node.id}`);
       clearInterval(state.interval);
       state.interval = undefined;
       state.attempts = 0;
@@ -89,45 +140,39 @@ lavalink.nodeManager.on('disconnect', (node, reason) => {
 
     state.attempts++;
 
-    // Only log every 6th attempt (approx every 30s) to keep logs clean
     if (state.attempts === 1 || state.attempts % 6 === 0) {
-      console.log(
-        `[NodeLink] ⏳ Node ${node.id} is offline. (Attempt ${state.attempts})`,
-      );
+      console.log(`[NodeLink] Node ${node.id} is offline. (Attempt ${state.attempts})`);
     }
 
     try {
-      // Small guard: don't call connect if it's already in the middle of connecting
-      // though node.connected check above mostly covers this.
       await node.connect();
-    } catch (e: any) {
-      // Most errors will fire the "error" event which we handle above
+    } catch {
+      // Most errors are handled by the nodeManager error event.
     }
   }, 5000);
 });
 
 lavalink.init({ id: '123456789012345678', username: 'MelofyBackend' });
 
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
     node: lavalink.nodeManager.nodes.size > 0 ? 'connected' : 'disconnected',
   });
 });
 
-// Proxy route for streaming
-app.use('/api', streamRouter);
+app.use('/api', streamRateLimit, streamRouter);
+app.use('/api/spotify', publicRateLimit, spotifyRouter);
+app.use('/api/lyrics', publicRateLimit, lyricsRouter);
 
-// Spotify API Integration Routes
-app.use('/api/spotify', spotifyRouter);
-
-// Lyrics API Route
-app.use('/api/lyrics', lyricsRouter);
-
-// Search API
-app.get('/api/search', async (req, res) => {
+app.get('/api/search', requireFirebaseAuth, privateRateLimit, async (req, res) => {
   const query = req.query.q as string;
   if (!query) return res.status(400).json({ error: 'Missing query' });
+
+  const trimmedQuery = query.trim();
+  if (trimmedQuery.length < 2 || trimmedQuery.length > 200) {
+    return res.status(400).json({ error: 'Invalid query length' });
+  }
 
   try {
     const node = lavalink.nodeManager.leastUsedNodes()[0];
@@ -135,9 +180,10 @@ app.get('/api/search', async (req, res) => {
       return res.status(500).json({ error: 'No NodeLink nodes available' });
 
     const result = await node.search(
-      { query: query },
-      { id: 'MelofyInternal' },
+      { query: trimmedQuery },
+      { id: req.user?.uid || 'MelofyInternal' },
     );
+
     res.json(result);
   } catch (error) {
     console.error('Search error:', error);
@@ -145,38 +191,73 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-// Recommendations API
-app.get('/api/recommendations', async (req, res) => {
-  const trackId = req.query.trackId as string;
-  if (!trackId) return res.status(400).json({ error: 'Missing trackId' });
+app.get(
+  '/api/recommendations',
+  requireFirebaseAuth,
+  privateRateLimit,
+  async (req, res) => {
+    const trackId = req.query.trackId as string;
+    if (!trackId) return res.status(400).json({ error: 'Missing trackId' });
 
-  try {
-    const node = lavalink.nodeManager.leastUsedNodes()[0];
-    if (!node)
-      return res.status(500).json({ error: 'No NodeLink nodes available' });
+    const trimmedTrackId = trackId.trim();
+    if (trimmedTrackId.length < 2 || trimmedTrackId.length > 300) {
+      return res.status(400).json({ error: 'Invalid trackId length' });
+    }
 
-    const result = await node.search(
-      { query: `ytsearch: ${trackId} similar songs` },
-      { id: 'MelofyAutoplay' },
-    );
-    res.json(result);
-  } catch (error) {
-    console.error('Recommendations error:', error);
-    res.status(500).json({ error: 'Recommendations failed' });
+    try {
+      const node = lavalink.nodeManager.leastUsedNodes()[0];
+      if (!node)
+        return res.status(500).json({ error: 'No NodeLink nodes available' });
+
+      const result = await node.search(
+        { query: `ytsearch: ${trimmedTrackId} similar songs` },
+        { id: req.user?.uid || 'MelofyAutoplay' },
+      );
+
+      res.json(result);
+    } catch (error) {
+      console.error('Recommendations error:', error);
+      res.status(500).json({ error: 'Recommendations failed' });
+    }
+  },
+);
+
+io.use(async (socket, next) => {
+  const token = socket.handshake.auth?.token as string | undefined;
+  if (!token) {
+    next(new Error('Unauthorized'));
+    return;
   }
+
+  const user = await verifyFirebaseIdToken(token);
+  if (!user) {
+    next(new Error('Unauthorized'));
+    return;
+  }
+
+  socket.data.userId = user.uid;
+  socket.data.username = user.email || user.uid;
+  next();
 });
 
 io.on('connection', (socket) => {
-  const username = socket.handshake.auth.username || 'Guest';
-  console.log(`[Socket] 👤 User connected: ${username} (${socket.id})`);
+  const userId = socket.data.userId as string;
+  const username = (socket.data.username as string) || userId;
+  const secureRoomId = `user:${userId}`;
 
-  socket.on('join_room', (roomId: string) => {
+  socket.join(secureRoomId);
+  socket.data.roomId = secureRoomId;
+
+  console.log(`[Socket] User connected: ${username} (${socket.id})`);
+
+  socket.on('join_room', () => {
     socket.rooms.forEach((room) => {
       if (room !== socket.id) socket.leave(room);
     });
-    socket.join(roomId);
-    socket.data.roomId = roomId;
-    console.log(`Socket ${socket.id} joined room ${roomId}`);
+
+    socket.join(secureRoomId);
+    socket.data.roomId = secureRoomId;
+    console.log(`Socket ${socket.id} joined secure room ${secureRoomId}`);
   });
 
   socket.on('queue_update', (data) => {

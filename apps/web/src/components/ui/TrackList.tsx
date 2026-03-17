@@ -4,6 +4,8 @@ import { Music2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePlayerStore, Track as PlayerTrack } from '@/store/usePlayerStore';
 import { toast } from 'sonner';
+import { getAuth } from 'firebase/auth';
+import { app } from '@/lib/firebase/config';
 
 /**
  * Unified track shape consumable by TrackList.
@@ -26,6 +28,14 @@ interface TrackListProps {
   tracks: TrackItem[];
   /** Show a column header row */
   showHeader?: boolean;
+}
+
+async function getClientAuthHeaders(): Promise<Record<string, string>> {
+  const currentUser = getAuth(app).currentUser;
+  if (!currentUser) return {};
+
+  const token = await currentUser.getIdToken();
+  return { Authorization: `Bearer ${token}` };
 }
 
 /**
@@ -51,7 +61,9 @@ async function resolvePlayableTrack(
 
   try {
     const searchQuery = `${item.title} ${item.artist}`;
-    const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
+    const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`, {
+      headers: await getClientAuthHeaders(),
+    });
     const data = await res.json();
 
     if (data?.tracks?.length > 0) {

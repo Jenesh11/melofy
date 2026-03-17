@@ -11,6 +11,7 @@ import { TrackList, TrackItem } from '@/components/ui/TrackList';
 import { TrackCarousel } from '@/components/home/TrackCarousel';
 import { PlaylistGrid } from '@/components/home/PlaylistGrid';
 import { useSpotifyCollection } from '@/hooks/useSpotifyCollection';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 export default function SearchPage() {
   const [query, setQuery] = useState('');
@@ -21,6 +22,7 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const { handlePlaySpotifyCollection } = useSpotifyCollection();
+  const { user } = useAuth();
 
   useEffect(() => {
     const savedHistory = localStorage.getItem('melofy_search_history');
@@ -68,8 +70,12 @@ export default function SearchPage() {
 
       setLoading(true);
       try {
+        const token = user ? await user.getIdToken() : null;
+
         const [ytRes, spotifyRes] = await Promise.allSettled([
-          fetch(`/api/search?q=${encodeURIComponent(debouncedQuery)}`),
+          fetch(`/api/search?q=${encodeURIComponent(debouncedQuery)}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          }),
           fetch(
             `/api/spotify/search?q=${encodeURIComponent(
               debouncedQuery,
@@ -124,7 +130,7 @@ export default function SearchPage() {
     };
 
     fetchResults();
-  }, [debouncedQuery]);
+  }, [debouncedQuery, user]);
 
   return (
     <div className='p-4 md:p-8 h-full flex flex-col'>

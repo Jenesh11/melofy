@@ -1,19 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { buildBackendUrl } from '@/lib/server/backend-url';
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
   const trackId = searchParams.get('trackId');
+  const authorization = req.headers.get('authorization');
 
   if (!trackId) {
     return NextResponse.json({ error: 'Missing trackId' }, { status: 400 });
   }
+  if (!authorization) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
   try {
-    // Pass to our backend
     const backendRes = await fetch(
-      `http://localhost:3001/api/recommendations?trackId=${encodeURIComponent(trackId)}`
+      `${buildBackendUrl('/api/recommendations')}?trackId=${encodeURIComponent(trackId)}`,
+      {
+        headers: {
+          Authorization: authorization,
+        },
+      },
     );
-    
+
     if (!backendRes.ok) {
       return NextResponse.json(
         { error: 'Backend recommendations failed' },

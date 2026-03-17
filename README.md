@@ -109,7 +109,16 @@ npm install
 
 ### 2️⃣ Configure Environmentals
 
-Fill in your credentials in the respective `.env` files located in `apps/web` and `apps/api`.
+Copy the example files and fill in your credentials:
+
+```bash
+cp apps/web/.env.example apps/web/.env.local
+cp apps/api/.env.example apps/api/.env
+```
+
+Important production vars:
+- `apps/api`: `FIREBASE_API_KEY`, `CORS_ORIGINS`, NodeLink + Spotify + Upstash vars
+- `apps/web`: Firebase public vars, Upstash vars, and `BACKEND_API_URL` (or `INTERNAL_API_URL`)
 
 ### 3️⃣ Launch the Engines
 
@@ -138,3 +147,4 @@ Join our Discord server to get updates, report bugs, or just hang out with the d
   <p>Built with 💖 and ☕ by <b><a href="https://github.com/ShreyJaiswal1">ShreyJaiswal1</a></b></p>
   <p><i>© 2026 Melofy. Licensed under ISC.</i></p>
 </div>
+

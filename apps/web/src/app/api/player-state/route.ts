@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Redis } from '@upstash/redis';
+import { verifyFirebaseUserFromRequest } from '@/lib/server/firebase-auth';
 
 // Initialize Redis client using Upstash env variables
 const redis = new Redis({
@@ -8,12 +9,18 @@ const redis = new Redis({
 });
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get('userId');
-
-  if (!userId) {
-    return NextResponse.json({ error: 'Missing userId parameter' }, { status: 400 });
+  const authUser = await verifyFirebaseUserFromRequest(request);
+  if (!authUser) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const { searchParams } = new URL(request.url);
+  const requestedUserId = searchParams.get('userId');
+  if (requestedUserId && requestedUserId !== authUser.uid) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  const userId = authUser.uid;
 
   try {
     const data = await redis.get(`player:${userId}`);
@@ -25,16 +32,39 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json();
-  const { userId, state } = body;
+  const authUser = await verifyFirebaseUserFromRequest(request);
+  if (!authUser) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
-  if (!userId || !state) {
-    return NextResponse.json({ error: 'Missing userId or state in body' }, { status: 400 });
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const { userId: requestedUserId, state } = (body || {}) as {
+    userId?: string;
+    state?: unknown;
+  };
+
+  if (requestedUserId && requestedUserId !== authUser.uid) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  if (!state) {
+    return NextResponse.json({ error: 'Missing state in body' }, { status: 400 });
   }
 
   try {
+    const serializedState = JSON.stringify(state);
+    if (serializedState.length > 200_000) {
+      return NextResponse.json({ error: 'State payload too large' }, { status: 413 });
+    }
+
     // Overwrite the user's player state in Redis
-    await redis.set(`player:${userId}`, JSON.stringify(state));
+    await redis.set(`player:${authUser.uid}`, serializedState, { ex: 60 * 60 * 24 * 14 });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error saving player state to Redis:', error);
