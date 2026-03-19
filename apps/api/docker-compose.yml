@@ -1,0 +1,23 @@
+services:
+  api:
+    container_name: melofy-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${API_PORT:-3001}:3001"
+    env_file:
+      - ./.env
+    environment:
+      NODE_ENV: production
+      PORT: "${PORT:-3001}"
+      # NodeLink is running on host (published 2333:2333).
+      LAVALINK_HOST: "${LAVALINK_HOST:-host.docker.internal}"
+      LAVALINK_PORT: "${LAVALINK_PORT:-2333}"
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ../../serviceAccountKey.json:/run/secrets/firebase-service-account.json:ro
+    restart: unless-stopped
+

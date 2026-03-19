@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
         destination: `${backendBaseUrl}/api/stream`,
       },
       {
+        source: '/api/stream-ticket',
+        destination: `${backendBaseUrl}/api/stream-ticket`,
+      },
+      {
         source: '/socket.io/:path*',
         destination: `${backendBaseUrl}/socket.io/:path*`,
       },

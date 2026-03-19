@@ -1,14 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Home,
   Search,
   Library,
-  Music2,
-  PlusCircle,
-  Heart,
   ListMusic,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
@@ -20,7 +17,6 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/lib/firebase/auth-context';
 import {
@@ -42,16 +38,14 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const [firebasePlaylists, setFirebasePlaylists] = useState<Playlist[]>([]);
-  const { savedPlaylists, removePlaylist } = useLibraryStore();
+  const savedPlaylists = useLibraryStore((state) => state.savedPlaylists);
+  const removePlaylist = useLibraryStore((state) => state.removePlaylist);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
-  const activeCollectionId = usePlayerStore(
-    (state: any) => state.activeCollectionId,
-  ) as string | null;
+  const activeCollectionId = usePlayerStore((state) => state.activeCollectionId);
 
   useEffect(() => {
     if (!user) {
-      setFirebasePlaylists([]);
       return;
     }
 
@@ -81,8 +75,15 @@ export function Sidebar() {
     return () => unsubscribe();
   }, [user]);
 
-  // Combine Firebase lists and locally stored Spotfiy lists
-  const allPlaylists = [...firebasePlaylists, ...savedPlaylists];
+  // Combine Firebase lists and locally stored Spotify lists.
+  const allPlaylists = useMemo(
+    () => [...(user ? firebasePlaylists : []), ...savedPlaylists],
+    [firebasePlaylists, savedPlaylists, user],
+  );
+  const savedPlaylistIds = useMemo(
+    () => new Set(savedPlaylists.map((playlist) => playlist.id)),
+    [savedPlaylists],
+  );
 
   const routes = [
     { label: 'Home', icon: Home, href: '/', active: pathname === '/' },
@@ -100,40 +101,40 @@ export function Sidebar() {
     },
   ];
 
-  const BrandContainer = ({ children }: { children: React.ReactNode }) => {
-    if (activeCollectionId) {
-      return (
+  return (
+    <div className='flex h-full flex-col bg-sidebar/40 backdrop-blur-xl border-r border-sidebar-border w-64 p-4 text-sidebar-foreground overflow-hidden'>
+      {activeCollectionId ? (
         <Link
           href={`/playlist/${activeCollectionId}`}
           className={cn(
             'flex items-center gap-2 px-2 pb-8 pt-2 transition-all duration-300 cursor-pointer hover:opacity-80 active:scale-95',
           )}
         >
-          {children}
+          <div className='h-8 w-8 overflow-hidden flex items-center justify-center shrink-0 shadow-lg shadow-primary/20 rounded-lg'>
+            <img
+              src='/logo.png'
+              alt='Melofy Logo'
+              className='h-full w-full object-contain'
+            />
+          </div>
+          <h1 className='text-xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent'>
+            Melofy
+          </h1>
         </Link>
-      );
-    }
-    return (
-      <div className='flex items-center gap-2 px-2 pb-8 pt-2 cursor-default'>
-        {children}
-      </div>
-    );
-  };
-
-  return (
-    <div className='flex h-full flex-col bg-sidebar/40 backdrop-blur-xl border-r border-sidebar-border w-64 p-4 text-sidebar-foreground overflow-hidden'>
-      <BrandContainer>
-        <div className='h-8 w-8 overflow-hidden flex items-center justify-center shrink-0 shadow-lg shadow-primary/20 rounded-lg'>
-          <img
-            src='/logo.png'
-            alt='Melofy Logo'
-            className='h-full w-full object-contain'
-          />
+      ) : (
+        <div className='flex items-center gap-2 px-2 pb-8 pt-2 cursor-default'>
+          <div className='h-8 w-8 overflow-hidden flex items-center justify-center shrink-0 shadow-lg shadow-primary/20 rounded-lg'>
+            <img
+              src='/logo.png'
+              alt='Melofy Logo'
+              className='h-full w-full object-contain'
+            />
+          </div>
+          <h1 className='text-xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent'>
+            Melofy
+          </h1>
         </div>
-        <h1 className='text-xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent'>
-          Melofy
-        </h1>
-      </BrandContainer>
+      )}
 
       <div className='flex flex-col gap-1'>
         {routes.map((route) => (
@@ -160,8 +161,8 @@ export function Sidebar() {
         <div className='flex flex-col gap-1 overflow-y-auto pr-2 custom-scrollbar sidebar-scrollbar'>
           <div className='mt-2 flex flex-col gap-0.5'>
             {allPlaylists.map((playlist) => {
-              const isLocalReference = savedPlaylists.some(
-                (p) => p.id === playlist.id,
+              const isLocalReference = savedPlaylistIds.has(
+                playlist.id as string,
               );
 
               return (
@@ -177,11 +178,16 @@ export function Sidebar() {
                         )}
                       >
                         <div className='flex items-center justify-center w-8 h-8 rounded-md bg-sidebar-accent/20 border border-sidebar-border overflow-hidden shrink-0 shadow-sm'>
-                          {playlist.artworkUrl || (playlist as any).coverUrl ? (
+                          {playlist.artworkUrl ||
+                          ('coverUrl' in playlist &&
+                            typeof playlist.coverUrl === 'string' &&
+                            playlist.coverUrl) ? (
                             <img
                               src={
                                 playlist.artworkUrl ||
-                                (playlist as any).coverUrl
+                                ('coverUrl' in playlist
+                                  ? playlist.coverUrl
+                                  : undefined)
                               }
                               alt={playlist.name}
                               className='h-full w-full object-cover group-hover:scale-110 transition-transform duration-300'

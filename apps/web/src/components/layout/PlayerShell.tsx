@@ -1,15 +1,67 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { MobilePlayer } from '@/components/player/MobilePlayer';
 import { DesktopPlayer } from '@/components/player/DesktopPlayer';
 import { useAudioPlayback } from '@/hooks/useAudioPlayback';
+import { useAuth } from '@/lib/firebase/auth-context';
+import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
 
 export function PlayerShell() {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [streamSrc, setStreamSrc] = useState<string | undefined>(undefined);
 
   const playback = useAudioPlayback();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const buildStreamSrc = async () => {
+      const encodedTrack = playback.currentTrack?.url;
+      if (!encodedTrack || !user) {
+        if (!cancelled) setStreamSrc(undefined);
+        return;
+      }
+
+      try {
+        const authHeaders = await getFirebaseAuthHeaders(user);
+        const ticketRes = await fetch('/api/stream-ticket', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders,
+          },
+          body: JSON.stringify({ url: encodedTrack }),
+        });
+        if (!ticketRes.ok) {
+          throw new Error(`Failed to create stream ticket (${ticketRes.status})`);
+        }
+
+        const ticketData = (await ticketRes.json()) as { ticket?: string };
+        if (!ticketData.ticket) {
+          throw new Error('Missing stream ticket');
+        }
+
+        if (cancelled) return;
+        const params = new URLSearchParams({
+          ticket: ticketData.ticket,
+          url: encodedTrack,
+        });
+        setStreamSrc(`/api/stream?${params.toString()}`);
+      } catch (error) {
+        if (!cancelled) setStreamSrc(undefined);
+        console.error('[PlayerShell] Failed to prepare stream URL:', error);
+      }
+    };
+
+    void buildStreamSrc();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [playback.currentTrack?.url, user]);
 
   if (!playback.currentTrack) {
     return (
@@ -45,11 +97,7 @@ export function PlayerShell() {
     <>
       <audio
         ref={playback.audioRef}
-        src={
-          playback.currentTrack.url
-            ? `/api/stream?url=${encodeURIComponent(playback.currentTrack.url)}`
-            : undefined
-        }
+        src={streamSrc}
         onTimeUpdate={(e) =>
           !playback.isDraggingSlider &&
           playback.setCurrentTime(e.currentTarget.currentTime)

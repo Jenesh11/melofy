@@ -1,14 +1,22 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Play, Music2, Headphones, Disc } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { usePlayerStore } from '@/store/usePlayerStore';
 import { useRouter } from 'next/navigation';
 
+interface HeroPlaylist {
+  id: string;
+  name?: string;
+  description?: string;
+  images?: Array<{ url?: string }>;
+  tracks?: { total?: number };
+  owner?: { display_name?: string };
+}
+
 interface HeroPlaylistCardProps {
-  playlist: any;
-  onPlay: (playlist: any) => void;
+  playlist: HeroPlaylist;
+  onPlay: (playlist: HeroPlaylist) => void;
   index: number;
 }
 
@@ -17,7 +25,6 @@ export function HeroPlaylistCard({
   onPlay,
   index,
 }: HeroPlaylistCardProps) {
-  const { currentTrack, isPlaying } = usePlayerStore();
   const router = useRouter();
 
   // Hero card component with 'essence' design: highly blurred artwork background
@@ -73,7 +80,7 @@ export function HeroPlaylistCard({
               Playlist
             </span>
             <h2 className='text-3xl md:text-4xl font-black text-white mt-4 leading-tight tracking-tight drop-shadow-lg group-hover:text-primary transition-colors truncate'>
-              {playlist.name}
+              {playlist.name || 'Untitled Playlist'}
             </h2>
           </div>
 

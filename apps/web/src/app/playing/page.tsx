@@ -20,7 +20,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SyncedLyrics } from '@/components/ui/SyncedLyrics';
 
 export default function PlayingPage() {
-  const { currentTrack, isPlaying, pause, resume } = usePlayerStore();
+  const currentTrack = usePlayerStore((state) => state.currentTrack);
+  const isPlaying = usePlayerStore((state) => state.isPlaying);
+  const pause = usePlayerStore((state) => state.pause);
+  const resume = usePlayerStore((state) => state.resume);
   const router = useRouter();
   const [showLyrics, setShowLyrics] = useState(false);
 

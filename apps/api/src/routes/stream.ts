@@ -1,8 +1,17 @@
-import { Router } from 'express';
+import { Router, type Request, type Response, type NextFunction } from 'express';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import { lavalink } from '../index';
 import http from 'http';
 import https from 'https';
 import { URL } from 'url';
+import dns from 'node:dns/promises';
+import net from 'node:net';
+import {
+  extractBearerToken,
+  requireFirebaseAuth,
+  verifyFirebaseIdToken,
+} from '../lib/firebaseAuth';
+import { issueStreamTicket, verifyStreamTicket } from '../lib/streamTicket';
 
 const router = Router();
 
@@ -11,6 +20,39 @@ const MAX_PROXY_RETRIES = 3;
 const RESOLVE_TIMEOUT_MS = 10_000;
 const UPSTREAM_TIMEOUT_MS = 20_000;
 const MAX_RESOLVE_BODY_BYTES = 1_000_000;
+const BLOCKED_HOSTNAMES = new Set([
+  'localhost',
+  'metadata.google.internal',
+  'metadata',
+  'instance-data',
+]);
+const BLOCKED_HOSTNAME_SUFFIXES = ['.localhost', '.local', '.internal'];
+
+const streamRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyGenerator(req) {
+    if (req.user?.uid) return `uid:${req.user.uid}`;
+    const ip = req.ip || req.socket.remoteAddress || '';
+    return `ip:${ipKeyGenerator(ip)}`;
+  },
+  message: { error: 'Too many requests' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const streamTicketRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyGenerator(req) {
+    if (req.user?.uid) return `uid:${req.user.uid}`;
+    const ip = req.ip || req.socket.remoteAddress || '';
+    return `ip:${ipKeyGenerator(ip)}`;
+  },
+  message: { error: 'Too many requests' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 interface NodeConnectionOptions {
   secure: boolean;
@@ -26,9 +68,121 @@ interface NodeLike {
 
 interface ResolveResponse {
   url?: string;
+  message?: string;
+  error?: string;
   exception?: {
     message?: string;
   };
+}
+
+class ResolveError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode?: number,
+    public readonly nonRetryable?: boolean,
+  ) {
+    super(message);
+  }
+}
+
+function isPrivateIPv4(address: string): boolean {
+  const octets = address.split('.').map((segment) => Number(segment));
+  if (octets.length !== 4 || octets.some((value) => Number.isNaN(value))) return true;
+
+  const [a, b] = octets;
+  if (a === 10) return true;
+  if (a === 127) return true;
+  if (a === 0) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+  if (a === 198 && (b === 18 || b === 19)) return true; // Benchmarking range
+  if (a === 192 && b === 0) return true; // IETF protocol assignments
+  return false;
+}
+
+function isPrivateIPv6(address: string): boolean {
+  const normalized = address.toLowerCase();
+  if (normalized === '::1' || normalized === '::') return true;
+
+  const mappedV4 = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (mappedV4?.[1]) return isPrivateIPv4(mappedV4[1]);
+
+  const firstSegment = normalized.split(':')[0] || '0';
+  const firstValue = parseInt(firstSegment, 16);
+  if (Number.isNaN(firstValue)) return true;
+
+  if ((firstValue & 0xfe00) === 0xfc00) return true; // fc00::/7 (ULA)
+  if ((firstValue & 0xffc0) === 0xfe80) return true; // fe80::/10 (link-local)
+  if ((firstValue & 0xff00) === 0xff00) return true; // ff00::/8 (multicast)
+  return false;
+}
+
+function isPrivateOrInternalIp(address: string): boolean {
+  const ipVersion = net.isIP(address);
+  if (ipVersion === 4) return isPrivateIPv4(address);
+  if (ipVersion === 6) return isPrivateIPv6(address);
+  return true;
+}
+
+function normalizeHostname(hostname: string): string {
+  return hostname.replace(/\.$/, '').toLowerCase();
+}
+
+function isBlockedHostname(hostname: string): boolean {
+  const normalized = normalizeHostname(hostname);
+  if (!normalized) return true;
+  if (BLOCKED_HOSTNAMES.has(normalized)) return true;
+  return BLOCKED_HOSTNAME_SUFFIXES.some((suffix) => normalized.endsWith(suffix));
+}
+
+async function assertSafeProxyTargetUrl(targetUrl: string): Promise<URL> {
+  let parsed: URL;
+  try {
+    parsed = new URL(targetUrl);
+  } catch {
+    throw new ResolveError('Invalid upstream URL', 400, true);
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new ResolveError('Blocked non-http upstream protocol', 400, true);
+  }
+
+  const hostname = normalizeHostname(parsed.hostname);
+  if (isBlockedHostname(hostname)) {
+    throw new ResolveError(`Blocked private hostname: ${hostname}`, 403, true);
+  }
+
+  if (net.isIP(hostname)) {
+    if (isPrivateOrInternalIp(hostname)) {
+      throw new ResolveError(`Blocked private IP: ${hostname}`, 403, true);
+    }
+    return parsed;
+  }
+
+  let lookupResults: Array<{ address: string; family: number }>;
+  try {
+    lookupResults = await dns.lookup(hostname, { all: true, verbatim: true });
+  } catch {
+    throw new ResolveError(`Unable to resolve upstream host: ${hostname}`, 502, true);
+  }
+
+  if (!lookupResults.length) {
+    throw new ResolveError(`Unable to resolve upstream host: ${hostname}`, 502, true);
+  }
+
+  for (const result of lookupResults) {
+    if (isPrivateOrInternalIp(result.address)) {
+      throw new ResolveError(
+        `Blocked upstream host resolved to private IP: ${result.address}`,
+        403,
+        true,
+      );
+    }
+  }
+
+  return parsed;
 }
 
 function parseItag(rawItag: string | undefined): number | null {
@@ -41,8 +195,8 @@ function getItagCandidates(rawItag: string | undefined): Array<number | null> {
   const explicit = parseItag(rawItag);
   if (explicit !== null) return [explicit, null];
 
-  // Prefer direct YouTube audio formats first, then default behavior.
-  return [251, 250, 249, 140, null];
+  // Let NodeLink choose automatically first, then try explicit YouTube audio itags.
+  return [null, 251, 250, 249, 140];
 }
 
 function shouldRetryStatus(statusCode: number): boolean {
@@ -144,16 +298,29 @@ function requestTrackstreamUrl(
           }
 
           if (statusCode < 200 || statusCode >= 300) {
+            const message =
+              parsed?.exception?.message ||
+              parsed?.message ||
+              parsed?.error ||
+              `Trackstream failed with status ${statusCode}`;
+            const nonRetryable =
+              message.toLowerCase().includes('runtime contract is incomplete') ||
+              message.toLowerCase().includes('track stream endpoint') ||
+              message.toLowerCase().includes('disabled');
+
             reject(
-              new Error(
-                parsed?.exception?.message || `Trackstream failed with status ${statusCode}`,
-              ),
+              new ResolveError(message, statusCode, nonRetryable),
             );
             return;
           }
 
           if (!parsed?.url) {
-            reject(new Error(parsed?.exception?.message || 'Trackstream returned no URL'));
+            const message =
+              parsed?.exception?.message ||
+              parsed?.message ||
+              parsed?.error ||
+              'Trackstream returned no URL';
+            reject(new ResolveError(message, statusCode));
             return;
           }
 
@@ -178,8 +345,75 @@ function resolveRedirectUrl(currentUrl: string, location: string): string | null
   }
 }
 
-router.get('/stream', async (req, res) => {
-  const trackUrl = req.query.url as string;
+interface StreamAuthContext {
+  trackUrl?: string;
+}
+
+async function requireStreamAccess(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const bearerToken = extractBearerToken(req.headers.authorization);
+  if (bearerToken) {
+    const user = await verifyFirebaseIdToken(bearerToken);
+    if (!user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    req.user = user;
+    next();
+    return;
+  }
+
+  const ticket = typeof req.query.ticket === 'string' ? req.query.ticket.trim() : '';
+  const trackUrl = typeof req.query.url === 'string' ? req.query.url.trim() : '';
+
+  if (!ticket || !trackUrl) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  if (trackUrl.length > 2048) {
+    res.status(400).json({ error: 'Invalid url parameter' });
+    return;
+  }
+
+  const payload = verifyStreamTicket(ticket, trackUrl);
+  if (!payload) {
+    res.status(401).json({ error: 'Invalid or expired stream ticket' });
+    return;
+  }
+
+  req.user = { uid: payload.uid };
+  (req as typeof req & StreamAuthContext).trackUrl = trackUrl;
+  next();
+}
+
+router.post('/stream-ticket', requireFirebaseAuth, streamTicketRateLimit, (req, res) => {
+  const trackUrl = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
+  if (!trackUrl) {
+    res.status(400).json({ error: 'Missing url in body' });
+    return;
+  }
+  if (trackUrl.length > 2048) {
+    res.status(400).json({ error: 'Invalid url in body' });
+    return;
+  }
+
+  const uid = req.user?.uid;
+  if (!uid) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  const { ticket, expiresInSeconds } = issueStreamTicket(uid, trackUrl);
+  res.json({ ticket, expiresInSeconds });
+});
+
+router.get('/stream', requireStreamAccess, streamRateLimit, async (req, res) => {
+  const contextTrackUrl = (req as typeof req & StreamAuthContext).trackUrl;
+  const trackUrl = contextTrackUrl || (req.query.url as string);
   const requestedItag = req.query.itag as string | undefined;
 
   if (!trackUrl) {
@@ -225,17 +459,21 @@ router.get('/stream', async (req, res) => {
         console.warn(
           `[Relay:${requestId}] Resolve failed for itag=${candidate === null ? 'auto' : candidate}: ${sanitizeErrorMessage(err.message)}`,
         );
+
+        if (error instanceof ResolveError && error.nonRetryable) {
+          break;
+        }
       }
     }
 
     throw lastError || new Error('Unable to resolve CDN URL');
   };
 
-  const proxyWithRedirects = (
+  const proxyWithRedirects = async (
     currentUrl: string,
     depth: number,
     retryCount: number,
-  ): void => {
+  ): Promise<void> => {
     if (depth > MAX_REDIRECTS) {
       if (!res.headersSent) res.status(502).send('Too many redirects from upstream');
       return;
@@ -243,9 +481,15 @@ router.get('/stream', async (req, res) => {
 
     let parsedUrl: URL;
     try {
-      parsedUrl = new URL(currentUrl);
-    } catch {
-      if (!res.headersSent) res.status(500).send('Invalid upstream URL');
+      parsedUrl = await assertSafeProxyTargetUrl(currentUrl);
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error('Invalid upstream URL');
+      const statusCode =
+        error instanceof ResolveError && typeof error.statusCode === 'number'
+          ? error.statusCode
+          : 403;
+      console.warn(`[Relay:${requestId}] Blocked upstream URL: ${sanitizeErrorMessage(err.message)}`);
+      if (!res.headersSent) res.status(statusCode).send('Blocked upstream stream target');
       return;
     }
 
@@ -279,7 +523,8 @@ router.get('/stream', async (req, res) => {
             if (!res.headersSent) res.status(502).send('Invalid redirect URL from upstream');
             return;
           }
-          return proxyWithRedirects(redirectedUrl, depth + 1, retryCount);
+          void proxyWithRedirects(redirectedUrl, depth + 1, retryCount);
+          return;
         }
 
         const needsRetry =
@@ -291,7 +536,7 @@ router.get('/stream', async (req, res) => {
 
           void resolveCdnUrl(advanceCandidate)
             .then((freshUrl) => {
-              proxyWithRedirects(freshUrl, 0, retryCount + 1);
+              void proxyWithRedirects(freshUrl, 0, retryCount + 1);
             })
             .catch((error) => {
               const err = error instanceof Error ? error : new Error('Retry resolve failed');
@@ -334,7 +579,7 @@ router.get('/stream', async (req, res) => {
       if (retryCount < MAX_PROXY_RETRIES && !res.headersSent) {
         void resolveCdnUrl(false)
           .then((freshUrl) => {
-            proxyWithRedirects(freshUrl, 0, retryCount + 1);
+            void proxyWithRedirects(freshUrl, 0, retryCount + 1);
           })
           .catch((resolveError) => {
             const err =
@@ -358,10 +603,20 @@ router.get('/stream', async (req, res) => {
 
   try {
     const initialUrl = await resolveCdnUrl(false);
-    proxyWithRedirects(initialUrl, 0, 0);
+    void proxyWithRedirects(initialUrl, 0, 0);
   } catch (error) {
     const err = error instanceof Error ? error : new Error('Unknown resolution error');
     console.error(`[Relay:${requestId}] Failed to resolve initial CDN URL: ${sanitizeErrorMessage(err.message)}`);
+
+    if (err.message.toLowerCase().includes('runtime contract is incomplete')) {
+      if (!res.headersSent) {
+        res.status(503).send(
+          'NodeLink track streaming is not fully enabled. Set NODELINK_ENABLETRACKSTREAMENDPOINT=true in your NodeLink config and restart it.',
+        );
+      }
+      return;
+    }
+
     if (!res.headersSent) {
       res.status(502).send('Failed to resolve CDN stream URL');
     }

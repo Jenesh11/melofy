@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 interface LyricLine {
   text: string;
@@ -39,7 +39,8 @@ const parseSyncedLyrics = (lrc: string): LyricLine[] => {
 };
 
 export const SyncedLyrics = () => {
-  const { currentTrack, progress } = usePlayerStore();
+  const currentTrack = usePlayerStore((state) => state.currentTrack);
+  const progress = usePlayerStore((state) => state.progress);
   const [lyricsLines, setLyricsLines] = useState<LyricLine[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -168,7 +169,7 @@ export const SyncedLyrics = () => {
           className='text-center space-y-2'
         >
           <p className='text-white/60 text-lg font-medium'>
-            Looks like we don't have lyrics for this track yet.
+            Looks like we don&apos;t have lyrics for this track yet.
           </p>
         </motion.div>
       </div>

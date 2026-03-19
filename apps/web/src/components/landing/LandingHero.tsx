@@ -94,35 +94,6 @@ export function LandingHero() {
                 <ChevronRight className='ml-2 w-5 h-5' />
               </Button>
             </Link>
-            <Button
-              variant='outline'
-              size='lg'
-              className='h-14 px-10 rounded-full border-border text-foreground font-bold hover:bg-muted backdrop-blur-sm'
-            >
-              View Plans
-            </Button>
-          </div>
-
-          <div className='flex items-center gap-6 justify-center lg:justify-start pt-4'>
-            <div className='flex -space-x-3'>
-              {[1, 2, 3, 4].map((i) => (
-                <div
-                  key={i}
-                  className='w-10 h-10 rounded-full border-2 border-black bg-zinc-800 flex items-center justify-center overflow-hidden'
-                >
-                  <img
-                    src={`https://i.pravatar.cc/100?u=${i}`}
-                    alt='user'
-                    className='w-full h-full object-cover opacity-80'
-                  />
-                </div>
-              ))}
-            </div>
-            <p className='text-sm text-muted-foreground font-medium'>
-              Joined by{' '}
-              <span className='text-foreground font-bold'>10,000+</span> music
-              lovers
-            </p>
           </div>
         </motion.div>
 

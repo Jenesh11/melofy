@@ -1,8 +1,12 @@
 import { Router } from 'express';
 import axios from 'axios';
 import { Redis } from '@upstash/redis';
+import { requireFirebaseAuth } from '../lib/firebaseAuth';
 
 const router = Router();
+
+// All Spotify routes require authentication
+router.use(requireFirebaseAuth);
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL || '',
@@ -11,6 +15,14 @@ const redis = new Redis({
 
 let spotifyAccessToken = '';
 let tokenExpirationTime = 0;
+const SPOTIFY_ID_PATTERN = /^[a-zA-Z0-9]{22}$/;
+
+function validateSpotifyId(rawId: unknown): string | null {
+  if (typeof rawId !== 'string') return null;
+  const id = rawId.trim();
+  if (!SPOTIFY_ID_PATTERN.test(id)) return null;
+  return id;
+}
 
 async function getSpotifyToken() {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
@@ -243,7 +255,8 @@ router.get('/mixes', async (req, res) => {
  * Fetches tracks for a specific album.
  */
 router.get('/albums/:id/tracks', async (req, res) => {
-  const { id } = req.params;
+  const id = validateSpotifyId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Invalid Spotify album ID' });
   try {
     const data = await spotifyGet(`/albums/${id}/tracks?limit=50`);
     res.json(data);
@@ -261,7 +274,8 @@ router.get('/albums/:id/tracks', async (req, res) => {
  * Fetches tracks for a specific playlist.
  */
 router.get('/playlists/:id/tracks', async (req, res) => {
-  const { id } = req.params;
+  const id = validateSpotifyId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Invalid Spotify playlist ID' });
   try {
     const data = await spotifyGet(`/playlists/${id}/tracks?limit=50`);
     res.json(data);
@@ -280,15 +294,25 @@ router.get('/playlists/:id/tracks', async (req, res) => {
  * Optimized with 'fields' query to reduce payload size.
  */
 router.get('/playlists/:id', async (req, res) => {
-  const { id } = req.params;
+  const id = validateSpotifyId(req.params.id);
+  if (!id) return res.status(400).json({ error: 'Invalid Spotify playlist ID' });
   try {
     // 1. Check Redis Cache First
     const cacheKey = `spotify:playlist:${id}`;
     const cachedData = await redis.get(cacheKey);
 
     if (cachedData) {
-      console.log(`[Spotify] ⚡ Serving playlist ${id} from Redis Cache`);
-      return res.json(cachedData);
+      console.log(`[Spotify] serving playlist ${id} from Redis cache`);
+
+      if (typeof cachedData === 'string') {
+        try {
+          return res.json(JSON.parse(cachedData));
+        } catch {
+          // Continue with live fetch if cache is malformed.
+        }
+      } else {
+        return res.json(cachedData);
+      }
     }
 
     // 2. Cache Miss: Fetch from Spotify API
@@ -342,7 +366,7 @@ router.get('/playlists/:id', async (req, res) => {
     };
 
     // 3. Save to Redis Cache (Expire after 1 hour = 3600 seconds)
-    await redis.set(cacheKey, JSON.stringify(formattedData), { ex: 3600 });
+    await redis.set(cacheKey, formattedData, { ex: 3600 });
 
     res.json(formattedData);
   } catch (error: any) {
@@ -378,3 +402,4 @@ router.get('/search', async (req, res) => {
 });
 
 export default router;
+

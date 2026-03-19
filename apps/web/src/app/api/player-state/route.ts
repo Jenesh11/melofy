@@ -7,6 +7,56 @@ const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL!,
   token: process.env.UPSTASH_REDIS_REST_TOKEN!,
 });
+const MAX_PLAYER_STATE_BODY_BYTES = 256 * 1024;
+
+function parseContentLength(request: Request): number | null {
+  const contentLengthHeader = request.headers.get('content-length');
+  if (!contentLengthHeader) return null;
+
+  const parsed = Number(contentLengthHeader);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+}
+
+async function parseJsonBodyWithLimit(
+  request: Request,
+  maxBytes: number,
+): Promise<unknown> {
+  const declaredLength = parseContentLength(request);
+  if (declaredLength !== null && declaredLength > maxBytes) {
+    throw new Error('PAYLOAD_TOO_LARGE');
+  }
+
+  if (!request.body) {
+    return {};
+  }
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+
+    totalBytes += value.byteLength;
+    if (totalBytes > maxBytes) {
+      throw new Error('PAYLOAD_TOO_LARGE');
+    }
+
+    chunks.push(value);
+  }
+
+  const bodyBuffer = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+  if (!bodyBuffer.length) return {};
+
+  try {
+    return JSON.parse(bodyBuffer.toString('utf8'));
+  } catch {
+    throw new Error('INVALID_JSON');
+  }
+}
 
 export async function GET(request: Request) {
   const authUser = await verifyFirebaseUserFromRequest(request);
@@ -39,8 +89,11 @@ export async function POST(request: Request) {
 
   let body: unknown;
   try {
-    body = await request.json();
-  } catch {
+    body = await parseJsonBodyWithLimit(request, MAX_PLAYER_STATE_BODY_BYTES);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'PAYLOAD_TOO_LARGE') {
+      return NextResponse.json({ error: 'Request body too large' }, { status: 413 });
+    }
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
@@ -59,7 +112,7 @@ export async function POST(request: Request) {
 
   try {
     const serializedState = JSON.stringify(state);
-    if (serializedState.length > 200_000) {
+    if (Buffer.byteLength(serializedState, 'utf8') > 200_000) {
       return NextResponse.json({ error: 'State payload too large' }, { status: 413 });
     }
 

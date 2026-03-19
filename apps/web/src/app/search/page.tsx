@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { Search as SearchIcon, Loader2, X, Clock, Flame } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useDebounce } from '@/hooks/useDebounce';
-import { usePlayerStore } from '@/store/usePlayerStore';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { TrackList, TrackItem } from '@/components/ui/TrackList';
@@ -12,13 +11,45 @@ import { TrackCarousel } from '@/components/home/TrackCarousel';
 import { PlaylistGrid } from '@/components/home/PlaylistGrid';
 import { useSpotifyCollection } from '@/hooks/useSpotifyCollection';
 import { useAuth } from '@/lib/firebase/auth-context';
+import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
+import type { SpotifyTrackLike } from '@/lib/track-mappers';
+
+interface SpotifyPlaylistItem {
+  id: string;
+  name?: string;
+  description?: string;
+  images?: Array<{ url?: string }>;
+  owner?: { display_name?: string };
+  tracks?: { total?: number };
+  type?: string;
+}
+
+interface YouTubeSearchTrack {
+  encoded?: string;
+  info?: {
+    identifier?: string;
+    title?: string;
+    author?: string;
+    artworkUrl?: string;
+    duration?: number;
+  };
+}
+
+interface YouTubeSearchResponse {
+  tracks?: YouTubeSearchTrack[];
+}
+
+interface SpotifySearchResponse {
+  tracks?: { items?: SpotifyTrackLike[] };
+  playlists?: { items?: SpotifyPlaylistItem[] };
+}
 
 export default function SearchPage() {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query, 500);
   const [results, setResults] = useState<TrackItem[]>([]);
-  const [spotifyTracks, setSpotifyTracks] = useState<any[]>([]);
-  const [spotifyPlaylists, setSpotifyPlaylists] = useState<any[]>([]);
+  const [spotifyTracks, setSpotifyTracks] = useState<SpotifyTrackLike[]>([]);
+  const [spotifyPlaylists, setSpotifyPlaylists] = useState<SpotifyPlaylistItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const { handlePlaySpotifyCollection } = useSpotifyCollection();
@@ -70,25 +101,28 @@ export default function SearchPage() {
 
       setLoading(true);
       try {
-        const token = user ? await user.getIdToken() : null;
+        const authHeaders = await getFirebaseAuthHeaders(user);
 
         const [ytRes, spotifyRes] = await Promise.allSettled([
           fetch(`/api/search?q=${encodeURIComponent(debouncedQuery)}`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            headers: authHeaders,
           }),
           fetch(
             `/api/spotify/search?q=${encodeURIComponent(
               debouncedQuery,
             )}&type=track,playlist`,
+            {
+              headers: authHeaders,
+            },
           ),
         ]);
 
-        let ytData: any = null;
+        let ytData: YouTubeSearchResponse | null = null;
         if (ytRes.status === 'fulfilled' && ytRes.value.ok) {
           ytData = await ytRes.value.json();
         }
 
-        let spotData: any = null;
+        let spotData: SpotifySearchResponse | null = null;
         if (spotifyRes.status === 'fulfilled' && spotifyRes.value.ok) {
           spotData = await spotifyRes.value.json();
         }
@@ -96,19 +130,22 @@ export default function SearchPage() {
         if (ytData && ytData.tracks && ytData.tracks.length > 0) {
           const mapped: TrackItem[] = ytData.tracks
             .filter(Boolean)
-            .map((track: any) => ({
-              id: track.info?.identifier || 'unknown',
-              title: track.info?.title || 'Unknown Title',
-              artist: track.info?.author || 'Unknown Artist',
-              artworkUrl:
-                track.info?.artworkUrl ||
-                (track.info?.identifier
-                  ? `https://img.youtube.com/vi/${track.info.identifier}/mqdefault.jpg`
-                  : ''),
-              duration: track.info?.duration || 0,
-              album: track.info?.author || '',
-              encoded: track.encoded,
-            }));
+            .map((track) => {
+              const identifier = track.info?.identifier;
+              return {
+                id: identifier || 'unknown',
+                title: track.info?.title || 'Unknown Title',
+                artist: track.info?.author || 'Unknown Artist',
+                artworkUrl:
+                  track.info?.artworkUrl ||
+                  (identifier
+                    ? `https://img.youtube.com/vi/${identifier}/mqdefault.jpg`
+                    : ''),
+                duration: track.info?.duration || 0,
+                album: track.info?.author || '',
+                encoded: track.encoded,
+              };
+            });
           setResults(mapped);
           saveToHistory(debouncedQuery);
         } else {

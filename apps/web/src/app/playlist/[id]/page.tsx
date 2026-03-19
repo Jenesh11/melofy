@@ -1,28 +1,72 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { Play, Music2, Loader2, ChevronLeft, Heart, Check } from 'lucide-react';
 import { useAuth } from '@/lib/firebase/auth-context';
-import { getPlaylistById, Playlist } from '@/lib/firebase/playlists';
-import { usePlayerStore, Track as PlayerTrack } from '@/store/usePlayerStore';
+import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
+import { getPlaylistById } from '@/lib/firebase/playlists';
+import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { Button } from '@/components/ui/button';
 import { TrackList, TrackItem } from '@/components/ui/TrackList';
 import Link from 'next/link';
+import {
+  mapSpotifyTrackToTrackItem,
+  mapTrackItemToPlayerTrack,
+  type SpotifyTrackLike,
+} from '@/lib/track-mappers';
+
+interface SpotifyPlaylistData {
+  id?: string;
+  name: string;
+  description?: string;
+  artworkUrl?: string;
+  images?: Array<{ url?: string }>;
+  trackCount?: number;
+  tracks: SpotifyTrackLike[];
+}
+
+interface CustomPlaylistTrack {
+  info: {
+    identifier: string;
+    title: string;
+    author: string;
+    artworkUrl?: string;
+    duration: number;
+  };
+  encoded?: string;
+}
+
+interface CustomPlaylistData {
+  id?: string;
+  name: string;
+  description?: string;
+  artworkUrl?: string;
+  images?: Array<{ url?: string }>;
+  trackCount?: number;
+  tracks: CustomPlaylistTrack[];
+}
+
+type PlaylistData = SpotifyPlaylistData | CustomPlaylistData;
 
 export default function PlaylistPage() {
   const params = useParams();
   const id = params.id as string;
   const { user } = useAuth();
-  const { playPlaylist } = usePlayerStore();
-  const { isSaved, addPlaylist, removePlaylist } = useLibraryStore();
+  const playPlaylist = usePlayerStore((state) => state.playPlaylist);
+  const savedPlaylists = useLibraryStore((state) => state.savedPlaylists);
+  const addPlaylist = useLibraryStore((state) => state.addPlaylist);
+  const removePlaylist = useLibraryStore((state) => state.removePlaylist);
 
-  const saved = isSaved(id);
-
-  const [playlist, setPlaylist] = useState<any>(null); // Use any to support both Firebase and Spotify shapes
+  const [playlist, setPlaylist] = useState<PlaylistData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSpotifySource, setIsSpotifySource] = useState(false);
+
+  const saved = useMemo(
+    () => savedPlaylists.some((entry) => entry.id === id),
+    [id, savedPlaylists],
+  );
 
   useEffect(() => {
     async function fetchPlaylist() {
@@ -30,11 +74,10 @@ export default function PlaylistPage() {
 
       setIsLoading(true);
 
-      // 1. Try Firebase first
       let dbPlaylist = null;
       try {
         dbPlaylist = await getPlaylistById(id);
-      } catch (e) {
+      } catch {
         console.log('Firebase lookup failed, proceeding to Spotify fallback');
       }
 
@@ -45,15 +88,18 @@ export default function PlaylistPage() {
         return;
       }
 
-      // 2. Fallback to Spotify API
       try {
-        const res = await fetch(`/api/spotify/playlists/${id}`);
+        const authHeaders = await getFirebaseAuthHeaders(user);
+        const res = await fetch(`/api/spotify/playlists/${id}`, {
+          headers: authHeaders,
+        });
+
         if (res.ok) {
-          const spotifyData = await res.json();
+          const spotifyData = (await res.json()) as SpotifyPlaylistData;
           setPlaylist(spotifyData);
           setIsSpotifySource(true);
         } else {
-          setPlaylist(null); // Truly not found
+          setPlaylist(null);
         }
       } catch (error) {
         console.error('Error fetching Spotify playlist:', error);
@@ -63,8 +109,61 @@ export default function PlaylistPage() {
       }
     }
 
-    fetchPlaylist();
-  }, [id]);
+    void fetchPlaylist();
+  }, [id, user]);
+
+  const trackItems: TrackItem[] = useMemo(() => {
+    if (!playlist?.tracks) return [];
+
+    if (isSpotifySource) {
+      const spotifyTracks = playlist.tracks as SpotifyTrackLike[];
+      return spotifyTracks.map((track) => {
+        const mapped = mapSpotifyTrackToTrackItem(track);
+        return {
+          ...mapped,
+          artworkUrl: mapped.artworkUrl || playlist.artworkUrl || '',
+          encoded: '',
+        };
+      });
+    }
+
+    const customTracks = playlist.tracks as CustomPlaylistTrack[];
+    return customTracks.map((track) => ({
+      id: track.info.identifier,
+      title: track.info.title,
+      artist: track.info.author,
+      artworkUrl: track.info.artworkUrl || '',
+      duration: track.info.duration,
+      album: track.info.author,
+      encoded: track.encoded,
+    }));
+  }, [isSpotifySource, playlist]);
+
+  const tracksToPlay = useMemo(
+    () => trackItems.map((track) => mapTrackItemToPlayerTrack(track)),
+    [trackItems],
+  );
+
+  const handlePlayPlaylist = useCallback(() => {
+    playPlaylist(tracksToPlay, id, isSpotifySource ? 'spotify' : 'custom');
+  }, [id, isSpotifySource, playPlaylist, tracksToPlay]);
+
+  const handleToggleSave = useCallback(() => {
+    if (!playlist) return;
+
+    if (saved) {
+      removePlaylist(id);
+      return;
+    }
+
+    addPlaylist({
+      id,
+      name: playlist.name,
+      artworkUrl: playlist.artworkUrl || playlist.images?.[0]?.url || '',
+      type: isSpotifySource ? 'spotify' : 'custom',
+      trackCount: playlist.trackCount || playlist.tracks?.length || 0,
+    });
+  }, [addPlaylist, id, isSpotifySource, playlist, removePlaylist, saved]);
 
   if (isLoading) {
     return (
@@ -90,53 +189,6 @@ export default function PlaylistPage() {
       </div>
     );
   }
-
-  // Map playlist tracks to TrackItem shape for the unified TrackList
-  const trackItems: TrackItem[] = isSpotifySource
-    ? playlist.tracks.map((t: any) => ({
-        id: t.id,
-        title: t.name,
-        artist: t.artists?.map((a: any) => a.name).join(', ') || 'Unknown',
-        artworkUrl: t.album?.images?.[0]?.url || playlist.artworkUrl || '',
-        duration: t.duration_ms || 0,
-        album: t.album?.name || 'Single',
-        encoded: '', // Empty, resolved on-the-fly by PlayerShell
-      }))
-    : playlist.tracks.map((t: any) => ({
-        id: t.info.identifier,
-        title: t.info.title,
-        artist: t.info.author,
-        artworkUrl: t.info.artworkUrl || '',
-        duration: t.info.duration,
-        album: t.info.author, // Show artist in album column
-        encoded: t.encoded,
-      }));
-
-  const handlePlayPlaylist = () => {
-    const tracksToPlay: PlayerTrack[] = trackItems.map((t) => ({
-      id: t.id,
-      title: t.title,
-      artist: t.artist,
-      artworkUrl: t.artworkUrl,
-      duration: t.duration,
-      url: t.encoded,
-    }));
-    playPlaylist(tracksToPlay, id, isSpotifySource ? 'spotify' : 'custom');
-  };
-
-  const handleToggleSave = () => {
-    if (saved) {
-      removePlaylist(id);
-    } else {
-      addPlaylist({
-        id: id,
-        name: playlist.name,
-        artworkUrl: playlist.artworkUrl || playlist.images?.[0]?.url || '',
-        type: isSpotifySource ? 'spotify' : 'custom',
-        trackCount: playlist.trackCount || playlist.tracks?.length || 0,
-      });
-    }
-  };
 
   return (
     <div className='flex flex-col min-h-full overflow-x-hidden custom-scrollbar p-4 md:p-8 pb-32 md:pb-8'>
@@ -171,7 +223,7 @@ export default function PlaylistPage() {
             <span className='font-semibold text-foreground'>
               {isSpotifySource ? 'Spotify' : user?.displayName || 'User'}
             </span>
-            <span>•</span>
+            <span>&middot;</span>
             <span>
               {playlist.trackCount || playlist.tracks?.length || 0} tracks
             </span>

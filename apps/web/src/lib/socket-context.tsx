@@ -13,6 +13,7 @@ const SocketContext = createContext<SocketContextData>({
   socket: null,
   isConnected: false,
 });
+const SOCKET_TOKEN_REFRESH_INTERVAL_MS = 45 * 60 * 1000;
 
 export const useSocket = () => {
   return useContext(SocketContext);
@@ -25,13 +26,41 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let activeSocket: Socket | null = null;
+    let refreshInterval: ReturnType<typeof setInterval> | null = null;
+    let reconnectAuthHandler: (() => void) | null = null;
     let cancelled = false;
 
     if (!user) {
-      setSocket(null);
-      setIsConnected(false);
       return;
     }
+
+    const refreshSocketToken = async (forceRefresh = false) => {
+      if (!activeSocket || cancelled) return;
+
+      try {
+        const refreshedToken = await user.getIdToken(forceRefresh);
+        if (cancelled || !activeSocket) return;
+
+        activeSocket.auth = { token: refreshedToken };
+        if (activeSocket.connected) {
+          activeSocket.emit(
+            'refresh_token',
+            refreshedToken,
+            (response?: { ok?: boolean; error?: string }) => {
+              if (response?.ok) return;
+
+              console.error(
+                'Socket token refresh rejected:',
+                response?.error || 'Unknown error',
+              );
+              activeSocket?.disconnect();
+            },
+          );
+        }
+      } catch (error) {
+        console.error('Failed to refresh socket token:', error);
+      }
+    };
 
     const connectSocket = async () => {
       const token = await user.getIdToken();
@@ -47,6 +76,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       socketInstance.on('connect', () => {
         console.log('Connected to Audio Backend socket server');
         setIsConnected(true);
+        void refreshSocketToken(false);
       });
 
       socketInstance.on('disconnect', () => {
@@ -54,8 +84,21 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         setIsConnected(false);
       });
 
+      socketInstance.on('auth_error', (payload) => {
+        console.error('Socket authentication error:', payload);
+        socketInstance.disconnect();
+      });
+
+      reconnectAuthHandler = () => {
+        void refreshSocketToken(true);
+      };
+      socketInstance.io.on('reconnect_attempt', reconnectAuthHandler);
+
       activeSocket = socketInstance;
       setSocket(socketInstance);
+      refreshInterval = setInterval(() => {
+        void refreshSocketToken(true);
+      }, SOCKET_TOKEN_REFRESH_INTERVAL_MS);
     };
 
     connectSocket().catch((error) => {
@@ -65,6 +108,10 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
     return () => {
       cancelled = true;
+      if (refreshInterval) clearInterval(refreshInterval);
+      if (activeSocket && reconnectAuthHandler) {
+        activeSocket.io.off('reconnect_attempt', reconnectAuthHandler);
+      }
       activeSocket?.disconnect();
       setSocket(null);
       setIsConnected(false);

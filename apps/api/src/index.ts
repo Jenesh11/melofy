@@ -1,8 +1,10 @@
 import 'dotenv/config';
 import express from 'express';
 import cors, { type CorsOptions } from 'cors';
-import { Server as SocketIOServer } from 'socket.io';
+import { Server as SocketIOServer, type Socket as SocketIOSocket } from 'socket.io';
 import http from 'http';
+import helmet from 'helmet';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import streamRouter from './routes/stream';
 import spotifyRouter from './routes/spotify';
 import lyricsRouter from './routes/lyrics';
@@ -10,7 +12,34 @@ import { LavalinkManager } from 'lavalink-client';
 import { requireFirebaseAuth, verifyFirebaseIdToken } from './lib/firebaseAuth';
 
 const app = express();
-app.set('trust proxy', 1);
+
+function resolveTrustProxySetting():
+  | boolean
+  | number
+  | string
+  | string[]
+  | ((ip: string) => boolean) {
+  const raw = process.env.TRUST_PROXY;
+  if (!raw) return false;
+
+  const normalized = raw.trim().toLowerCase();
+  if (!normalized) return false;
+  if (normalized === 'true') return true;
+  if (normalized === 'false') return false;
+
+  const numeric = Number(normalized);
+  if (Number.isInteger(numeric) && numeric >= 0) return numeric;
+
+  // Supports values like "loopback", "10.0.0.0/8", or comma-separated lists.
+  const entries = raw
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return entries.length <= 1 ? raw.trim() : entries;
+}
+
+app.set('trust proxy', resolveTrustProxySetting());
 
 const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000')
   .split(',')
@@ -30,44 +59,32 @@ const corsOptions: CorsOptions = {
   credentials: true,
 };
 
+app.use(helmet());
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '512kb' }));
 
-const requestBuckets = new Map<string, { count: number; resetAt: number }>();
-
-function createRateLimiter(maxRequests: number, windowMs: number) {
-  return (
-    req: express.Request,
-    res: express.Response,
-    next: express.NextFunction,
-  ) => {
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const key = `${ip}:${req.path}`;
-    const now = Date.now();
-    const existing = requestBuckets.get(key);
-
-    if (!existing || now > existing.resetAt) {
-      requestBuckets.set(key, { count: 1, resetAt: now + windowMs });
-      next();
-      return;
-    }
-
-    if (existing.count >= maxRequests) {
-      const retryAfter = Math.ceil((existing.resetAt - now) / 1000);
-      res.setHeader('Retry-After', retryAfter.toString());
-      res.status(429).json({ error: 'Too many requests' });
-      return;
-    }
-
-    existing.count += 1;
-    requestBuckets.set(key, existing);
-    next();
-  };
+function getAuthenticatedRateLimitKey(req: express.Request): string {
+  if (req.user?.uid) return `uid:${req.user.uid}`;
+  const ip = req.ip || req.socket.remoteAddress || '';
+  return `ip:${ipKeyGenerator(ip)}`;
 }
 
-const publicRateLimit = createRateLimiter(120, 60_000);
-const privateRateLimit = createRateLimiter(90, 60_000);
-const streamRateLimit = createRateLimiter(30, 60_000);
+const publicRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: { error: 'Too many requests' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const privateRateLimit = rateLimit({
+  windowMs: 60 * 1000,
+  max: 90,
+  keyGenerator: getAuthenticatedRateLimitKey,
+  message: { error: 'Too many requests' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 app.use((req, _res, next) => {
   console.log(`[HTTP] ${req.method} ${req.path}`);
@@ -161,7 +178,7 @@ app.get('/health', (_req, res) => {
   });
 });
 
-app.use('/api', streamRateLimit, streamRouter);
+app.use('/api', streamRouter);
 app.use('/api/spotify', publicRateLimit, spotifyRouter);
 app.use('/api/lyrics', publicRateLimit, lyricsRouter);
 
@@ -237,18 +254,87 @@ io.use(async (socket, next) => {
 
   socket.data.userId = user.uid;
   socket.data.username = user.email || user.uid;
+  socket.data.tokenExpiresAt = user.exp
+    ? user.exp * 1000
+    : Date.now() + 55 * 60 * 1000;
   next();
 });
+
+function scheduleSocketExpiry(socket: SocketIOSocket): void {
+  const existingTimer = socket.data.authExpiryTimer as NodeJS.Timeout | undefined;
+  if (existingTimer) clearTimeout(existingTimer);
+
+  const tokenExpiresAt =
+    typeof socket.data.tokenExpiresAt === 'number'
+      ? socket.data.tokenExpiresAt
+      : Date.now() + 55 * 60 * 1000;
+
+  const delayMs = Math.max(1000, tokenExpiresAt - Date.now() + 5000);
+  socket.data.authExpiryTimer = setTimeout(() => {
+    socket.emit('auth_error', { error: 'TokenExpired' });
+    socket.disconnect(true);
+  }, delayMs);
+}
 
 io.on('connection', (socket) => {
   const userId = socket.data.userId as string;
   const username = (socket.data.username as string) || userId;
   const secureRoomId = `user:${userId}`;
 
+  scheduleSocketExpiry(socket);
   socket.join(secureRoomId);
   socket.data.roomId = secureRoomId;
 
   console.log(`[Socket] User connected: ${username} (${socket.id})`);
+
+  socket.use((packet, next) => {
+    if (packet[0] === 'refresh_token') {
+      next();
+      return;
+    }
+
+    const tokenExpiresAt = socket.data.tokenExpiresAt as number | undefined;
+    if (typeof tokenExpiresAt === 'number' && Date.now() > tokenExpiresAt + 5000) {
+      next(new Error('Token expired'));
+      socket.emit('auth_error', { error: 'TokenExpired' });
+      socket.disconnect(true);
+      return;
+    }
+
+    next();
+  });
+
+  socket.on(
+    'refresh_token',
+    async (
+      token: string,
+      callback?: (payload: { ok: boolean; error?: string; expiresAt?: number }) => void,
+    ) => {
+      if (typeof token !== 'string' || !token.trim()) {
+        callback?.({ ok: false, error: 'Missing token' });
+        return;
+      }
+
+      const refreshedUser = await verifyFirebaseIdToken(token.trim());
+      if (!refreshedUser || refreshedUser.uid !== userId) {
+        callback?.({ ok: false, error: 'Unauthorized' });
+        socket.emit('auth_error', { error: 'Unauthorized' });
+        socket.disconnect(true);
+        return;
+      }
+
+      socket.data.username = refreshedUser.email || refreshedUser.uid;
+      socket.data.tokenExpiresAt = refreshedUser.exp
+        ? refreshedUser.exp * 1000
+        : Date.now() + 55 * 60 * 1000;
+      scheduleSocketExpiry(socket);
+
+      callback?.({
+        ok: true,
+        expiresAt: socket.data.tokenExpiresAt as number,
+      });
+    },
+  );
 
   socket.on('join_room', () => {
     socket.rooms.forEach((room) => {
@@ -273,6 +359,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    const timer = socket.data.authExpiryTimer as NodeJS.Timeout | undefined;
+    if (timer) clearTimeout(timer);
     console.log('Client disconnected:', socket.id);
   });
 });

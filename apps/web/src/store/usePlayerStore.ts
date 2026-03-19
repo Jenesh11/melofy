@@ -203,24 +203,37 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   toggleShuffle: () => set((state) => ({ isShuffle: !state.isShuffle })),
   toggleRepeat: () => set((state) => ({ isRepeat: !state.isRepeat })),
   toggleAutoplay: () => set((state) => ({ isAutoplay: !state.isAutoplay })),
-  updateTrackUrl: (id, url, identifier) => {
-    const { currentTrack, queue } = get();
-    // Update current track if it matches
-    if (currentTrack && currentTrack.id === id) {
-      set({
-        currentTrack: {
-          ...currentTrack,
+  updateTrackUrl: (id, url, identifier) =>
+    set((state) => {
+      const nextCurrentTrack =
+        state.currentTrack && state.currentTrack.id === id
+          ? {
+              ...state.currentTrack,
+              url,
+              identifier: identifier || state.currentTrack.identifier,
+            }
+          : state.currentTrack;
+
+      const queueIndex = state.queue.findIndex((track) => track.id === id);
+      if (queueIndex === -1 && nextCurrentTrack === state.currentTrack) {
+        return state;
+      }
+
+      let nextQueue = state.queue;
+      if (queueIndex >= 0) {
+        nextQueue = [...state.queue];
+        nextQueue[queueIndex] = {
+          ...nextQueue[queueIndex],
           url,
-          identifier: identifier || currentTrack.identifier,
-        },
-      });
-    }
-    // Also update in queue if it exists there
-    const newQueue = queue.map((t) =>
-      t.id === id ? { ...t, url, identifier: identifier || t.identifier } : t,
-    );
-    set({ queue: newQueue });
-  },
+          identifier: identifier || nextQueue[queueIndex].identifier,
+        };
+      }
+
+      return {
+        currentTrack: nextCurrentTrack,
+        queue: nextQueue,
+      };
+    }),
   hydrateState: (newState) =>
     set((state) => ({ ...state, ...newState, isPlaying: false })), // Always start paused on reload
   setPlaying: (isPlaying) => set({ isPlaying }),

@@ -1,50 +1,71 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { TrendingUp, Loader2, Music2, Play } from 'lucide-react';
 import { TrackList, TrackItem } from '@/components/ui/TrackList';
-import { usePlayerStore, Track as PlayerTrack } from '@/store/usePlayerStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/lib/firebase/auth-context';
+import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
+import {
+  mapSpotifyTrackToTrackItem,
+  mapTrackItemToPlayerTrack,
+  type SpotifyTrackLike,
+} from '@/lib/track-mappers';
+
+interface SpotifyTrendingItem {
+  track?: SpotifyTrackLike;
+}
 
 export default function TrendingPage() {
   const [tracks, setTracks] = useState<TrackItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { playPlaylist } = usePlayerStore();
+  const playPlaylist = usePlayerStore((state) => state.playPlaylist);
+  const { user } = useAuth();
+
+  const tracksToPlay = useMemo(
+    () => tracks.map((track) => mapTrackItemToPlayerTrack(track)),
+    [tracks],
+  );
 
   useEffect(() => {
     const fetchTrending = async () => {
+      if (!user) {
+        setTracks([]);
+        setIsLoading(false);
+        return;
+      }
+
       try {
         setIsLoading(true);
-        const res = await fetch('/api/spotify/trending');
-        if (res.ok) {
-          const data = await res.json();
-          const mapped: TrackItem[] = data
-            .filter((item: any) => item.track)
-            .map((item: any) => ({
-              id: item.track.id,
-              title: item.track.name,
-              artist:
-                item.track.artists?.map((a: any) => a.name).join(', ') ||
-                'Unknown',
-              artworkUrl: item.track.album?.images?.[0]?.url || '',
-              duration: item.track.duration_ms || 0,
-              album: item.track.album?.name || '',
-            }));
-          setTracks(mapped);
+        const authHeaders = await getFirebaseAuthHeaders(user);
+        const res = await fetch('/api/spotify/trending', {
+          headers: authHeaders,
+        });
+
+        if (!res.ok) {
+          setTracks([]);
+          return;
         }
-      } catch (err) {
-        console.error('Failed to fetch trending:', err);
+
+        const data = (await res.json()) as SpotifyTrendingItem[];
+        const mapped: TrackItem[] = data
+          .filter((item): item is { track: SpotifyTrackLike } => Boolean(item?.track))
+          .map((item) => mapSpotifyTrackToTrackItem(item.track));
+
+        setTracks(mapped);
+      } catch (error) {
+        console.error('Failed to fetch trending:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchTrending();
-  }, []);
+    void fetchTrending();
+  }, [user]);
 
   return (
     <div className='flex flex-col min-h-full overflow-x-hidden custom-scrollbar p-4 md:p-8 pb-32 md:pb-8'>
-      {/* Header – matching playlist page style */}
       <header className='flex flex-col md:flex-row items-center md:items-end gap-6 mb-8 mt-4'>
         <div className='h-48 w-48 md:h-60 md:w-60 rounded-[2.5rem] bg-linear-to-br from-primary/30 to-blue-500/20 shadow-2xl shrink-0 flex items-center justify-center'>
           <TrendingUp className='h-24 w-24 text-primary' />
@@ -59,9 +80,9 @@ export default function TrendingPage() {
           </h1>
           <div className='flex items-center gap-2 text-muted-foreground text-sm font-light'>
             <span className='font-semibold text-foreground'>Spotify</span>
-            <span>•</span>
+            <span>&middot;</span>
             <span>{tracks.length} tracks</span>
-            <span>•</span>
+            <span>&middot;</span>
             <span>Updated daily</span>
           </div>
         </div>
@@ -71,18 +92,8 @@ export default function TrendingPage() {
         <Button
           size='lg'
           className='bg-primary text-primary-foreground font-bold h-14 w-14 rounded-full shadow-lg hover:scale-105 transition-transform'
-          onClick={() => {
-            const tracksToPlay: PlayerTrack[] = tracks.map((t) => ({
-              id: t.id,
-              title: t.title,
-              artist: t.artist,
-              artworkUrl: t.artworkUrl,
-              duration: t.duration,
-              url: t.encoded || '',
-            }));
-            playPlaylist(tracksToPlay);
-          }}
-          disabled={tracks.length === 0}
+          onClick={() => playPlaylist(tracksToPlay)}
+          disabled={tracksToPlay.length === 0}
         >
           <Play className='h-6 w-6 fill-current' />
         </Button>
@@ -91,7 +102,6 @@ export default function TrendingPage() {
         </p>
       </div>
 
-      {/* Track List */}
       {isLoading ? (
         <div className='flex flex-col items-center justify-center py-32 gap-4'>
           <Loader2 className='h-10 w-10 text-primary animate-spin' />

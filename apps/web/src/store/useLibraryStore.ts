@@ -7,7 +7,7 @@ export interface SavedCollection {
   artworkUrl: string;
   type: 'custom' | 'spotify' | 'youtube';
   trackCount?: number;
-  tracks?: any[]; // Only for custom playlists
+  tracks?: unknown[]; // Only for custom playlists
 }
 
 interface LibraryState {
@@ -22,9 +22,21 @@ export const useLibraryStore = create<LibraryState>()(
     (set, get) => ({
       savedPlaylists: [],
       addPlaylist: (playlist) =>
-        set((state) => ({
-          savedPlaylists: [...state.savedPlaylists, playlist],
-        })),
+        set((state) => {
+          const existingIndex = state.savedPlaylists.findIndex(
+            (entry) => entry.id === playlist.id,
+          );
+
+          if (existingIndex === -1) {
+            return {
+              savedPlaylists: [...state.savedPlaylists, playlist],
+            };
+          }
+
+          const nextPlaylists = [...state.savedPlaylists];
+          nextPlaylists[existingIndex] = playlist;
+          return { savedPlaylists: nextPlaylists };
+        }),
       removePlaylist: (id) =>
         set((state) => ({
           savedPlaylists: state.savedPlaylists.filter((p) => p.id !== id),
