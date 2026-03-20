@@ -8,6 +8,7 @@ import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import streamRouter from './routes/stream';
 import spotifyRouter from './routes/spotify';
 import lyricsRouter from './routes/lyrics';
+import playerRouter from './routes/player';
 import { LavalinkManager } from 'lavalink-client';
 import { requireFirebaseAuth, verifyFirebaseIdToken } from './lib/firebaseAuth';
 
@@ -182,6 +183,7 @@ app.get('/health', (_req, res) => {
 app.use('/api', streamRouter);
 app.use('/api/spotify', publicRateLimit, spotifyRouter);
 app.use('/api/lyrics', publicRateLimit, lyricsRouter);
+app.use('/api', playerRouter);
 
 app.get('/api/search', requireFirebaseAuth, privateRateLimit, async (req, res) => {
   const query = req.query.q as string;
