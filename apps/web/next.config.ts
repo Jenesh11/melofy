@@ -1,13 +1,14 @@
 import type { NextConfig } from "next";
 
 const backendBaseUrl = (
-  process.env.INTERNAL_API_URL ||
-  process.env.BACKEND_API_URL ||
-  process.env.NEXT_PUBLIC_BACKEND_API_URL ||
-  'http://localhost:3001'
+  process.env.INTERNAL_API_URL || 
+  process.env.BACKEND_API_URL || 
+  process.env.NEXT_PUBLIC_BACKEND_API_URL || 
+  'http://api:3001'           // Docker Compose service name — safe fallback inside container
 ).replace(/\/$/, '');
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   async rewrites() {
     return [
       {

@@ -41,7 +41,7 @@ function resolveTrustProxySetting():
 
 app.set('trust proxy', resolveTrustProxySetting());
 
-const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000')
+const allowedOrigins = (process.env.CORS_ORIGINS || '')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -52,6 +52,7 @@ const corsOptions: CorsOptions = {
       callback(null, true);
       return;
     }
+    console.log(`[CORS] Rejected origin: ${origin}. Allowed: ${allowedOrigins.join(', ')}`);
     callback(new Error('CORS origin not allowed'));
   },
   methods: ['GET', 'POST', 'OPTIONS'],

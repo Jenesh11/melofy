@@ -1,0 +1,64 @@
+services:
+  # --- Melofy Backend (API) ---
+  api:
+    container_name: melofy-api
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "${API_PORT:-3001}:3001"
+    env_file:
+      - ./apps/api/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      # Explicitly set credentials location if the volume is provided
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
+    networks:
+      - nodelink_default
+    restart: unless-stopped
+    # If using Firebase Admin with local key (matches existing api/docker-compose configuration)
+    volumes:
+      - ./serviceAccountKey.json:/run/secrets/firebase-service-account.json:ro
+
+  # --- Melofy Frontend (Web) ---
+  web:
+    container_name: melofy-web
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        # These vars must be available at build time (Next.js bakes NEXT_PUBLIC_* into the bundle)
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
+        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}
+        NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID}
+        UPSTASH_REDIS_REST_URL: ${UPSTASH_REDIS_REST_URL}
+        UPSTASH_REDIS_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN}
+        BACKEND_API_URL: ${BACKEND_API_URL}
+        INTERNAL_API_URL: ${INTERNAL_API_URL}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    env_file:
+      - ./apps/web/.env.local
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      INTERNAL_API_URL: ${INTERNAL_API_URL}
+      BACKEND_API_URL: ${BACKEND_API_URL}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
+    networks:
+      - nodelink_default
+    depends_on:
+      - api
+    restart: unless-stopped
+    volumes:
+      - ./serviceAccountKey.json:/run/secrets/firebase-service-account.json:ro
+
+
+networks:
+  nodelink_default:
+    external: true
