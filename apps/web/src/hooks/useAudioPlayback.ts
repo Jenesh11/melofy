@@ -187,6 +187,8 @@ export function useAudioPlayback() {
     };
   }, [currentTrack, getAuthHeader, updateTrackUrl]);
 
+  const [isHydrated, setIsHydrated] = useState(false);
+
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -197,6 +199,7 @@ export function useAudioPlayback() {
       })
       .then((res) => (res ? res.json() : null))
       .then((data) => {
+        setIsHydrated(true); // Mark as hydrated even if no state exists
         if (!data?.state) return;
 
         let state = data.state;
@@ -223,11 +226,14 @@ export function useAudioPlayback() {
           setCurrentTime(state.currentTime);
         }
       })
-      .catch(console.error);
+      .catch((err) => {
+        console.error(err);
+        setIsHydrated(true); // Still allow saving if fetch fails
+      });
   }, [user?.uid, getAuthHeader, hydrateState, setCurrentTime]);
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || !isHydrated) return;
 
     if (stateSyncTimer.current) {
       clearTimeout(stateSyncTimer.current);
@@ -276,6 +282,7 @@ export function useAudioPlayback() {
     volume,
     activePlaylistContext,
     getAuthHeader,
+    isHydrated,
   ]);
 
   const handleTogglePlay = useCallback(() => {
