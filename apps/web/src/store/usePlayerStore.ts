@@ -47,9 +47,10 @@ interface PlayerState {
   updateTrackUrl: (id: string, url: string, identifier?: string) => void;
   hydrateState: (state: Partial<PlayerState>) => void;
   setPlaying: (isPlaying: boolean) => void;
+  reset: () => void;
 }
 
-export const usePlayerStore = create<PlayerState>((set, get) => ({
+const initialState = {
   currentTrack: null,
   isPlaying: false,
   volume: 0.8,
@@ -62,6 +63,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   activePlaylistContext: null,
   activeCollectionId: null,
   activeCollectionType: null,
+};
+
+export const usePlayerStore = create<PlayerState>((set, get) => ({
+  ...initialState,
 
   play: (track) =>
     set((state) => ({
@@ -237,4 +242,5 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   hydrateState: (newState) =>
     set((state) => ({ ...state, ...newState, isPlaying: false })), // Always start paused on reload
   setPlaying: (isPlaying) => set({ isPlaying }),
+  reset: () => set(initialState),
 }));

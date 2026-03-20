@@ -8,7 +8,7 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
 });
 
-const MAX_STATE_SIZE_BYTES = 256 * 1024; // 256KB limit
+const MAX_STATE_SIZE_BYTES = 2 * 1024 * 1024; // 2MB limit
 
 // GET /api/player-state - Fetch persisted player state
 router.get('/player-state', requireFirebaseAuth, async (req, res) => {

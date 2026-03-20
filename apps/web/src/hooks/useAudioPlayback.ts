@@ -52,7 +52,12 @@ export function useAudioPlayback() {
   const activePlaylistContext = usePlayerStore(
     (state) => state.activePlaylistContext,
   );
+  const activeCollectionId = usePlayerStore((state) => state.activeCollectionId);
+  const activeCollectionType = usePlayerStore(
+    (state) => state.activeCollectionType,
+  );
   const isAutoplay = usePlayerStore((state) => state.isAutoplay);
+  const resetStore = usePlayerStore((state) => state.reset);
 
   const { user } = useAuth();
   const { socket } = useSocket();
@@ -189,6 +194,12 @@ export function useAudioPlayback() {
 
   const [isHydrated, setIsHydrated] = useState(false);
 
+  // Reset store when user changes to prevent cross-user contamination
+  useEffect(() => {
+    resetStore();
+    setIsHydrated(false);
+  }, [user?.uid, resetStore]);
+
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -197,16 +208,23 @@ export function useAudioPlayback() {
         if (!headers) return null;
         return fetch('/api/player-state', { headers });
       })
-      .then((res) => (res ? res.json() : null))
+      .then((res) => {
+        if (!res || !res.ok) throw new Error('Failed to fetch player state');
+        return res.json();
+      })
       .then((data) => {
-        setIsHydrated(true); // Mark as hydrated even if no state exists
-        if (!data?.state) return;
+        if (!data?.state) {
+          setIsHydrated(true); // Confirmed no state exists for this user
+          return;
+        }
 
         let state = data.state;
         if (typeof state === 'string') {
           try {
             state = JSON.parse(state);
           } catch {
+            console.error('[PlayerState] Failed to parse state string');
+            // Don't mark as hydrated if parsing fails to avoid overwriting with blank
             return;
           }
         }
@@ -219,18 +237,73 @@ export function useAudioPlayback() {
           isRepeat: state.isRepeat || false,
           volume: state.volume ?? 0.8,
           activePlaylistContext: state.activePlaylistContext || null,
+          activeCollectionId: state.activeCollectionId || null,
+          activeCollectionType: state.activeCollectionType || null,
         });
 
         if (audioRef.current && state.currentTime) {
           audioRef.current.currentTime = state.currentTime;
           setCurrentTime(state.currentTime);
         }
+
+        // Only mark as hydrated AFTER the store has been updated
+        setIsHydrated(true);
       })
       .catch((err) => {
-        console.error(err);
-        setIsHydrated(true); // Still allow saving if fetch fails
+        console.error('[PlayerState] Hydration failed:', err);
+        // Note: we do NOT set isHydrated(true) here. 
+        // This prevents the sync effect from running and wiping the server state.
       });
   }, [user?.uid, getAuthHeader, hydrateState, setCurrentTime]);
+
+  const syncStateToServer = useCallback(async () => {
+    if (!user?.uid || !isHydrated) return;
+
+    // Prune history to last 50 items to keep payload size manageable
+    const prunedHistory = history.slice(-50);
+
+    const stateToSave = {
+      currentTrack,
+      queue,
+      history: prunedHistory,
+      isShuffle,
+      isRepeat,
+      volume,
+      currentTime: audioRef.current?.currentTime || 0,
+      activePlaylistContext,
+      activeCollectionId,
+      activeCollectionType,
+    };
+
+    try {
+      const authHeaders = await getAuthHeader();
+      if (!authHeaders) return;
+
+      await fetch('/api/player-state', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: JSON.stringify({ state: stateToSave }),
+      });
+    } catch (error) {
+      console.error('[PlayerState] Sync failed:', error);
+    }
+  }, [
+    user?.uid,
+    isHydrated,
+    history,
+    currentTrack,
+    queue,
+    isShuffle,
+    isRepeat,
+    volume,
+    activePlaylistContext,
+    activeCollectionId,
+    activeCollectionType,
+    getAuthHeader,
+  ]);
 
   useEffect(() => {
     if (!user?.uid || !isHydrated) return;
@@ -240,31 +313,7 @@ export function useAudioPlayback() {
     }
 
     stateSyncTimer.current = setTimeout(() => {
-      const stateToSave = {
-        currentTrack,
-        queue,
-        history,
-        isShuffle,
-        isRepeat,
-        volume,
-        currentTime: audioRef.current?.currentTime || 0,
-        activePlaylistContext,
-      };
-
-      getAuthHeader()
-        .then((authHeaders) => {
-          if (!authHeaders) return;
-
-          return fetch('/api/player-state', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...authHeaders,
-            },
-            body: JSON.stringify({ state: stateToSave }),
-          });
-        })
-        .catch(console.error);
+      syncStateToServer();
     }, 2000);
 
     return () => {
@@ -272,18 +321,19 @@ export function useAudioPlayback() {
         clearTimeout(stateSyncTimer.current);
       }
     };
-  }, [
-    user?.uid,
-    currentTrack,
-    queue,
-    history,
-    isShuffle,
-    isRepeat,
-    volume,
-    activePlaylistContext,
-    getAuthHeader,
-    isHydrated,
-  ]);
+  }, [syncStateToServer, user?.uid, isHydrated]);
+
+  // Periodic position sync (heartbeat) every 10 seconds while playing
+  useEffect(() => {
+    if (!user?.uid || !isHydrated || !isPlaying) return;
+
+    const intervalId = setInterval(() => {
+      if (!audioRef.current || audioRef.current.paused) return;
+      syncStateToServer();
+    }, 10000); 
+
+    return () => clearInterval(intervalId);
+  }, [user?.uid, isHydrated, isPlaying, syncStateToServer]);
 
   const handleTogglePlay = useCallback(() => {
     if (isPlaying) {
@@ -442,14 +492,21 @@ export function useAudioPlayback() {
       ? (currentDisplayTimeMs / currentTrack.duration) * 100
       : 0;
 
-  const handleSeek = (value: number[]) => {
-    const seekPosition = value[0];
-    if (seekPosition === undefined || !audioRef.current || !currentTrack) return;
+  const handleSeek = useCallback(
+    (value: number[]) => {
+      const seekPosition = value[0];
+      if (seekPosition === undefined || !audioRef.current || !currentTrack)
+        return;
 
-    const time = (seekPosition / 100) * (currentTrack.duration / 1000);
-    audioRef.current.currentTime = time;
-    if (socket) socket.emit('playback_state', { type: 'seek', time });
-  };
+      const time = (seekPosition / 100) * (currentTrack.duration / 1000);
+      audioRef.current.currentTime = time;
+      if (socket) socket.emit('playback_state', { type: 'seek', time });
+
+      // Immediate sync on seek
+      syncStateToServer();
+    },
+    [currentTrack, socket, syncStateToServer],
+  );
 
   const handleVolumeWheel = (event: WheelEvent) => {
     const delta = event.deltaY > 0 ? -0.05 : 0.05;

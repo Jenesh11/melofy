@@ -63,7 +63,7 @@ const corsOptions: CorsOptions = {
 
 app.use(helmet());
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '512kb' }));
+app.use(express.json({ limit: '2mb' }));
 
 function getAuthenticatedRateLimitKey(req: express.Request): string {
   if (req.user?.uid) return `uid:${req.user.uid}`;
