@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
-const DEFAULT_STREAM_TICKET_TTL_SECONDS = 120;
-const MAX_STREAM_TICKET_TTL_SECONDS = 300;
+const DEFAULT_STREAM_TICKET_TTL_SECONDS = 300;
+const MAX_STREAM_TICKET_TTL_SECONDS = 600;
 
 interface StreamTicketClaims {
   u: string; // uid

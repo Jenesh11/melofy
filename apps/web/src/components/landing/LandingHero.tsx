@@ -101,81 +101,109 @@ export function LandingHero() {
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1, ease: 'easeOut', delay: 0.2 }}
-          className='relative hidden lg:block'
+          className='relative hidden lg:flex items-center justify-center'
         >
-          <div className='relative z-10 w-[500px] h-[600px] mx-auto bg-card rounded-[3rem] p-4 border border-border shadow-2xl overflow-hidden group'>
-            <div className='absolute inset-0 bg-primary/5 group-hover:bg-primary/10 transition-colors duration-500' />
+          <div className='relative w-full max-w-[500px] aspect-square flex items-center justify-center'>
+            {/* Background Glow */}
+            <div className='absolute inset-0 bg-linear-to-tr from-primary/30 via-purple-500/20 to-blue-500/30 blur-[100px] rounded-full' />
 
-            {/* Mock App UI */}
-            <div className='relative h-full flex flex-col gap-6 p-6'>
-              <div className='flex items-center justify-between'>
-                <div className='w-10 h-10 rounded-full bg-muted' />
-                <div className='flex gap-2'>
-                  <div className='w-2 h-2 rounded-full bg-muted' />
-                  <div className='w-2 h-2 rounded-full bg-muted' />
-                </div>
+            {/* Main Center Image */}
+            <motion.div
+              animate={{ y: [0, -15, 0] }}
+              transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+              className='absolute z-20 w-64 h-64 md:w-80 md:h-80 rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl'
+            >
+              <img
+                src='https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?auto=format&fit=crop&q=80&w=1000'
+                className='w-full h-full object-cover hover:scale-110 transition-transform duration-700'
+                alt='Vibrant Album Artwork'
+              />
+              <div className='absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent' />
+            </motion.div>
+
+            {/* Top Right Floating Image */}
+            <motion.div
+              animate={{ y: [0, 20, 0], rotate: [6, 2, 6] }}
+              transition={{
+                duration: 7,
+                repeat: Infinity,
+                ease: 'easeInOut',
+                delay: 1,
+              }}
+              className='absolute -top-4 right-4 z-10 w-40 h-40 md:w-52 md:h-52 rounded-3xl overflow-hidden border border-white/10 shadow-2xl'
+            >
+              <img
+                src='https://images.unsplash.com/photo-1541126274323-dbac58d14741?auto=format&fit=crop&q=80&w=800'
+                className='w-full h-full object-cover scale-110'
+                alt='Live Concert'
+              />
+              <div className='absolute inset-0 bg-black/20' />
+            </motion.div>
+
+            {/* Bottom Left Floating Image */}
+            <motion.div
+              animate={{ y: [0, -20, 0], rotate: [-6, -2, -6] }}
+              transition={{
+                duration: 8,
+                repeat: Infinity,
+                ease: 'easeInOut',
+                delay: 2,
+              }}
+              className='absolute -bottom-8 left-0 z-30 w-48 h-48 md:w-60 md:h-60 rounded-3xl overflow-hidden border border-white/10 shadow-2xl'
+            >
+              <img
+                src='https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=800'
+                className='w-full h-full object-cover'
+                alt='DJ Deck'
+              />
+              <div className='absolute inset-0 bg-linear-to-tr from-primary/20 to-transparent' />
+            </motion.div>
+
+            {/* Floating Glassmorphism Badges */}
+            <motion.div
+              animate={{ y: [0, -10, 0] }}
+              transition={{
+                duration: 5,
+                repeat: Infinity,
+                ease: 'easeInOut',
+                delay: 0.5,
+              }}
+              className='absolute top-1/4 -left-12 z-40 bg-background/80 backdrop-blur-xl p-4 rounded-2xl border border-white/5 shadow-2xl flex items-center gap-4'
+            >
+              <div className='p-3 bg-primary/20 rounded-full text-primary'>
+                <Headphones className='w-6 h-6' />
               </div>
-              <div className='w-full aspect-square bg-zinc-800/80 rounded-2xl overflow-hidden border border-white/5 relative group/img'>
-                <img
-                  src='https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=1000&auto=format&fit=crop'
-                  className='w-full h-full object-cover opacity-60 group-hover/img:scale-110 transition-transform duration-700'
-                  alt='album'
-                />
-                <div className='absolute inset-0 flex items-center justify-center'>
-                  <div className='w-16 h-16 rounded-full bg-primary flex items-center justify-center shadow-2xl'>
-                    <div className='w-0 h-0 border-t-10 border-t-transparent border-l-16 border-l-black border-b-10 border-b-transparent translate-x-1' />
-                  </div>
-                </div>
+              <div className='pr-4 text-left'>
+                <p className='text-sm font-bold text-foreground'>
+                  Lossless Audio
+                </p>
+                <p className='text-xs text-muted-foreground font-medium'>
+                  High Fidelity
+                </p>
               </div>
-              <div className='flex flex-col gap-2'>
-                <div className='h-6 w-3/4 bg-white/10 rounded-md' />
-                <div className='h-4 w-1/2 bg-white/5 rounded-md' />
+            </motion.div>
+
+            <motion.div
+              animate={{ y: [0, 15, 0] }}
+              transition={{
+                duration: 6,
+                repeat: Infinity,
+                ease: 'easeInOut',
+                delay: 1.5,
+              }}
+              className='absolute bottom-1/4 -right-8 z-40 bg-background/80 backdrop-blur-xl p-4 rounded-2xl border border-white/5 shadow-2xl flex items-center gap-4'
+            >
+              <div className='p-3 bg-blue-500/20 rounded-full text-blue-400'>
+                <Music2 className='w-6 h-6' />
               </div>
-              <div className='mt-auto space-y-4'>
-                <div className='h-1.5 w-full bg-muted rounded-full overflow-hidden'>
-                  <motion.div
-                    animate={{ width: ['10%', '60%', '30%'] }}
-                    transition={{
-                      duration: 5,
-                      repeat: Infinity,
-                      ease: 'easeInOut',
-                    }}
-                    className='h-full bg-primary'
-                  />
-                </div>
-                <div className='flex justify-between'>
-                  <div className='w-4 h-4 rounded bg-muted' />
-                  <div className='w-4 h-4 rounded bg-muted' />
-                  <div className='w-4 h-4 rounded bg-muted' />
-                </div>
+              <div className='pr-4 text-left'>
+                <p className='text-sm font-bold text-foreground'>50M+ Tracks</p>
+                <p className='text-xs text-muted-foreground font-medium'>
+                  Endless library
+                </p>
               </div>
-            </div>
+            </motion.div>
           </div>
-
-          {/* Floating Elements */}
-          <motion.div
-            animate={{ y: [0, -20, 0] }}
-            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-            className='absolute -top-10 -right-10 w-24 h-24 bg-primary/20 backdrop-blur-xl rounded-2xl border border-white/10 flex items-center justify-center shadow-xl'
-          >
-            <Headphones className='w-10 h-10 text-primary' />
-          </motion.div>
-          <motion.div
-            animate={{ y: [0, 20, 0] }}
-            transition={{
-              duration: 5,
-              repeat: Infinity,
-              ease: 'easeInOut',
-              delay: 1,
-            }}
-            className='absolute bottom-20 -left-20 w-32 h-16 bg-blue-500/20 backdrop-blur-xl rounded-full border border-white/10 flex items-center justify-center gap-3 px-4 shadow-xl'
-          >
-            <Music2 className='w-6 h-6 text-blue-400' />
-            <div className='flex flex-col gap-1'>
-              <div className='h-1.5 w-12 bg-white/20 rounded-full' />
-              <div className='h-1.5 w-8 bg-white/10 rounded-full' />
-            </div>
-          </motion.div>
         </motion.div>
       </div>
     </section>

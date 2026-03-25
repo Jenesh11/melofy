@@ -16,14 +16,15 @@ interface RemotePlaybackState {
 }
 
 interface AutoplayTrackData {
-  encoded?: string;
-  info?: {
-    identifier?: string;
-    title?: string;
-    author?: string;
-    artworkUrl?: string;
-    duration?: number;
-  };
+  encoded: string;
+  id: string;
+  title: string;
+  artist: string;
+  duration: number;
+  artwork: string;
+  uri: string;
+  isrc?: string;
+  source?: string;
 }
 
 interface AutoplayResponse {
@@ -352,32 +353,37 @@ export function useAudioPlayback() {
 
     setIsFetchingAutoplay(true);
     try {
-      const res = await fetch(
-        `/api/recommendations?trackId=${encodeURIComponent(currentTrack.title + ' ' + currentTrack.artist)}`,
-        {
-          headers: (await getAuthHeader()) || {},
-        },
-      );
+      // Prioritize Spotify ID for NodeLink sprec: recommendations
+      const params = new URLSearchParams();
+      if (currentTrack.id) params.append('spotifyId', currentTrack.id);
+      if (currentTrack.identifier) params.append('videoId', currentTrack.identifier);
+      params.append('query', `${currentTrack.title} ${currentTrack.artist}`);
+
+      const res = await fetch(`/api/recommendations?${params.toString()}`, {
+        headers: (await getAuthHeader()) || {},
+      });
       const data = (await res.json()) as AutoplayResponse;
 
       if (!data?.tracks?.length) return;
 
+      // Avoid playing the same track if recommended. The backend now also filters, 
+      // but we filter here for absolute certainty on the client side.
       const nextTrackData =
-        data.tracks.find((track) => track.info?.title !== currentTrack.title) ||
-        data.tracks[0];
+        data.tracks.find(
+          (track) => 
+            track.id !== currentTrack.identifier && 
+            track.title.toLowerCase() !== currentTrack.title.toLowerCase(),
+        ) || data.tracks[0];
 
       if (!nextTrackData) return;
 
       const newTrack: Track = {
-        id: nextTrackData.info?.identifier || 'unknown',
-        title: nextTrackData.info?.title || 'Unknown Title',
-        artist: nextTrackData.info?.author || 'Unknown Artist',
-        artworkUrl:
-          nextTrackData.info?.artworkUrl ||
-          (nextTrackData.info?.identifier
-            ? `https://img.youtube.com/vi/${nextTrackData.info.identifier}/maxresdefault.jpg`
-            : ''),
-        duration: nextTrackData.info?.duration || 0,
+        id: nextTrackData.id,
+        identifier: nextTrackData.id,
+        title: nextTrackData.title,
+        artist: nextTrackData.artist,
+        artworkUrl: nextTrackData.artwork,
+        duration: nextTrackData.duration,
         url: nextTrackData.encoded,
       };
       play(newTrack);

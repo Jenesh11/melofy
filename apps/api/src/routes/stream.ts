@@ -354,6 +354,14 @@ async function requireStreamAccess(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
+  const fetchSite = req.headers['sec-fetch-site'];
+  const fetchDest = req.headers['sec-fetch-dest'];
+
+  if (fetchSite === 'none' || fetchDest === 'document') {
+    res.status(403).json({ error: 'Direct browser access to stream is restricted' });
+    return;
+  }
+
   const bearerToken = extractBearerToken(req.headers.authorization);
   if (bearerToken) {
     const user = await verifyFirebaseIdToken(bearerToken);

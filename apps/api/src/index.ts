@@ -216,13 +216,28 @@ app.get(
   requireFirebaseAuth,
   privateRateLimit,
   async (req, res) => {
-    const trackId = req.query.trackId as string;
-    if (!trackId) return res.status(400).json({ error: 'Missing trackId' });
+    const { videoId, spotifyId, query, trackId } = req.query as {
+      videoId?: string;
+      spotifyId?: string;
+      query?: string;
+      trackId?: string;
+    };
 
-    const trimmedTrackId = trackId.trim();
-    if (trimmedTrackId.length < 2 || trimmedTrackId.length > 300) {
-      return res.status(400).json({ error: 'Invalid trackId length' });
+    // Determine seed criteria. Prioritize Spotify for recommendations if available.
+    const effectiveSpotifyId = spotifyId || (trackId?.length === 22 ? trackId : undefined);
+    const effectiveVideoId = videoId || (trackId?.length === 11 ? trackId : undefined);
+    const effectiveQuery = query || trackId;
+
+    if (!effectiveSpotifyId && !effectiveVideoId && !effectiveQuery) {
+      return res.status(400).json({ error: 'Missing seed identifier' });
     }
+
+    // NodeLink sprec: hits Spotify recommendations, ytrec: hits YouTube recommendations
+    const identifier = effectiveSpotifyId
+      ? `sprec:${effectiveSpotifyId}`
+      : effectiveVideoId
+        ? `ytrec:${effectiveVideoId}`
+        : `ytrec:${effectiveQuery}`;
 
     try {
       const node = lavalink.nodeManager.leastUsedNodes()[0];
@@ -230,14 +245,39 @@ app.get(
         return res.status(500).json({ error: 'No NodeLink nodes available' });
 
       const result = await node.search(
-        { query: `ytsearch: ${trimmedTrackId} similar songs` },
+        { query: identifier },
         { id: req.user?.uid || 'MelofyAutoplay' },
       );
 
-      res.json(result);
-    } catch (error) {
+      if (result.loadType === 'empty' || result.loadType === 'error') {
+        return res.json({ tracks: [] });
+      }
+
+      const rawTracks = (result as any).tracks || (result as any).data || [];
+      const tracks = rawTracks.map((track: any) => ({
+        encoded: track.encoded,
+        id: track.info.identifier,
+        title: track.info.title,
+        artist: track.info.author,
+        duration: track.info.length,
+        artwork: track.info.artworkUrl,
+        uri: track.info.uri,
+        isrc: track.info.isrc,
+        source: track.info.sourceName,
+      }));
+
+      // Filter out the seed track to ensure autoplay moves forward
+      const filtered = tracks.filter(
+        (t: any) =>
+          t.id !== effectiveVideoId &&
+          t.id !== effectiveSpotifyId &&
+          t.title.toLowerCase() !== effectiveQuery?.toLowerCase(),
+      );
+
+      res.json({ tracks: filtered.length > 0 ? filtered : tracks });
+    } catch (error: any) {
       console.error('Recommendations error:', error);
-      res.status(500).json({ error: 'Recommendations failed' });
+      res.status(500).json({ error: error.message });
     }
   },
 );
