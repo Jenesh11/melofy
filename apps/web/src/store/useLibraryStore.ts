@@ -8,6 +8,7 @@ export interface SavedCollection {
   type: 'custom' | 'spotify' | 'youtube';
   trackCount?: number;
   tracks?: unknown[]; // Only for custom playlists
+  isLikedSongs?: boolean;
 }
 
 interface LibraryState {
