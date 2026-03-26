@@ -10,17 +10,24 @@ import {
   Calendar,
   Sun,
   Moon,
-  Laptop,
   ChevronLeft,
+  Settings,
+  Music,
+  Sparkles,
+  Share2,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { motion } from 'framer-motion';
+import { useSettingsStore } from '@/store/useSettingsStore';
+import { Switch } from '@/components/ui/Switch';
+import { PreMidGuide } from '@/components/settings/PreMidGuide';
 import { useTheme } from '@/lib/theme-context';
 import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const { essence, setEssence, mode, setMode } = useTheme();
+  const { autoPip, toggleAutoPip } = useSettingsStore();
   const router = useRouter();
 
   const handleSignOut = async () => {
@@ -44,217 +51,181 @@ export default function SettingsPage() {
   if (!user) return null;
 
   return (
-    <div className='p-8 h-full max-w-4xl mx-auto flex flex-col'>
+    <div className='p-6 md:p-12 h-full max-w-6xl mx-auto flex flex-col gap-12 pb-24'>
+      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className='mb-12'
+        className='flex flex-col gap-4'
       >
-        <Button
-          variant='ghost'
-          onClick={() => router.back()}
-          className='mb-6 -ml-4 text-muted-foreground hover:text-foreground'
-        >
-          <ChevronLeft className='mr-2 h-4 w-4' />
-          Back
-        </Button>
-        <h1 className='text-4xl font-bold text-foreground mb-2'>Settings</h1>
-        <p className='text-muted-foreground'>
-          Manage your profile and preferences.
-        </p>
-      </motion.div>
-
-      {/* Account Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        <Card className='p-8 bg-card/50 border-border backdrop-blur-3xl rounded-3xl'>
-          <div className='flex flex-col md:flex-row gap-8 items-start md:items-center'>
-            <div className='h-32 w-32 rounded-full overflow-hidden shrink-0 border-4 border-primary/20 shadow-2xl bg-muted flex items-center justify-center'>
-              {user.photoURL ? (
-                <img
-                  src={user.photoURL}
-                  alt='Profile'
-                  referrerPolicy='no-referrer'
-                  className='h-full w-full object-cover'
-                />
-              ) : (
-                <User className='h-12 w-12 text-muted-foreground' />
-              )}
+        <div className='flex items-center gap-4'>
+          <Button
+            variant='ghost'
+            size='icon'
+            onClick={() => router.back()}
+            className='h-10 w-10 rounded-full bg-foreground/5 hover:bg-foreground/10'
+          >
+            <ChevronLeft className='h-5 w-5' />
+          </Button>
+          <div className='flex items-center gap-3'>
+            <div className='h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20'>
+              <Settings className='h-5 w-5 text-primary' />
             </div>
-
-            <div className='flex flex-col gap-2 flex-1'>
-              <h2 className='text-3xl font-bold text-foreground'>
-                {user.displayName || 'Unknown User'}
-              </h2>
-
-              <div className='flex items-center gap-2 text-muted-foreground'>
-                <Mail className='h-4 w-4' />
-                <span>{user.email}</span>
-              </div>
-
-              <div className='flex items-center gap-2 text-muted-foreground'>
-                <Calendar className='h-4 w-4' />
-                <span>
-                  Joined{' '}
-                  {user.metadata.creationTime
-                    ? new Date(user.metadata.creationTime).toLocaleDateString()
-                    : 'recently'}
-                </span>
-              </div>
-            </div>
-
-            <Button
-              onClick={handleSignOut}
-              variant='destructive'
-              className='md:ml-auto rounded-full px-8 py-6 text-base font-semibold shadow-xl shadow-red-500/10 hover:shadow-red-500/20 hover:-translate-y-1 transition-all'
-            >
-              <LogOut className='mr-2 h-5 w-5' />
-              Sign Out
-            </Button>
+            <h1 className='text-3xl font-black text-foreground tracking-tight'>Settings</h1>
           </div>
-        </Card>
+        </div>
       </motion.div>
 
-      {/* Theme Section */}
-      <div className='grid grid-cols-1 md:grid-cols-2 gap-8 mt-8'>
-        {/* Mode Selector */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Card className='p-8 bg-card/50 border-border backdrop-blur-3xl rounded-3xl h-full'>
-            <div className='flex flex-col gap-6'>
-              <div className='flex flex-col gap-1'>
-                <h2 className='text-2xl font-bold text-foreground'>
-                  Appearance
-                </h2>
-                <p className='text-muted-foreground text-sm'>
-                  Choose between light and dark themes.
-                </p>
-              </div>
-
-              <div className='grid grid-cols-2 gap-4'>
-                <button
-                  onClick={() => setMode('light')}
-                  className={cn(
-                    'flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all duration-300',
-                    mode === 'light'
-                      ? 'bg-primary/10 border-primary shadow-[0_0_20px_rgba(var(--primary),0.1)]'
-                      : 'bg-muted/50 border-border hover:border-foreground/20',
-                  )}
-                >
-                  <Sun
-                    className={cn(
-                      'h-8 w-8',
-                      mode === 'light'
-                        ? 'text-primary'
-                        : 'text-muted-foreground',
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      'text-xs font-bold uppercase tracking-wider',
-                      mode === 'light'
-                        ? 'text-foreground'
-                        : 'text-muted-foreground',
-                    )}
-                  >
-                    Light
-                  </span>
-                </button>
-                <button
-                  onClick={() => setMode('dark')}
-                  className={cn(
-                    'flex flex-col items-center gap-3 p-4 rounded-2xl border transition-all duration-300',
-                    mode === 'dark'
-                      ? 'bg-primary/10 border-primary shadow-[0_0_20px_rgba(var(--primary),0.1)]'
-                      : 'bg-muted/50 border-border hover:border-foreground/20',
-                  )}
-                >
-                  <Moon
-                    className={cn(
-                      'h-8 w-8',
-                      mode === 'dark'
-                        ? 'text-primary'
-                        : 'text-muted-foreground',
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      'text-xs font-bold uppercase tracking-wider',
-                      mode === 'dark'
-                        ? 'text-foreground'
-                        : 'text-muted-foreground',
-                    )}
-                  >
-                    Dark
-                  </span>
-                </button>
-              </div>
+      <div className='grid grid-cols-1 lg:grid-cols-3 gap-12'>
+        {/* Left Column: Account & Appearance */}
+        <div className='lg:col-span-2 flex flex-col gap-12'>
+          
+          {/* Account Section */}
+          <section className='space-y-6'>
+            <div className='flex items-center gap-2 px-2'>
+              <User className='h-4 w-4 text-primary' />
+              <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Account</h2>
             </div>
-          </Card>
-        </motion.div>
+            
+            <Card className='p-8 bg-card/50 border-border backdrop-blur-3xl rounded-[2.5rem] overflow-hidden relative group'>
+              <div className='absolute -bottom-24 -right-24 h-64 w-64 bg-primary/5 blur-[80px] rounded-full' />
+              
+              <div className='relative z-10 flex flex-col md:flex-row gap-8 items-center'>
+                <div className='h-24 w-24 rounded-full overflow-hidden shrink-0 border-4 border-primary/10 shadow-2xl bg-muted flex items-center justify-center'>
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt='Profile' referrerPolicy='no-referrer' className='h-full w-full object-cover' />
+                  ) : (
+                    <User className='h-10 w-10 text-muted-foreground' />
+                  )}
+                </div>
 
-        {/* Essence Selector */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card className='p-8 bg-card/50 border-border backdrop-blur-3xl rounded-3xl h-full'>
-            <div className='flex flex-col gap-6'>
-              <div className='flex flex-col gap-1'>
-                <h2 className='text-2xl font-bold text-foreground'>
-                  Theme Essence
-                </h2>
-                <p className='text-muted-foreground text-sm'>
-                  Select your primary accent color.
-                </p>
-              </div>
-
-              <div className='grid grid-cols-3 gap-3'>
-                {themes.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setEssence(t.id as any)}
-                    className={cn(
-                      'flex flex-col items-center gap-2 p-3 rounded-xl border transition-all duration-300 group relative',
-                      essence === t.id
-                        ? 'bg-primary/10 border-primary shadow-[0_0_15px_rgba(var(--primary),0.1)]'
-                        : 'bg-muted/30 border-border hover:border-foreground/10',
-                    )}
-                  >
-                    <div
-                      className='w-6 h-6 rounded-full shadow-inner relative transition-transform duration-300 group-hover:scale-110'
-                      style={{ backgroundColor: t.color }}
-                    >
-                      {essence === t.id && (
-                        <motion.div
-                          layoutId='active-theme'
-                          className='absolute inset-[-3px] rounded-full border-2 border-primary'
-                        />
-                      )}
+                <div className='flex flex-col gap-1 flex-1 text-center md:text-left'>
+                  <h3 className='text-2xl font-black text-foreground'>{user.displayName || 'Melofy User'}</h3>
+                  <div className='flex flex-wrap justify-center md:justify-start gap-4 mt-1'>
+                    <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+                      <Mail className='h-3.5 w-3.5 opacity-50' />
+                      <span>{user.email}</span>
                     </div>
-                    <span
+                    <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+                      <Calendar className='h-3.5 w-3.5 opacity-50' />
+                      <span>Joined {user.metadata.creationTime ? new Date(user.metadata.creationTime).toLocaleDateString() : 'recently'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleSignOut}
+                  variant='destructive'
+                  className='rounded-full px-8 h-12 text-sm font-bold shadow-xl shadow-red-500/10 hover:shadow-red-500/20 active:scale-95 transition-all'
+                >
+                  <LogOut className='mr-2 h-4 w-4' />
+                  Sign Out
+                </Button>
+              </div>
+            </Card>
+          </section>
+
+          {/* Appearance Section */}
+          <section className='space-y-6'>
+             <div className='flex items-center gap-2 px-2'>
+              <Sparkles className='h-4 w-4 text-primary' />
+              <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Appearance</h2>
+            </div>
+
+            <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+              {/* Mode Selector */}
+              <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem]'>
+                <div className='flex flex-col gap-6'>
+                  <div className='flex flex-col gap-0.5'>
+                    <h3 className='font-bold text-foreground text-lg'>Interface Mode</h3>
+                    <p className='text-muted-foreground text-xs'>Choose your preferred experience.</p>
+                  </div>
+
+                  <div className='grid grid-cols-2 gap-3 p-1 bg-foreground/5 rounded-2xl'>
+                    <button
+                      onClick={() => setMode('light')}
                       className={cn(
-                        'text-[8px] font-black uppercase tracking-widest',
-                        essence === t.id
-                          ? 'text-primary'
-                          : 'text-muted-foreground',
+                        'flex items-center justify-center gap-2 py-3 rounded-xl transition-all duration-300',
+                        mode === 'light' ? 'bg-background shadow-lg text-foreground font-bold' : 'text-muted-foreground hover:text-foreground'
                       )}
                     >
-                      {t.name}
-                    </span>
-                  </button>
-                ))}
-              </div>
+                      <Sun className='h-4 w-4' />
+                      <span className='text-xs uppercase tracking-wider'>Light</span>
+                    </button>
+                    <button
+                      onClick={() => setMode('dark')}
+                      className={cn(
+                        'flex items-center justify-center gap-2 py-3 rounded-xl transition-all duration-300',
+                        mode === 'dark' ? 'bg-background shadow-lg text-foreground font-bold' : 'text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      <Moon className='h-4 w-4' />
+                      <span className='text-xs uppercase tracking-wider'>Dark</span>
+                    </button>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Essence Selector */}
+              <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem]'>
+                <div className='flex flex-col gap-6'>
+                  <div className='flex flex-col gap-0.5'>
+                    <h3 className='font-bold text-foreground text-lg'>Theme Essence</h3>
+                    <p className='text-muted-foreground text-xs'>Personalize your accent color.</p>
+                  </div>
+
+                  <div className='grid grid-cols-3 gap-2'>
+                    {themes.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setEssence(t.id as any)}
+                        className={cn(
+                          'flex items-center justify-center p-2 rounded-xl transition-all border group relative',
+                          essence === t.id ? 'bg-primary/10 border-primary shadow-lg' : 'bg-foreground/5 border-transparent hover:border-foreground/10'
+                        )}
+                        title={t.name}
+                      >
+                        <div className='w-5 h-5 rounded-full shadow-inner' style={{ backgroundColor: t.color }} />
+                        {essence === t.id && (
+                          <motion.div layoutId='active-essence' className='absolute -top-1 -right-1 h-3 w-3 bg-primary rounded-full border-2 border-background' />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Card>
             </div>
-          </Card>
-        </motion.div>
+          </section>
+
+          {/* Player Section */}
+          <section className='space-y-6'>
+            <div className='flex items-center gap-2 px-2'>
+              <Music className='h-4 w-4 text-primary' />
+              <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Playback Settings</h2>
+            </div>
+            
+            <Card className='p-8 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem]'>
+              <div className='flex items-center justify-between'>
+                <div className='space-y-1'>
+                  <h3 className='font-bold text-foreground text-lg'>Auto Picture-in-Picture</h3>
+                  <p className='text-muted-foreground text-sm max-w-md'>
+                    Automatically open a mini-player window when you switch to another tab while music is playing.
+                  </p>
+                </div>
+                <Switch checked={autoPip} onCheckedChange={toggleAutoPip} />
+              </div>
+            </Card>
+          </section>
+        </div>
+
+        {/* Right Column: Integrations Card (Sticky) */}
+        <div className='flex flex-col gap-6 h-fit lg:sticky lg:top-24'>
+          <div className='flex items-center gap-2 px-2'>
+            <Share2 className='h-4 w-4 text-primary' />
+            <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Integrations</h2>
+          </div>
+          <PreMidGuide />
+        </div>
       </div>
     </div>
   );

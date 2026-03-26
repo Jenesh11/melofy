@@ -1,9 +1,11 @@
-import { Github, Twitter, Instagram, Globe } from 'lucide-react';
+import Link from 'next/link';
+import { Github, Globe } from 'lucide-react';
 
 export function LandingFooter() {
   return (
     <footer className='py-20 px-6 border-t border-border bg-background'>
-      <div className='max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-4 gap-12'>
+      <div className='max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-3 gap-12'>
+        {/* Brand */}
         <div className='flex flex-col gap-6 col-span-1 md:col-span-1'>
           <div className='flex items-center gap-2'>
             <div className='w-8 h-8 flex items-center justify-center overflow-hidden'>
@@ -22,77 +24,70 @@ export function LandingFooter() {
             the perfect listening experience.
           </p>
           <div className='flex items-center gap-4 text-muted-foreground/40'>
-            <Github className='w-5 h-5 hover:text-foreground cursor-pointer transition-colors' />
-            <Twitter className='w-5 h-5 hover:text-foreground cursor-pointer transition-colors' />
-            <Instagram className='w-5 h-5 hover:text-foreground cursor-pointer transition-colors' />
+            <Link href='/github'>
+              <Github className='w-5 h-5 hover:text-foreground cursor-pointer transition-colors' />
+            </Link>
+            <a
+              href='https://discord.gg/ZVCB8EnRX2'
+              target='_blank'
+              rel='noopener noreferrer'
+              className='hover:text-foreground cursor-pointer transition-colors'
+            >
+              <svg
+                viewBox='0 0 24 24'
+                fill='currentColor'
+                className='w-5 h-5'
+              >
+                <path d='M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.196.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.419 0 1.334-.956 2.419-2.157 2.419zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.419 0 1.334-.946 2.419-2.157 2.419z' />
+              </svg>
+            </a>
           </div>
         </div>
 
+        {/* Company */}
         <div className='flex flex-col gap-6'>
           <h4 className='text-foreground font-bold tracking-tight uppercase text-xs'>
-            Platform
+            Company
           </h4>
           <div className='flex flex-col gap-3 text-sm text-muted-foreground/60'>
-            <span className='hover:text-primary cursor-pointer transition-colors'>
-              Download App
-            </span>
-            <span className='hover:text-primary cursor-pointer transition-colors'>
-              Web Player
-            </span>
-            <span className='hover:text-primary cursor-pointer transition-colors'>
-              Premium Plans
-            </span>
-            <span className='hover:text-primary cursor-pointer transition-colors'>
-              Partnerships
-            </span>
-          </div>
-        </div>
-
-        <div className='flex flex-col gap-6'>
-          <h4 className='text-foreground font-bold tracking-tight uppercase text-xs'>
-            Resources
-          </h4>
-          <div className='flex flex-col gap-3 text-sm text-muted-foreground/60'>
-            <span className='hover:text-primary cursor-pointer transition-colors'>
+            <Link href='/github' className='hover:text-primary transition-colors'>
+              GitHub
+            </Link>
+            <Link href='/help' className='hover:text-primary transition-colors'>
               Help Center
-            </span>
-            <span className='hover:text-primary cursor-pointer transition-colors'>
-              Community
-            </span>
-            <span className='hover:text-primary cursor-pointer transition-colors'>
-              Developers
-            </span>
-            <span className='hover:text-primary cursor-pointer transition-colors'>
-              API Docs
-            </span>
+            </Link>
           </div>
         </div>
 
+        {/* Legal */}
         <div className='flex flex-col gap-6'>
           <h4 className='text-foreground font-bold tracking-tight uppercase text-xs'>
             Legal
           </h4>
           <div className='flex flex-col gap-3 text-sm text-muted-foreground/60'>
-            <span className='hover:text-primary cursor-pointer transition-colors'>
+            <Link href='/privacy' className='hover:text-primary transition-colors'>
               Privacy Policy
-            </span>
-            <span className='hover:text-primary cursor-pointer transition-colors'>
+            </Link>
+            <Link href='/terms' className='hover:text-primary transition-colors'>
               Terms of Service
-            </span>
-            <span className='hover:text-primary cursor-pointer transition-colors'>
-              Cookie Settings
-            </span>
-            <span className='hover:text-primary cursor-pointer transition-colors'>
-              Trust Center
-            </span>
+            </Link>
           </div>
         </div>
       </div>
+
       <div className='max-w-7xl mx-auto w-full pt-20 flex flex-col md:flex-row justify-between items-center gap-6'>
         <p className='text-xs text-muted-foreground/40 font-medium'>
           © 2026 Melofy Inc. Built with passion for music.
         </p>
         <div className='flex items-center gap-6'>
+          <a
+            href='https://discord.gg/ZVCB8EnRX2'
+            target='_blank'
+            rel='noopener noreferrer'
+            className='text-xs text-muted-foreground/40 hover:text-primary cursor-pointer transition-colors font-medium border-r border-border/50 pr-6'
+          >
+            Discord Support
+          </a>
           <span className='text-xs text-muted-foreground/40 hover:text-muted-foreground cursor-pointer transition-colors'>
             English (US)
           </span>

@@ -11,6 +11,7 @@ import {
   Loader2,
   Mic2,
   Heart,
+  PictureInPicture2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProgressBar } from './ProgressBar';
@@ -20,6 +21,9 @@ import { cn } from '@/lib/utils';
 import { Track } from '@/store/usePlayerStore';
 import Link from 'next/link';
 import { useLikedSongs } from '@/hooks/useLikedSongs';
+import { isPipSupported } from '@/hooks/usePip';
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface DesktopPlayerProps {
   currentTrack: Track;
@@ -45,6 +49,10 @@ interface DesktopPlayerProps {
   setVolume: (volume: number) => void;
   handleVolumeWheel: (e: React.WheelEvent) => void;
   onExpand: () => void;
+  onOpenPip?: () => void;
+  isPipOpen?: boolean;
+  isLyricsOpen?: boolean;
+  toggleLyrics?: () => void;
 }
 
 export function DesktopPlayer({
@@ -71,8 +79,14 @@ export function DesktopPlayer({
   setVolume,
   handleVolumeWheel,
   onExpand,
+  onOpenPip,
+  isPipOpen,
+  isLyricsOpen,
+  toggleLyrics,
 }: DesktopPlayerProps) {
   const { isLiked, toggleLike } = useLikedSongs();
+  const [pipAvailable, setPipAvailable] = useState(false);
+  useEffect(() => { setPipAvailable(isPipSupported()); }, []);
 
   return (
     <div
@@ -85,10 +99,30 @@ export function DesktopPlayer({
       }}
     >
       {/* Current Track Info */}
-      <div className='flex items-center flex-1 md:flex-none md:w-[30%] md:min-w-[180px] gap-2 pl-1 md:pl-0'>
+      <div className='relative flex items-center flex-1 md:flex-none md:w-[35%] md:min-w-[240px] gap-2 pl-1 md:pl-0 overflow-hidden group/bar'>
+        {/* Blended Background Artwork */}
+        <AnimatePresence mode='wait'>
+          <motion.div
+            key={currentTrack.artworkUrl}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.15 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1 }}
+            className='absolute inset-0 z-0 pointer-events-none'
+            style={{
+              backgroundImage: `url(${currentTrack.artworkUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              filter: 'blur(40px) saturate(2)',
+              maskImage: 'linear-gradient(to right, black, transparent)',
+              WebkitMaskImage: 'linear-gradient(to right, black, transparent)',
+            }}
+          />
+        </AnimatePresence>
+
         <Link
           href='/playing'
-          className='flex items-center gap-3 cursor-pointer group/info overflow-hidden flex-1 min-w-0'
+          className='relative z-10 flex items-center gap-3 cursor-pointer group/info overflow-hidden flex-1 min-w-0 py-2 px-1'
           onClick={(e) => {
             if (window.innerWidth < 768) {
               e.preventDefault();
@@ -113,22 +147,6 @@ export function DesktopPlayer({
             </p>
           </div>
         </Link>
-        <Button
-          variant='ghost'
-          size='icon'
-          className={cn(
-            'h-9 w-9 shrink-0 transition-colors hidden md:inline-flex',
-            isLiked(currentTrack.id) 
-              ? 'text-primary hover:text-primary/80' 
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleLike(currentTrack);
-          }}
-        >
-          <Heart className={cn('h-5 w-5', isLiked(currentTrack.id) && 'fill-current')} />
-        </Button>
       </div>
 
       {/* Primary Controls */}
@@ -245,15 +263,56 @@ export function DesktopPlayer({
       </div>
 
       {/* Secondary Controls (Volume etc.) */}
-      <div className='hidden md:flex items-center justify-end w-[30%] min-w-[180px] gap-4'>
+      <div className='hidden md:flex items-center justify-end w-[30%] min-w-[180px] gap-2'>
+        <Button
+          variant='ghost'
+          size='icon'
+          className={cn(
+            'h-9 w-9 shrink-0 transition-colors',
+            isLiked(currentTrack.id) 
+              ? 'text-primary hover:text-primary/80' 
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleLike(currentTrack);
+          }}
+          title={isLiked(currentTrack.id) ? 'Remove from Liked Songs' : 'Add to Liked Songs'}
+        >
+          <Heart className={cn('h-5 w-5', isLiked(currentTrack.id) && 'fill-current')} />
+        </Button>
         <ListenAlongPopover />
-        <Link
-          href='/playing'
-          className='text-muted-foreground hover:text-foreground transition-colors'
+        <Button
+          variant='ghost'
+          size='icon'
+          className={cn(
+            'transition-colors',
+            isLyricsOpen ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleLyrics?.();
+          }}
           title='View Lyrics'
         >
           <Mic2 className='h-5 w-5' />
-        </Link>
+        </Button>
+        {pipAvailable && (
+          <Button
+            variant='ghost'
+            size='icon'
+            className={cn(
+              'h-9 w-9 transition-colors',
+              isPipOpen
+                ? 'text-primary bg-primary/10'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+            onClick={() => onOpenPip?.()}
+            title={isPipOpen ? 'PiP open' : 'Open Picture-in-Picture'}
+          >
+            <PictureInPicture2 className='h-5 w-5' />
+          </Button>
+        )}
         <VolumeControl
           volume={volume}
           setVolume={setVolume}

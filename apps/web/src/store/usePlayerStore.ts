@@ -36,6 +36,7 @@ interface PlayerState {
   isPartyHost: boolean;
   listenersCanControl: boolean;
   partyListeners: PartyListener[];
+  lyricsCache: Record<string, any>;
 
   // Actions
   canControlPlayback: () => boolean;
@@ -59,6 +60,7 @@ interface PlayerState {
   toggleShuffle: () => void;
   toggleRepeat: () => void;
   toggleAutoplay: () => void;
+  setLyrics: (id: string, lyrics: any) => void;
   updateTrackUrl: (id: string, url: string, identifier?: string) => void;
   hydrateState: (state: Partial<PlayerState>) => void;
   setPlaying: (isPlaying: boolean) => void;
@@ -87,6 +89,7 @@ const initialState = {
   isPartyHost: false,
   listenersCanControl: false,
   partyListeners: [],
+  lyricsCache: {},
 };
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -253,6 +256,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   toggleShuffle: () => set((state) => ({ isShuffle: !state.isShuffle })),
   toggleRepeat: () => set((state) => ({ isRepeat: !state.isRepeat })),
   toggleAutoplay: () => set((state) => ({ isAutoplay: !state.isAutoplay })),
+  setLyrics: (id, lyrics) =>
+    set((state) => ({
+      lyricsCache: { ...state.lyricsCache, [id]: lyrics },
+    })),
   updateTrackUrl: (id, url, identifier) =>
     set((state) => {
       const nextCurrentTrack =

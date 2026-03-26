@@ -168,13 +168,19 @@ export function LoginView() {
 
           <p className='mt-8 text-xs text-muted-foreground/60 font-medium px-4 leading-relaxed'>
             By signing in, you agree to our{' '}
-            <span className='text-muted-foreground hover:text-foreground cursor-pointer transition-colors'>
+            <Link
+              href='/terms'
+              className='text-muted-foreground hover:text-foreground cursor-pointer transition-colors hover:underline'
+            >
               Terms of Service
-            </span>{' '}
+            </Link>{' '}
             and{' '}
-            <span className='text-muted-foreground hover:text-foreground cursor-pointer transition-colors'>
+            <Link
+              href='/privacy'
+              className='text-muted-foreground hover:text-foreground cursor-pointer transition-colors hover:underline'
+            >
               Privacy Policy
-            </span>
+            </Link>
             .
           </p>
         </motion.div>

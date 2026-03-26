@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,6 +12,7 @@ import {
   ListMusic,
   X,
   Heart,
+  PictureInPicture2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -20,6 +21,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { SyncedLyrics } from '@/components/ui/SyncedLyrics';
 import { useLikedSongs } from '@/hooks/useLikedSongs';
+import { openPip, isPipSupported } from '@/hooks/usePip';
 
 export default function PlayingPage() {
   const currentTrack = usePlayerStore((state) => state.currentTrack);
@@ -29,6 +31,8 @@ export default function PlayingPage() {
   const router = useRouter();
   const [showLyrics, setShowLyrics] = useState(false);
   const { toggleLike, isLiked } = useLikedSongs();
+  const [pipAvailable, setPipAvailable] = useState(false);
+  useEffect(() => { setPipAvailable(isPipSupported()); }, []);
 
   const handleTogglePlay = () => {
     if (isPlaying) pause();
@@ -54,7 +58,7 @@ export default function PlayingPage() {
   };
 
   return (
-    <div className='relative flex-1 h-full w-full overflow-hidden bg-black flex flex-col px-6 pt-6 md:px-12 md:pt-8'>
+    <div className='relative flex-1 h-full w-full overflow-hidden bg-background flex flex-col px-6 pt-6 md:px-12 md:pt-8 transition-colors duration-500'>
       {/* Dynamic Cinematic Backdrop (The "Essence") */}
       <AnimatePresence mode='wait'>
         {currentTrack && (
@@ -74,7 +78,8 @@ export default function PlayingPage() {
                 backgroundPosition: 'center',
               }}
             />
-            <div className='absolute inset-0 bg-black/60' />
+            {/* Theme-aware scrim */}
+            <div className='absolute inset-0 bg-background/60 dark:bg-black/60 backdrop-blur-3xl' />
           </motion.div>
         )}
       </AnimatePresence>
@@ -84,7 +89,7 @@ export default function PlayingPage() {
         <Button
           variant='ghost'
           onClick={() => router.back()}
-          className='text-white/60 hover:text-white hover:bg-white/10 rounded-full'
+          className='text-foreground/60 hover:text-foreground hover:bg-foreground/10 rounded-full'
         >
           <ChevronLeft className='mr-2 h-5 w-5' />
           Back
@@ -103,10 +108,10 @@ export default function PlayingPage() {
               transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
               className={`flex flex-col lg:flex-row gap-12 lg:gap-20 items-center w-full max-w-5xl mx-auto transition-all duration-700 ${showLyrics ? 'scale-90 opacity-0 pointer-events-none' : 'scale-100 opacity-100'}`}
             >
-              {/* Artwork Card */}
+              {/* Artwork Card with Frost Effect */}
               <div className='relative group shrink-0 w-full max-w-[280px] sm:max-w-[320px] md:max-w-[400px]'>
                 <div className='absolute -inset-10 bg-primary/20 blur-[60px] rounded-full opacity-50 group-hover:opacity-100 transition-opacity duration-1000' />
-                <div className='relative aspect-square rounded-[2rem] lg:rounded-[3rem] overflow-hidden shadow-2xl border border-white/10 bg-zinc-900'>
+                <div className='relative aspect-square rounded-[2rem] lg:rounded-[3rem] overflow-hidden shadow-2xl border border-foreground/10 bg-secondary/30 backdrop-blur-2xl'>
                   {currentTrack.artworkUrl ? (
                     <img
                       src={currentTrack.artworkUrl}
@@ -115,14 +120,14 @@ export default function PlayingPage() {
                     />
                   ) : (
                     <div className='w-full h-full flex items-center justify-center'>
-                      <Music2 className='h-32 w-32 text-white/10' />
+                      <Music2 className='h-32 w-32 text-foreground/10' />
                     </div>
                   )}
 
-                  <div className='absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
+                  <div className='absolute inset-0 bg-background/20 dark:bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm'>
                     <Button
                       size='icon'
-                      className='h-24 w-24 rounded-full bg-primary text-black hover:scale-110 transition-transform shadow-2xl border-none'
+                      className='h-24 w-24 rounded-full bg-primary text-primary-foreground hover:scale-110 transition-transform shadow-2xl border-none'
                       onClick={handleTogglePlay}
                     >
                       {isPlaying ? (
@@ -145,10 +150,10 @@ export default function PlayingPage() {
                   >
                     Now Playing
                   </motion.p>
-                  <h1 className='text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-black text-white tracking-tighter leading-[1.1] drop-shadow-2xl line-clamp-2'>
+                  <h1 className='text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-black text-foreground tracking-tighter leading-[1.1] drop-shadow-2xl line-clamp-2'>
                     {currentTrack.title}
                   </h1>
-                  <p className='text-xl md:text-3xl lg:text-4xl text-white/50 font-medium tracking-tight truncate'>
+                  <p className='text-xl md:text-3xl lg:text-4xl text-foreground/50 font-medium tracking-tight truncate'>
                     {currentTrack.artist}
                   </p>
                 </div>
@@ -156,7 +161,7 @@ export default function PlayingPage() {
                 <div className='flex items-center justify-center lg:justify-start gap-4 mt-2 lg:mt-6'>
                   <Button
                     size='lg'
-                    className='bg-white text-black font-black h-16 w-16 md:w-auto md:px-12 rounded-full hover:scale-105 transition-all active:scale-95 shadow-xl border-none text-base'
+                    className='bg-foreground text-background font-black h-16 w-16 md:w-auto md:px-12 rounded-full hover:scale-105 transition-all active:scale-95 shadow-xl border-none text-base'
                     onClick={handleTogglePlay}
                   >
                     {isPlaying ? (
@@ -175,7 +180,7 @@ export default function PlayingPage() {
                   <Button
                     size='icon'
                     variant='outline'
-                    className={`h-14 w-14 rounded-full border-white/20 transition-all backdrop-blur-md ${showLyrics ? 'bg-white text-black' : 'bg-white/5 text-white hover:bg-white/10'}`}
+                    className={`h-14 w-14 rounded-full border-foreground/20 transition-all backdrop-blur-xl ${showLyrics ? 'bg-foreground text-background' : 'bg-foreground/5 text-foreground hover:bg-foreground/10'}`}
                     onClick={() => setShowLyrics(!showLyrics)}
                     title='Toggle Lyrics'
                   >
@@ -185,24 +190,36 @@ export default function PlayingPage() {
                   <Button
                     size='icon'
                     variant='outline'
-                    className='h-14 w-14 rounded-full border-white/20 hover:bg-white/10 bg-white/5 backdrop-blur-md transition-all'
+                    className='h-14 w-14 rounded-full border-foreground/20 hover:bg-foreground/10 bg-foreground/5 backdrop-blur-xl transition-all'
                     onClick={handleShare}
                     title='Share'
                   >
-                    <Share2 className='h-6 w-6 text-white/80' />
+                    <Share2 className='h-6 w-6 text-foreground/80' />
                   </Button>
 
                   <Button
                     size='icon'
                     variant='outline'
-                    className='h-14 w-14 rounded-full border-white/20 hover:bg-white/10 bg-white/5 backdrop-blur-md transition-all'
+                    className='h-14 w-14 rounded-full border-foreground/20 hover:bg-foreground/10 bg-foreground/5 backdrop-blur-xl transition-all'
                     onClick={() => currentTrack && toggleLike(currentTrack)}
                     title='Like Song'
                   >
                     <Heart
-                      className={`h-6 w-6 transition-all ${isLiked(currentTrack?.id || '') ? 'fill-white' : ''}`}
+                      className={`h-6 w-6 transition-all ${isLiked(currentTrack?.id || '') ? 'fill-foreground' : ''}`}
                     />
                   </Button>
+
+                  {pipAvailable && (
+                    <Button
+                      size='icon'
+                      variant='outline'
+                      className='h-14 w-14 rounded-full border-foreground/20 hover:bg-foreground/10 bg-foreground/5 backdrop-blur-xl transition-all'
+                      onClick={() => openPip()}
+                      title='Picture-in-Picture'
+                    >
+                      <PictureInPicture2 className='h-6 w-6 text-foreground/80' />
+                    </Button>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -212,14 +229,14 @@ export default function PlayingPage() {
               animate={{ opacity: 1 }}
               className='flex flex-col items-center gap-6'
             >
-              <div className='p-8 rounded-full bg-white/5 backdrop-blur-3xl border border-white/10 animate-pulse'>
-                <Music2 className='h-16 w-16 text-white/20' />
+              <div className='p-8 rounded-full bg-foreground/5 backdrop-blur-3xl border border-foreground/10 animate-pulse'>
+                <Music2 className='h-16 w-16 text-foreground/20' />
               </div>
               <div className='space-y-2 text-center'>
-                <h2 className='text-3xl font-bold text-white tracking-tight'>
+                <h2 className='text-3xl font-bold text-foreground tracking-tight'>
                   The stage is empty
                 </h2>
-                <p className='text-white/40 max-w-sm font-medium'>
+                <p className='text-foreground/40 max-w-sm font-medium'>
                   Play something from your library or search for a track to see
                   it come to life here.
                 </p>
@@ -227,7 +244,7 @@ export default function PlayingPage() {
               <Link href='/'>
                 <Button
                   variant='outline'
-                  className='rounded-full border-white/10 hover:bg-white/5 mt-4 transition-all'
+                  className='rounded-full border-foreground/10 hover:bg-foreground/5 mt-4 transition-all'
                 >
                   Discover Music
                 </Button>
@@ -244,7 +261,7 @@ export default function PlayingPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.4 }}
-              className='fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4 md:p-8'
+              className='fixed inset-0 z-50 flex items-center justify-center bg-background/40 backdrop-blur-md p-4 md:p-8'
             >
               {/* Click outside to close */}
               <div
@@ -257,14 +274,14 @@ export default function PlayingPage() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
                 transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                className='relative w-full max-w-4xl h-[80vh] bg-black/60 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-2xl overflow-hidden flex flex-col'
+                className='relative w-full max-w-4xl h-[80vh] bg-background/60 backdrop-blur-3xl border border-foreground/10 rounded-[2rem] shadow-2xl overflow-hidden flex flex-col'
               >
                 <div className='absolute top-4 right-4 z-50'>
                   <Button
                     variant='ghost'
                     size='icon'
                     onClick={() => setShowLyrics(false)}
-                    className='text-white/60 hover:text-white hover:bg-white/10 rounded-full h-10 w-10 md:h-12 md:w-12 bg-black/20 backdrop-blur-sm shadow-sm'
+                    className='text-foreground/60 hover:text-foreground hover:bg-foreground/10 rounded-full h-10 w-10 md:h-12 md:w-12 bg-background/20 backdrop-blur-sm shadow-sm'
                   >
                     <X className='h-6 w-6 md:h-8 md:w-8' />
                   </Button>

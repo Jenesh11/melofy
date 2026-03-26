@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import {
   Music2,
-  Search,
+  Users,
   Smartphone,
   CloudLightning,
   Layers,
@@ -21,10 +21,10 @@ export function LandingFeatures() {
         'Access a vast library of music from every genre and era, all at your fingertips.',
     },
     {
-      icon: <Search className='w-6 h-6' />,
-      title: 'Smart Search',
+      icon: <Users className='w-6 h-6' />,
+      title: 'Listen Along',
       description:
-        'Find your favorite songs, artists, and albums instantly with our powerful search engine.',
+        'Share your listening session with friends in real-time and experience music together.',
     },
     {
       icon: <Smartphone className='w-6 h-6' />,
@@ -75,7 +75,7 @@ export function LandingFeatures() {
           <div className='text-center mb-20 flex flex-col gap-4'>
             <h2 className='text-4xl md:text-5xl font-bold text-foreground tracking-tight py-4'>
               Everything you need to{' '}
-              <span className='text-primary italic'>feel</span> the music.
+              <span className='text-primary italic pr-2'>feel</span> the music.
             </h2>
             <p className='text-muted-foreground max-w-2xl mx-auto text-lg font-light'>
               Melofy is built by audiophiles, for audiophiles. We've packed

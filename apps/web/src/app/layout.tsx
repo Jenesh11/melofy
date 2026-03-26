@@ -15,13 +15,18 @@ import { Toaster } from 'sonner';
 import { PreMiDExposer } from '@/components/PreMiDExposer';
 
 export const metadata: Metadata = {
-  title: 'Melofy - Syncing Your Soundscape',
+  title: 'Melofy | Elevate Your Sound',
   description:
     'The ultimate destination for music lovers. Port your Spotify playlists, discover new sounds, and experience high-fidelity streaming in a stunning, minimalist interface.',
   keywords: [
     'music streaming',
     'spotify importer',
     'melofy',
+    'melofy music',
+    'melofy app',
+    'melofy music app',
+    'melofy music streaming',
+    'melofy music streaming app',
     'high fidelity audio',
     'personalized playlists',
   ],

@@ -25,7 +25,13 @@ function AppContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const isPublicRoute = pathname === '/' || pathname === '/login';
+  const isPublicRoute =
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname === '/terms' ||
+    pathname === '/privacy' ||
+    pathname === '/help' ||
+    pathname === '/github';
 
   useEffect(() => {
     if (!loading && !user && !isPublicRoute) {

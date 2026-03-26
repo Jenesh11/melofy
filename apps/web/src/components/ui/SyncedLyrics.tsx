@@ -38,9 +38,13 @@ const parseSyncedLyrics = (lrc: string): LyricLine[] => {
   return result.sort((a, b) => a.timeMs - b.timeMs);
 };
 
+// Premium Synced Lyrics Component (with Caching)
 export const SyncedLyrics = () => {
   const currentTrack = usePlayerStore((state) => state.currentTrack);
   const progress = usePlayerStore((state) => state.progress);
+  const lyricsCache = usePlayerStore((state) => state.lyricsCache);
+  const setLyricsCache = usePlayerStore((state) => state.setLyrics);
+
   const [lyricsLines, setLyricsLines] = useState<LyricLine[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -56,6 +60,19 @@ export const SyncedLyrics = () => {
       if (!currentTrack) {
         setLyricsLines(null);
         setPlainLyrics(null);
+        return;
+      }
+
+      // 1. Check Cache First
+      if (lyricsCache[currentTrack.id]) {
+        const cachedData = lyricsCache[currentTrack.id];
+        if (cachedData.syncedLyrics) {
+          setLyricsLines(parseSyncedLyrics(cachedData.syncedLyrics));
+        } else if (cachedData.plainLyrics) {
+          setPlainLyrics(cachedData.plainLyrics);
+        }
+        setLoading(false);
+        setError(false);
         return;
       }
 
@@ -81,6 +98,9 @@ export const SyncedLyrics = () => {
         const data: LyricsData = await res.json();
 
         if (!active) return;
+
+        // 2. Save result to store cache
+        setLyricsCache(currentTrack.id, data);
 
         if (data.syncedLyrics) {
           const parsed = parseSyncedLyrics(data.syncedLyrics);
@@ -154,7 +174,7 @@ export const SyncedLyrics = () => {
           className='flex flex-col items-center gap-4'
         >
           <div className='h-8 w-8 rounded-full border-t-2 border-primary animate-spin' />
-          <p className='text-white/40 text-sm font-medium'>Finding lyrics...</p>
+          <p className='text-foreground/40 text-sm font-medium'>Finding lyrics...</p>
         </motion.div>
       </div>
     );
@@ -168,7 +188,7 @@ export const SyncedLyrics = () => {
           animate={{ opacity: 1 }}
           className='text-center space-y-2'
         >
-          <p className='text-white/60 text-lg font-medium'>
+          <p className='text-foreground/60 text-lg font-medium'>
             Looks like we don&apos;t have lyrics for this track yet.
           </p>
         </motion.div>
@@ -201,12 +221,11 @@ export const SyncedLyrics = () => {
                 animate={{
                   scale: isActive ? 1.08 : 1,
                   opacity: isActive ? 1 : isPast ? 0.3 : 0.5,
-                  color: isActive ? '#fff' : '#ffffff80',
                   y: isActive ? 0 : 5,
                 }}
                 transition={{ duration: 0.4, ease: 'easeOut' }}
                 className={`text-2xl md:text-4xl lg:text-5xl font-black tracking-tight cursor-default transition-all duration-300 text-center
-                                 ${isActive ? 'text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'hover:text-white/80'}
+                                 ${isActive ? 'text-foreground drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'text-foreground/50 hover:text-foreground/80'}
                              `}
               >
                 {line.text || '♪'}
@@ -216,11 +235,11 @@ export const SyncedLyrics = () => {
         </div>
       ) : plainLyrics ? (
         <div className='max-w-2xl mx-auto pt-8'>
-          <p className='whitespace-pre-wrap text-white/50 text-xl md:text-2xl font-medium leading-relaxed text-center'>
+          <p className='whitespace-pre-wrap text-foreground/50 text-xl md:text-2xl font-medium leading-relaxed text-center'>
             {plainLyrics}
           </p>
           <div className='mt-12 text-center pb-8'>
-            <span className='text-xs font-black tracking-widest uppercase text-white/20 bg-white/5 px-4 py-2 rounded-full border border-white/10'>
+            <span className='text-xs font-black tracking-widest uppercase text-foreground/20 bg-foreground/5 px-4 py-2 rounded-full border border-foreground/10'>
               Unsynced Lyrics
             </span>
           </div>
