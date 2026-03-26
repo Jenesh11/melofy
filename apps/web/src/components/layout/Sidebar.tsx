@@ -242,6 +242,10 @@ export function Sidebar() {
                       >
                         Remove from Library
                       </ContextMenuItem>
+                    ) : playlist.isLikedSongs || playlist.name === 'Liked Songs' ? (
+                      <ContextMenuItem disabled className='text-sidebar-foreground/40'>
+                        System Playlist
+                      </ContextMenuItem>
                     ) : (
                       <>
                         <ContextMenuItem
