@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { Music2 } from 'lucide-react';
+import { Music2, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePlayerStore, Track as PlayerTrack } from '@/store/usePlayerStore';
 import { toast } from 'sonner';
 import { getAuth } from 'firebase/auth';
 import { app } from '@/lib/firebase/config';
 import { mapTrackItemToPlayerTrack } from '@/lib/track-mappers';
+import { useLikedSongs } from '@/hooks/useLikedSongs';
 import type { TrackItem } from '@/lib/track-types';
 
 export type { TrackItem };
@@ -74,6 +75,7 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
   const playInContext = usePlayerStore((state) => state.playInContext);
   const pause = usePlayerStore((state) => state.pause);
   const resume = usePlayerStore((state) => state.resume);
+  const { toggleLike, isLiked } = useLikedSongs();
 
   const contextTracks = useMemo(
     () => tracks.map((track) => mapTrackItemToPlayerTrack(track)),
@@ -114,7 +116,7 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
   return (
     <div className='flex flex-col gap-1'>
       {showHeader && (
-        <div className='grid grid-cols-[2rem_1fr_auto] md:grid-cols-[2rem_1fr_minmax(0,200px)_auto] gap-4 px-4 py-2 border-b border-border text-muted-foreground text-[10px] font-bold tracking-wider uppercase mb-2'>
+        <div className='grid grid-cols-[2rem_1fr_auto_2rem] md:grid-cols-[2rem_1fr_minmax(0,200px)_auto_2rem] gap-4 px-4 py-2 border-b border-border text-muted-foreground text-[10px] font-bold tracking-wider uppercase mb-2'>
           <span className='text-center'>#</span>
           <span>Title</span>
           <span className='hidden md:block'>Album</span>
@@ -134,6 +136,7 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
               <polyline points='12 6 12 12 16 14' />
             </svg>
           </span>
+          <span></span>
         </div>
       )}
 
@@ -142,9 +145,8 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
         return (
           <div
             key={item.id + index}
-            onClick={() => handlePlay(item, index)}
             className={cn(
-              'grid grid-cols-[2rem_1fr_auto] md:grid-cols-[2rem_1fr_minmax(0,200px)_auto] gap-4 px-4 py-3 rounded-xl transition-all group cursor-pointer items-center',
+              'grid grid-cols-[2rem_1fr_auto_2rem] md:grid-cols-[2rem_1fr_minmax(0,200px)_auto_2rem] gap-4 px-4 py-3 rounded-xl transition-all group items-center',
               isActive ? 'bg-foreground/10 shadow-sm' : 'hover:bg-foreground/5',
             )}
           >
@@ -176,7 +178,7 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
               )}
             </span>
 
-            <div className='flex items-center gap-3 min-w-0'>
+            <div className='flex items-center gap-3 min-w-0 cursor-pointer' onClick={() => handlePlay(item, index)}>
               <div className='h-10 w-10 rounded-lg bg-muted shrink-0 overflow-hidden'>
                 {item.artworkUrl ? (
                   <img
@@ -210,9 +212,27 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
               {item.album || item.artist}
             </span>
 
-            <span className='text-xs text-muted-foreground tabular-nums font-light flex justify-end items-center'>
+            <span className='text-xs text-muted-foreground tabular-nums font-light flex justify-end items-center cursor-pointer' onClick={() => handlePlay(item, index)}>
               {formatDuration(item.duration)}
             </span>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleLike(contextTracks[index]);
+              }}
+              className='flex items-center justify-center h-8 w-8 rounded-full hover:bg-foreground/10 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 placeholder-shown:opacity-100'
+              style={{ opacity: isLiked(contextTracks[index]?.id || '') ? 1 : undefined }}
+            >
+              <Heart
+                className={cn(
+                  'h-4 w-4 transition-all',
+                  isLiked(contextTracks[index]?.id || '')
+                    ? 'fill-primary text-primary'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              />
+            </button>
           </div>
         );
       })}

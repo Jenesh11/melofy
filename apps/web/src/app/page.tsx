@@ -10,6 +10,7 @@ import { TrackCarousel } from '@/components/home/TrackCarousel';
 import { PlaylistGrid } from '@/components/home/PlaylistGrid';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 import { HeroPlaylistCard } from '@/components/home/HeroPlaylistCard';
 import { HistoryCarousel } from '@/components/home/HistoryCarousel';
 import { useSpotifyCollection } from '@/hooks/useSpotifyCollection';
@@ -18,25 +19,7 @@ import {
   mapSpotifyTrackToPlayerTrack,
   type SpotifyTrackLike,
 } from '@/lib/track-mappers';
-
-interface SpotifyTrendingItem {
-  id?: string;
-  track?: SpotifyTrackLike;
-}
-
-interface SpotifyCollectionOwner {
-  display_name?: string;
-}
-
-interface SpotifyCollectionSummary {
-  id: string;
-  name?: string;
-  description?: string;
-  images?: Array<{ url?: string }>;
-  owner?: SpotifyCollectionOwner;
-  tracks?: { total?: number };
-  type?: string;
-}
+import { useHomeStore, type SpotifyCollectionSummary } from '@/store/useHomeStore';
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -48,18 +31,21 @@ export default function Home() {
   const resume = usePlayerStore((state) => state.resume);
   const playPlaylist = usePlayerStore((state) => state.playPlaylist);
 
-  const [trending, setTrending] = useState<SpotifyTrendingItem[]>([]);
-  const [newReleases, setNewReleases] = useState<SpotifyCollectionSummary[]>(
-    [],
-  );
-  const [recommendations, setRecommendations] = useState<SpotifyTrackLike[]>(
-    [],
-  );
-  const [mixes, setMixes] = useState<SpotifyCollectionSummary[]>([]);
-  const [popularPlaylists, setPopularPlaylists] = useState<
-    SpotifyCollectionSummary[]
-  >([]);
-  const [isFetching, setIsFetching] = useState(true);
+  const {
+    trending,
+    newReleases,
+    recommendations,
+    mixes,
+    popularPlaylists,
+    hasFetched,
+    setTrending,
+    setNewReleases,
+    setRecommendations,
+    setMixes,
+    setPopularPlaylists,
+    setHasFetched,
+  } = useHomeStore();
+  const [isFetching, setIsFetching] = useState(!hasFetched);
 
   const { handlePlaySpotifyCollection } = useSpotifyCollection();
 
@@ -81,6 +67,20 @@ export default function Home() {
     [recommendations],
   );
 
+  const newReleasesAsTracks = useMemo(() => {
+    return newReleases.map(album => ({
+      id: album.id,
+      name: album.name,
+      artists: album.owner ? [{ name: album.owner.display_name }] : [{ name: 'Unknown' }],
+      album: album,
+    } as SpotifyTrackLike));
+  }, [newReleases]);
+
+  const newReleasesTracksToPlay = useMemo(
+    () => newReleasesAsTracks.map((track) => mapSpotifyTrackToPlayerTrack(track)),
+    [newReleasesAsTracks],
+  );
+
   const handlePlayTrending = useCallback(() => {
     playPlaylist(trendingTracksToPlay);
   }, [playPlaylist, trendingTracksToPlay]);
@@ -89,8 +89,16 @@ export default function Home() {
     playPlaylist(recommendationTracksToPlay);
   }, [playPlaylist, recommendationTracksToPlay]);
 
+  const handlePlayNewReleases = useCallback(() => {
+    playPlaylist(newReleasesTracksToPlay);
+  }, [playPlaylist, newReleasesTracksToPlay]);
+
   useEffect(() => {
     if (!user) return;
+    if (hasFetched) {
+      setIsFetching(false);
+      return;
+    }
 
     const fetchDashboardData = async () => {
       try {
@@ -117,6 +125,8 @@ export default function Home() {
         );
 
         if (recRes.ok) setRecommendations(await recRes.json());
+        
+        setHasFetched(true);
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
       } finally {
@@ -125,7 +135,7 @@ export default function Home() {
     };
 
     void fetchDashboardData();
-  }, [user]);
+  }, [user, hasFetched, setTrending, setNewReleases, setMixes, setPopularPlaylists, setRecommendations, setHasFetched]);
 
   if (loading) return <div className='min-h-screen bg-background' />;
 
@@ -263,12 +273,10 @@ export default function Home() {
             onPlayAll={handlePlayRecommendations}
           />
 
-          <PlaylistGrid
+          <TrackCarousel
             title='New Releases'
-            items={newReleases}
-            isAlbum={true}
-            isCarousel={true}
-            onPlayPlaylist={handlePlaySpotifyCollection}
+            tracks={newReleasesAsTracks}
+            onPlayAll={handlePlayNewReleases}
           />
 
           <PlaylistGrid

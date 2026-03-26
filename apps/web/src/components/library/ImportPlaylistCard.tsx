@@ -79,7 +79,7 @@ export function ImportPlaylistCard({
   };
 
   return (
-    <Card className='lg:col-span-1 bg-card/40 backdrop-blur-xl border-border rounded-[2rem] overflow-hidden shadow-2xl'>
+    <Card className='w-full bg-card/40 backdrop-blur-xl border-border rounded-[2rem] overflow-hidden shadow-2xl'>
       <CardHeader className='p-8 pb-4'>
         <CardTitle className='text-2xl font-bold text-foreground flex items-center gap-3'>
           <Sparkles className='h-6 w-6 text-foreground' />

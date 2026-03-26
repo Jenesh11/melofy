@@ -10,6 +10,7 @@ import {
   Repeat,
   Loader2,
   Mic2,
+  Heart,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProgressBar } from './ProgressBar';
@@ -18,6 +19,7 @@ import { ListenAlongPopover } from './ListenAlongPopover';
 import { cn } from '@/lib/utils';
 import { Track } from '@/store/usePlayerStore';
 import Link from 'next/link';
+import { useLikedSongs } from '@/hooks/useLikedSongs';
 
 interface DesktopPlayerProps {
   currentTrack: Track;
@@ -70,6 +72,8 @@ export function DesktopPlayer({
   handleVolumeWheel,
   onExpand,
 }: DesktopPlayerProps) {
+  const { isLiked, toggleLike } = useLikedSongs();
+
   return (
     <div
       className={cn(
@@ -81,33 +85,51 @@ export function DesktopPlayer({
       }}
     >
       {/* Current Track Info */}
-      <Link
-        href='/playing'
-        className='flex items-center flex-1 md:flex-none md:w-[30%] md:min-w-[180px] gap-3 cursor-pointer group/info overflow-hidden pl-1 md:pl-0'
-        onClick={(e) => {
-          if (window.innerWidth < 768) {
-            e.preventDefault();
-            onExpand();
-          }
-        }}
-      >
-        <div className='h-10 w-10 md:h-14 md:w-14 rounded-md bg-muted overflow-hidden shrink-0'>
-          <img
-            src={currentTrack.artworkUrl}
-            alt={currentTrack.title}
-            loading='lazy'
-            className='h-full w-full object-cover group-hover/info:scale-105 transition-transform duration-300'
-          />
-        </div>
-        <div className='flex flex-col truncate'>
-          <p className='text-sm font-semibold text-foreground truncate group-hover/info:underline'>
-            {currentTrack.title}
-          </p>
-          <p className='text-xs text-muted-foreground truncate group-hover/info:text-foreground transition-colors'>
-            {currentTrack.artist}
-          </p>
-        </div>
-      </Link>
+      <div className='flex items-center flex-1 md:flex-none md:w-[30%] md:min-w-[180px] gap-2 pl-1 md:pl-0'>
+        <Link
+          href='/playing'
+          className='flex items-center gap-3 cursor-pointer group/info overflow-hidden flex-1 min-w-0'
+          onClick={(e) => {
+            if (window.innerWidth < 768) {
+              e.preventDefault();
+              onExpand();
+            }
+          }}
+        >
+          <div className='h-10 w-10 md:h-14 md:w-14 rounded-md bg-muted overflow-hidden shrink-0'>
+            <img
+              src={currentTrack.artworkUrl}
+              alt={currentTrack.title}
+              loading='lazy'
+              className='h-full w-full object-cover group-hover/info:scale-105 transition-transform duration-300'
+            />
+          </div>
+          <div className='flex flex-col min-w-0'>
+            <p className='text-sm font-semibold text-foreground truncate group-hover/info:underline'>
+              {currentTrack.title}
+            </p>
+            <p className='text-xs text-muted-foreground truncate group-hover/info:text-foreground transition-colors'>
+              {currentTrack.artist}
+            </p>
+          </div>
+        </Link>
+        <Button
+          variant='ghost'
+          size='icon'
+          className={cn(
+            'h-9 w-9 shrink-0 transition-colors hidden md:inline-flex',
+            isLiked(currentTrack.id) 
+              ? 'text-primary hover:text-primary/80' 
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleLike(currentTrack);
+          }}
+        >
+          <Heart className={cn('h-5 w-5', isLiked(currentTrack.id) && 'fill-current')} />
+        </Button>
+      </div>
 
       {/* Primary Controls */}
       <div className='flex items-center md:flex-col md:items-center justify-end md:max-w-[40%] flex-1 gap-2 pr-1 md:pr-0'>

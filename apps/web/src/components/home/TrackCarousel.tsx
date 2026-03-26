@@ -12,6 +12,7 @@ import {
   mapTrackItemToPlayerTrack,
   type SpotifyTrackLike,
 } from '@/lib/track-mappers';
+import { cn } from '@/lib/utils';
 
 interface TrackCarouselProps {
   title: string;
@@ -107,7 +108,7 @@ export function TrackCarousel({
               onClick={() => void handlePlay(index)}
             >
               <div className='aspect-square rounded-[2.5rem] bg-muted relative overflow-hidden shadow-lg group-hover:shadow-primary/20 transition-all duration-500'>
-                <div className='absolute bottom-3 right-3 z-20'>
+                <div className={cn('absolute bottom-3 right-3 z-20 transition-opacity duration-300', !isActive && 'opacity-0 group-hover:opacity-100')}>
                   <div className='w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-xl group-hover:scale-105 transition-transform'>
                     {isActive ? (
                       <div className='h-5 w-5 flex items-end justify-center gap-[2px]'>

@@ -46,6 +46,7 @@ interface CustomPlaylistData {
   images?: Array<{ url?: string }>;
   trackCount?: number;
   tracks: CustomPlaylistTrack[];
+  isLikedSongs?: boolean;
 }
 
 type PlaylistData = SpotifyPlaylistData | CustomPlaylistData;
@@ -190,11 +191,27 @@ export default function PlaylistPage() {
     );
   }
 
+  const bgImageUrl = playlist.artworkUrl || playlist.images?.[0]?.url || '';
+
   return (
-    <div className='flex flex-col min-h-full overflow-x-hidden custom-scrollbar p-4 md:p-8 pb-32 md:pb-8'>
+    <div className='flex flex-col min-h-full overflow-x-hidden custom-scrollbar p-4 md:p-8 pb-32 md:pb-8 relative'>
+      {bgImageUrl && (
+        <div
+          className='absolute top-0 left-0 right-0 h-[50vh] opacity-30 blur-[120px] pointer-events-none z-10'
+          style={{
+            backgroundImage: `url(${bgImageUrl})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        />
+      )}
       <header className='flex flex-col md:flex-row items-center md:items-end gap-6 mb-8 mt-4'>
-        <div className='h-48 w-48 md:h-60 md:w-60 rounded-[2.5rem] bg-muted shadow-2xl shrink-0 overflow-hidden'>
-          {playlist.artworkUrl ? (
+        <div className='h-48 w-48 md:h-60 md:w-60 rounded-[2.5rem] bg-muted shadow-2xl shrink-0 overflow-hidden z-10 relative'>
+          {(playlist as CustomPlaylistData).isLikedSongs || playlist.name === 'Liked Songs' ? (
+            <div className='h-full w-full flex items-center justify-center bg-linear-to-br from-indigo-500 via-purple-500 to-pink-500'>
+              <Heart className='h-24 w-24 text-white fill-white drop-shadow-lg' />
+            </div>
+          ) : playlist.artworkUrl ? (
             <img
               src={playlist.artworkUrl}
               alt={playlist.name}
@@ -232,6 +249,7 @@ export default function PlaylistPage() {
       </header>
 
       <div className='flex items-center gap-6 mb-8'>
+
         <Button
           size='lg'
           className='bg-primary text-primary-foreground font-bold h-14 w-14 rounded-full shadow-lg hover:scale-105 transition-transform'
@@ -239,8 +257,7 @@ export default function PlaylistPage() {
         >
           <Play className='h-6 w-6 fill-current' />
         </Button>
-
-        {isSpotifySource && (
+        {isSpotifySource ? (
           <Button
             variant='outline'
             size='icon'
@@ -258,7 +275,13 @@ export default function PlaylistPage() {
               <Heart className='h-6 w-6' />
             )}
           </Button>
+        ) : (
+          <p className='text-muted-foreground font-light italic tracking-widest text-[10px] uppercase'>
+            Play whole playlist
+          </p>
         )}
+
+
       </div>
 
       <TrackList tracks={trackItems} />

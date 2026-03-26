@@ -13,7 +13,9 @@ import {
   Loader2,
   Mic2,
   X,
+  Heart,
 } from 'lucide-react';
+import { useLikedSongs } from '@/hooks/useLikedSongs';
 import { Button } from '@/components/ui/button';
 import { ProgressBar } from './ProgressBar';
 import { cn } from '@/lib/utils';
@@ -70,6 +72,7 @@ export function MobilePlayer({
   isBuffering,
 }: MobilePlayerProps) {
   const [showLyrics, setShowLyrics] = useState(false);
+  const { isLiked, toggleLike } = useLikedSongs();
 
   if (!isExpanded) return null;
 
@@ -144,14 +147,32 @@ export function MobilePlayer({
           )}
         </div>
 
-        {/* Title & Artist */}
-        <div className='flex flex-col mb-3 items-center min-w-0 text-center'>
-          <h2 className='text-3xl font-black text-white truncate drop-shadow-lg tracking-tight'>
-            {currentTrack.title}
-          </h2>
-          <p className='text-xl text-white/60 truncate mt-1 font-medium'>
-            {currentTrack.artist}
-          </p>
+        {/* Title & Artist & Like */}
+        <div className='flex items-center justify-between gap-4 mb-3 w-full px-2'>
+          <div className='flex flex-col items-start min-w-0 flex-1'>
+            <h2 className='text-3xl font-black text-white truncate drop-shadow-lg tracking-tight w-full text-left'>
+              {currentTrack.title}
+            </h2>
+            <p className='text-xl text-white/60 truncate mt-1 font-medium w-full text-left'>
+              {currentTrack.artist}
+            </p>
+          </div>
+          <Button
+            variant='ghost'
+            size='icon'
+            className={cn(
+              'h-12 w-12 shrink-0 transition-colors',
+              isLiked(currentTrack.id) 
+                ? 'text-primary hover:bg-primary/20' 
+                : 'text-white/50 hover:bg-white/10'
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleLike(currentTrack);
+            }}
+          >
+            <Heart className={cn('h-7 w-7', isLiked(currentTrack.id) && 'fill-current')} />
+          </Button>
         </div>
 
         {/* Progress Slider */}

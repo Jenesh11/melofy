@@ -7,6 +7,7 @@ import {
   Search,
   Library,
   ListMusic,
+  Heart,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -178,7 +179,11 @@ export function Sidebar() {
                         )}
                       >
                         <div className='flex items-center justify-center w-8 h-8 rounded-md bg-sidebar-accent/20 border border-sidebar-border overflow-hidden shrink-0 shadow-sm'>
-                          {playlist.artworkUrl ||
+                          {playlist.isLikedSongs || playlist.name === 'Liked Songs' ? (
+                            <div className='h-full w-full flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500'>
+                              <Heart className='h-4 w-4 text-white fill-white shadow-md' />
+                            </div>
+                          ) : playlist.artworkUrl ||
                           ('coverUrl' in playlist &&
                             typeof playlist.coverUrl === 'string' &&
                             playlist.coverUrl) ? (

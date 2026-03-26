@@ -8,6 +8,7 @@ import {
   MoreHorizontal,
   Edit2,
   Trash2,
+  Heart,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -31,7 +32,7 @@ export function LibraryPlaylistGrid({
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
   return (
-    <div className='lg:col-span-2 overflow-y-auto custom-scrollbar'>
+    <div className='w-full overflow-y-auto custom-scrollbar'>
       <h2 className='text-2xl font-bold text-foreground mb-6 flex items-center gap-3'>
         <ListMusic className='h-6 w-6 text-foreground' />
         Stored Playlists
@@ -58,7 +59,7 @@ export function LibraryPlaylistGrid({
       ) : (
         <motion.div
           layout
-          className='grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6'
+          className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6'
         >
           <AnimatePresence>
             {playlists.map((playlist) => (
@@ -83,7 +84,11 @@ export function LibraryPlaylistGrid({
                   </div>
                   <Link href={`/playlist/${playlist.id}`}>
                     <div className='h-full w-full bg-linear-to-br from-muted to-background group-hover:scale-110 transition-transform duration-700 cursor-pointer'>
-                      {playlist.artworkUrl ? (
+                      {playlist.isLikedSongs || playlist.name === 'Liked Songs' ? (
+                        <div className='h-full w-full flex items-center justify-center bg-linear-to-br from-indigo-500 via-purple-500 to-pink-500'>
+                          <Heart className='h-16 w-16 text-white fill-white drop-shadow-lg' />
+                        </div>
+                      ) : playlist.artworkUrl ? (
                         <img
                           src={playlist.artworkUrl}
                           alt={playlist.name}
@@ -118,21 +123,23 @@ export function LibraryPlaylistGrid({
                   </Link>
 
                   <div className='relative'>
-                    <Button
-                      size='icon'
-                      variant='ghost'
-                      className='h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted shrink-0'
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveMenuId(
-                          activeMenuId === playlist.id
-                            ? null
-                            : playlist.id || null,
-                        );
-                      }}
-                    >
-                      <MoreHorizontal className='h-4 w-4' />
-                    </Button>
+                    {!playlist.isLikedSongs && (
+                      <Button
+                        size='icon'
+                        variant='ghost'
+                        className='h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted shrink-0'
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenuId(
+                            activeMenuId === playlist.id
+                              ? null
+                              : playlist.id || null,
+                          );
+                        }}
+                      >
+                        <MoreHorizontal className='h-4 w-4' />
+                      </Button>
+                    )}
 
                     <AnimatePresence>
                       {activeMenuId === playlist.id && (

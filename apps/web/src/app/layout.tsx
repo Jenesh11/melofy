@@ -12,6 +12,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { SocketProvider } from '@/lib/socket-context';
 import { AppWrapper } from '@/components/layout/AppWrapper';
 import { Toaster } from 'sonner';
+import { PreMiDExposer } from '@/components/PreMiDExposer';
 
 export const metadata: Metadata = {
   title: 'Melofy - Syncing Your Soundscape',
@@ -72,6 +73,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <SocketProvider>
+              <PreMiDExposer />
               <AppWrapper>{children}</AppWrapper>
               <Toaster richColors position='bottom-right' />
             </SocketProvider>

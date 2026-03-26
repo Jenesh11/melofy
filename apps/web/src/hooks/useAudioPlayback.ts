@@ -542,6 +542,18 @@ export function useAudioPlayback() {
 
     navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
 
+    if ('setPositionState' in navigator.mediaSession && currentTrack) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: currentTrack.duration / 1000,
+          playbackRate: 1,
+          position: currentTime,
+        });
+      } catch (error) {
+        console.error('Error updating MediaSession position state:', error);
+      }
+    }
+
     const actionHandlers: [MediaSessionAction, () => void][] = [
       ['play', resume],
       ['pause', pause],

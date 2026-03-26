@@ -11,6 +11,7 @@ import {
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { app, db } from '@/lib/firebase/config';
 import { getAuth } from 'firebase/auth';
+import { addPlaylist } from '@/lib/firebase/playlists';
 
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
@@ -48,6 +49,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             displayName: user.displayName,
             photoURL: user.photoURL,
             createdAt: new Date().toISOString(),
+          });
+
+          // Generate initial "Liked Songs" playlist
+          await addPlaylist(user.uid, {
+            name: 'Liked Songs',
+            trackCount: 0,
+            tracks: [],
+            isLikedSongs: true,
           });
         }
       }

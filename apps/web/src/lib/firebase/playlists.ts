@@ -37,6 +37,7 @@ export interface Playlist {
   artworkUrl?: string;
   createdAt?: any;
   tracks: Track[];
+  isLikedSongs?: boolean;
 }
 
 /**

@@ -85,8 +85,10 @@ export default function LibraryPage() {
         </h1>
       </header>
 
-      <div className='grid grid-cols-1 lg:grid-cols-3 gap-10 items-start'>
-        <ImportPlaylistCard onImportSuccess={fetchPlaylists} />
+      <div className='flex flex-col gap-10 items-start w-full'>
+        <div className='w-full max-w-2xl'>
+          <ImportPlaylistCard onImportSuccess={fetchPlaylists} />
+        </div>
 
         <LibraryPlaylistGrid
           playlists={playlists}

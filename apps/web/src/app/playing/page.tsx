@@ -11,6 +11,7 @@ import {
   Pause,
   ListMusic,
   X,
+  Heart,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -18,6 +19,7 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { SyncedLyrics } from '@/components/ui/SyncedLyrics';
+import { useLikedSongs } from '@/hooks/useLikedSongs';
 
 export default function PlayingPage() {
   const currentTrack = usePlayerStore((state) => state.currentTrack);
@@ -26,6 +28,7 @@ export default function PlayingPage() {
   const resume = usePlayerStore((state) => state.resume);
   const router = useRouter();
   const [showLyrics, setShowLyrics] = useState(false);
+  const { toggleLike, isLiked } = useLikedSongs();
 
   const handleTogglePlay = () => {
     if (isPlaying) pause();
@@ -187,6 +190,18 @@ export default function PlayingPage() {
                     title='Share'
                   >
                     <Share2 className='h-6 w-6 text-white/80' />
+                  </Button>
+
+                  <Button
+                    size='icon'
+                    variant='outline'
+                    className='h-14 w-14 rounded-full border-white/20 hover:bg-white/10 bg-white/5 backdrop-blur-md transition-all'
+                    onClick={() => currentTrack && toggleLike(currentTrack)}
+                    title='Like Song'
+                  >
+                    <Heart
+                      className={`h-6 w-6 transition-all ${isLiked(currentTrack?.id || '') ? 'fill-white' : ''}`}
+                    />
                   </Button>
                 </div>
               </div>
