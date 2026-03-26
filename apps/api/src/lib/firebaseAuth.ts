@@ -5,6 +5,8 @@ import { getAdminApp } from './firebase-admin';
 export interface VerifiedFirebaseUser {
   uid: string;
   email?: string;
+  name?: string;
+  picture?: string;
   exp?: number;
 }
 
@@ -24,7 +26,13 @@ export async function verifyFirebaseIdToken(
     const app = getAdminApp();
     const decoded = await getAuth(app).verifyIdToken(idToken);
 
-    return { uid: decoded.uid, email: decoded.email, exp: decoded.exp };
+    return { 
+      uid: decoded.uid, 
+      email: decoded.email, 
+      name: decoded.name || decoded.display_name,
+      picture: decoded.picture,
+      exp: decoded.exp 
+    };
   } catch (error) {
     console.error('Firebase token verification failed:', error);
     return null;

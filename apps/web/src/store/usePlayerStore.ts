@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { toast } from 'sonner';
 
 export interface Track {
   id: string; // Spotify ID or internal ID
@@ -8,6 +9,11 @@ export interface Track {
   artworkUrl: string;
   duration: number; // in milliseconds
   url?: string; // NodeLink encoded track string
+}
+
+export interface PartyListener {
+  userId: string;
+  username: string;
 }
 
 interface PlayerState {
@@ -24,12 +30,20 @@ interface PlayerState {
   activeCollectionId: string | null;
   activeCollectionType: 'spotify' | 'custom' | null;
 
+  // Party State
+  partyId: string | null;
+  hostName: string | null;
+  isPartyHost: boolean;
+  listenersCanControl: boolean;
+  partyListeners: PartyListener[];
+
   // Actions
-  play: (track: Track) => void;
+  canControlPlayback: () => boolean;
+  play: (track: Track, force?: boolean) => void;
   /** Play a track within a context (e.g. a carousel section). Sets the remaining tracks as queue. */
-  playInContext: (track: Track, allTracks: Track[]) => void;
-  pause: () => void;
-  resume: () => void;
+  playInContext: (track: Track, allTracks: Track[], force?: boolean) => void;
+  pause: (force?: boolean) => void;
+  resume: (force?: boolean) => void;
   setVolume: (volume: number) => void;
   setProgress: (progress: number) => void;
   addToQueue: (track: Track) => void;
@@ -38,9 +52,10 @@ interface PlayerState {
     tracks: Track[],
     collectionId?: string,
     collectionType?: 'spotify' | 'custom',
+    force?: boolean
   ) => void;
-  playNext: () => void;
-  playPrevious: () => void;
+  playNext: (force?: boolean) => void;
+  playPrevious: (force?: boolean) => void;
   toggleShuffle: () => void;
   toggleRepeat: () => void;
   toggleAutoplay: () => void;
@@ -48,6 +63,10 @@ interface PlayerState {
   hydrateState: (state: Partial<PlayerState>) => void;
   setPlaying: (isPlaying: boolean) => void;
   reset: () => void;
+  setParty: (partyId: string, isHost: boolean, hostName?: string) => void;
+  clearParty: () => void;
+  setListenersCanControl: (canControl: boolean) => void;
+  setPartyListeners: (listeners: PartyListener[]) => void;
 }
 
 const initialState = {
@@ -63,12 +82,27 @@ const initialState = {
   activePlaylistContext: null,
   activeCollectionId: null,
   activeCollectionType: null,
+  partyId: null,
+  hostName: null,
+  isPartyHost: false,
+  listenersCanControl: false,
+  partyListeners: [],
 };
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
   ...initialState,
 
-  play: (track) =>
+  canControlPlayback: () => {
+    const state = get();
+    if (state.partyId && !state.isPartyHost && !state.listenersCanControl) {
+      toast.error('The host has locked playback controls.');
+      return false;
+    }
+    return true;
+  },
+
+  play: (track, force = false) => {
+    if (!force && !get().canControlPlayback()) return;
     set((state) => ({
       history: state.currentTrack
         ? [...state.history, state.currentTrack]
@@ -80,9 +114,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       activePlaylistContext: null, // clear context on manual individual play
       activeCollectionId: null,
       activeCollectionType: null,
-    })),
+    }));
+  },
 
-  playInContext: (track, allTracks) => {
+  playInContext: (track, allTracks, force = false) => {
+    if (!force && !get().canControlPlayback()) return;
     const trackIndex = allTracks.findIndex(
       (t) => t.id === track.id || t.title === track.title,
     );
@@ -101,13 +137,20 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     }));
   },
 
-  pause: () => set({ isPlaying: false }),
-  resume: () => set({ isPlaying: true }),
+  pause: (force = false) => {
+    if (!force && !get().canControlPlayback()) return;
+    set({ isPlaying: false });
+  },
+  resume: (force = false) => {
+    if (!force && !get().canControlPlayback()) return;
+    set({ isPlaying: true });
+  },
   setVolume: (volume) => set({ volume }),
   setProgress: (progress) => set({ progress }),
   addToQueue: (track) => set((state) => ({ queue: [...state.queue, track] })),
   setQueue: (tracks) => set({ queue: tracks }),
-  playPlaylist: (tracks, collectionId, collectionType) => {
+  playPlaylist: (tracks, collectionId, collectionType, force = false) => {
+    if (!force && !get().canControlPlayback()) return;
     if (tracks.length === 0) return;
     set((state) => ({
       history: state.currentTrack
@@ -122,7 +165,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       progress: 0,
     }));
   },
-  playNext: () => {
+  playNext: (force = false) => {
+    if (!force && !get().canControlPlayback()) return;
     const { queue, currentTrack, history, isRepeat, isShuffle } = get();
 
     // Handle repeat state
@@ -190,7 +234,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       });
     }
   },
-  playPrevious: () => {
+  playPrevious: (force = false) => {
+    if (!force && !get().canControlPlayback()) return;
     const { history, currentTrack, queue } = get();
     if (history.length > 0) {
       const previousTrack = history[history.length - 1];
@@ -240,7 +285,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       };
     }),
   hydrateState: (newState) =>
-    set((state) => ({ ...state, ...newState, isPlaying: false })), // Always start paused on reload
+    set((state) => ({ ...state, ...newState, isPlaying: false, partyId: newState.partyId || null, hostName: (newState as any).hostName || null, isPartyHost: newState.isPartyHost || false, listenersCanControl: newState.listenersCanControl || false })),
   setPlaying: (isPlaying) => set({ isPlaying }),
   reset: () => set(initialState),
+  setParty: (partyId, isHost, hostName) => set({ partyId, isPartyHost: isHost, hostName: hostName || null }),
+  clearParty: () => set({ partyId: null, hostName: null, isPartyHost: false, listenersCanControl: false, partyListeners: [] }),
+  setListenersCanControl: (canControl) => set({ listenersCanControl: canControl }),
+  setPartyListeners: (listeners) => set({ partyListeners: listeners }),
 }));

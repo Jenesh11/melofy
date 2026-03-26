@@ -66,7 +66,10 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       const token = await user.getIdToken();
       if (cancelled) return;
 
-      const socketInstance = io('/', {
+      const isDev = process.env.NODE_ENV === 'development';
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || (isDev ? 'http://localhost:3001' : '/');
+
+      const socketInstance = io(backendUrl, {
         transports: ['websocket'],
         auth: {
           token,

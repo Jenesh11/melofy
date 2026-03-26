@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { Track } from '@/store/usePlayerStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SyncedLyrics } from '@/components/ui/SyncedLyrics';
+import { ListenAlongPopover } from './ListenAlongPopover';
 
 interface MobilePlayerProps {
   isExpanded: boolean;
@@ -112,17 +113,20 @@ export function MobilePlayer({
           <div className='text-xs font-bold uppercase tracking-widest text-white/50'>
             Now Playing
           </div>
-          <Button
-            variant='ghost'
-            size='icon'
-            onClick={toggleAutoplay}
-            className={cn(
-              'transition-colors hover:bg-white/10',
-              isAutoplay ? 'text-primary bg-primary/20' : 'text-white/50',
-            )}
-          >
-            <Radio className='h-6 w-6' />
-          </Button>
+          <div className='flex items-center gap-1'>
+            <ListenAlongPopover />
+            <Button
+              variant='ghost'
+              size='icon'
+              onClick={toggleAutoplay}
+              className={cn(
+                'transition-colors hover:bg-white/10',
+                isAutoplay ? 'text-primary bg-primary/20' : 'text-white/50',
+              )}
+            >
+              <Radio className='h-6 w-6' />
+            </Button>
+          </div>
         </div>
 
         {/* Large Artwork */}

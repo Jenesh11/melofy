@@ -5,14 +5,16 @@ import {
   useRef,
   useState,
 } from 'react';
-import { usePlayerStore, Track } from '@/store/usePlayerStore';
+import { usePlayerStore, Track, PartyListener } from '@/store/usePlayerStore';
 import { useSocket } from '@/lib/socket-context';
 import { useAuth } from '@/lib/firebase/auth-context';
+import { toast } from 'sonner';
 
 interface RemotePlaybackState {
-  type: 'play_track' | 'pause' | 'resume' | 'seek';
+  type: 'play_track' | 'pause' | 'resume' | 'seek' | 'sync';
   track?: Track;
   time?: number;
+  isPlaying?: boolean;
 }
 
 interface AutoplayTrackData {
@@ -59,6 +61,8 @@ export function useAudioPlayback() {
   );
   const isAutoplay = usePlayerStore((state) => state.isAutoplay);
   const resetStore = usePlayerStore((state) => state.reset);
+  const isPartyHost = usePlayerStore((state) => state.isPartyHost);
+  const partyId = usePlayerStore((state) => state.partyId);
 
   const { user } = useAuth();
   const { socket } = useSocket();
@@ -76,7 +80,7 @@ export function useAudioPlayback() {
   const [isBuffering, setIsBuffering] = useState(false);
   const [isFetchingAutoplay, setIsFetchingAutoplay] = useState(false);
 
-  const isRemoteUpdate = useRef(false);
+  const lastReceivedTrackRef = useRef<string | null>(null);
   const stateSyncTimer = useRef<NodeJS.Timeout | null>(null);
   const pendingTrackResolutionRef = useRef<Map<string, Promise<void>>>(
     new Map(),
@@ -91,28 +95,69 @@ export function useAudioPlayback() {
     if (!socket) return;
 
     const handlePlaybackState = (data: RemotePlaybackState) => {
-      isRemoteUpdate.current = true;
-
       if (data.type === 'play_track' && data.track) {
-        play(data.track);
+        lastReceivedTrackRef.current = data.track.id;
+        usePlayerStore.getState().play(data.track, true);
+        if (typeof data.time === 'number' && audioRef.current) {
+          audioRef.current.currentTime = data.time;
+        }
       } else if (data.type === 'pause') {
-        pause();
+        usePlayerStore.getState().pause(true);
+        if (typeof data.time === 'number' && audioRef.current) {
+          audioRef.current.currentTime = data.time;
+        }
       } else if (data.type === 'resume') {
-        resume();
+        usePlayerStore.getState().resume(true);
+        if (typeof data.time === 'number' && audioRef.current) {
+          audioRef.current.currentTime = data.time;
+        }
       } else if (
         data.type === 'seek' &&
         audioRef.current &&
         typeof data.time === 'number'
       ) {
         audioRef.current.currentTime = data.time;
+      } else if (
+        data.type === 'sync' &&
+        audioRef.current &&
+        typeof data.time === 'number'
+      ) {
+        if (Math.abs(audioRef.current.currentTime - data.time) > 2) {
+          audioRef.current.currentTime = data.time;
+        }
+        if (data.isPlaying && audioRef.current.paused) {
+          usePlayerStore.getState().resume(true);
+        } else if (!data.isPlaying && !audioRef.current.paused) {
+          usePlayerStore.getState().pause(true);
+        }
       }
+    };
+    const handleListenerControl = (data: { canControl: boolean }) => {
+      usePlayerStore.getState().setListenersCanControl(data.canControl);
+    };
+    const handleListenersUpdate = (data: { listeners: PartyListener[] }) => {
+      usePlayerStore.getState().setPartyListeners(data.listeners);
+    };
+    const handleListenerJoined = (data: { username: string }) => {
+      toast.success(`${data.username} joined the session`);
+    };
+    const handleListenerLeft = (data: { username: string }) => {
+      toast.info(`${data.username} left the session`);
     };
 
     socket.on('playback_state', handlePlaybackState);
+    socket.on('listener_control_updated', handleListenerControl);
+    socket.on('listeners_update', handleListenersUpdate);
+    socket.on('listener_joined', handleListenerJoined);
+    socket.on('listener_left', handleListenerLeft);
     return () => {
       socket.off('playback_state', handlePlaybackState);
+      socket.off('listener_control_updated', handleListenerControl);
+      socket.off('listeners_update', handleListenersUpdate);
+      socket.off('listener_joined', handleListenerJoined);
+      socket.off('listener_left', handleListenerLeft);
     };
-  }, [socket, play, pause, resume]);
+  }, [socket]);
 
   useEffect(() => {
     if (!audioRef.current) return;
@@ -126,18 +171,38 @@ export function useAudioPlayback() {
   }, [isPlaying]);
 
   useEffect(() => {
-    if (isRemoteUpdate.current) {
-      isRemoteUpdate.current = false;
-      return;
-    }
-
     if (socket && currentTrack) {
+      if (lastReceivedTrackRef.current === currentTrack.id) {
+        lastReceivedTrackRef.current = null;
+        return;
+      }
+      
       socket.emit('playback_state', {
         type: 'play_track',
         track: currentTrack,
+        time: audioRef.current?.currentTime || 0,
       });
     }
   }, [currentTrack, socket]);
+
+  // Immediate sync when host creates a party
+  const [prevPartyId, setPrevPartyId] = useState<string | null>(null);
+  useEffect(() => {
+    if (isPartyHost && partyId && partyId !== prevPartyId && socket && currentTrack) {
+      setPrevPartyId(partyId);
+      socket.emit('playback_state', {
+        type: 'play_track',
+        track: currentTrack,
+        time: audioRef.current?.currentTime || 0,
+      });
+      if (isPlaying) {
+        socket.emit('playback_state', {
+          type: 'resume',
+          time: audioRef.current?.currentTime || 0,
+        });
+      }
+    }
+  }, [isPartyHost, partyId, prevPartyId, socket, currentTrack, isPlaying]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -206,10 +271,14 @@ export function useAudioPlayback() {
 
     getAuthHeader()
       .then((headers) => {
-        if (!headers) return null;
+        if (!headers) {
+          setIsHydrated(true);
+          return null;
+        }
         return fetch('/api/player-state', { headers });
       })
       .then((res) => {
+        if (res === null) return;
         if (!res || !res.ok) throw new Error('Failed to fetch player state');
         return res.json();
       })
@@ -240,6 +309,10 @@ export function useAudioPlayback() {
           activePlaylistContext: state.activePlaylistContext || null,
           activeCollectionId: state.activeCollectionId || null,
           activeCollectionType: state.activeCollectionType || null,
+          partyId: state.partyId || null,
+          hostName: (state as any).hostName || null,
+          isPartyHost: state.isPartyHost || false,
+          listenersCanControl: state.listenersCanControl || false,
         });
 
         if (audioRef.current && state.currentTime) {
@@ -274,6 +347,9 @@ export function useAudioPlayback() {
       activePlaylistContext,
       activeCollectionId,
       activeCollectionType,
+      partyId: usePlayerStore.getState().partyId,
+      isPartyHost: usePlayerStore.getState().isPartyHost,
+      listenersCanControl: usePlayerStore.getState().listenersCanControl,
     };
 
     try {
@@ -324,6 +400,24 @@ export function useAudioPlayback() {
     };
   }, [syncStateToServer, user?.uid, isHydrated]);
 
+  const hasAttemptedRejoin = useRef(false);
+  useEffect(() => {
+    if (isHydrated && partyId && socket && !hasAttemptedRejoin.current) {
+      hasAttemptedRejoin.current = true;
+      socket.emit('join_party', partyId, (response: any) => {
+        if (response?.ok && response.initialState) {
+          usePlayerStore.getState().setParty(partyId, !!response.isHost, response.initialState.hostName);
+          usePlayerStore.getState().setListenersCanControl(!!response.initialState.listenersCanControl);
+          if (response.initialState.listeners) {
+            usePlayerStore.getState().setPartyListeners(response.initialState.listeners);
+          }
+        } else {
+          usePlayerStore.getState().clearParty();
+        }
+      });
+    }
+  }, [isHydrated, partyId, socket]);
+
   // Periodic position sync (heartbeat) every 10 seconds while playing
   useEffect(() => {
     if (!user?.uid || !isHydrated || !isPlaying) return;
@@ -331,20 +425,30 @@ export function useAudioPlayback() {
     const intervalId = setInterval(() => {
       if (!audioRef.current || audioRef.current.paused) return;
       syncStateToServer();
+
+      if (socket && usePlayerStore.getState().isPartyHost) {
+        socket.emit('playback_state', {
+          type: 'sync',
+          time: audioRef.current.currentTime || 0,
+          isPlaying: true,
+        });
+      }
     }, 10000); 
 
     return () => clearInterval(intervalId);
-  }, [user?.uid, isHydrated, isPlaying, syncStateToServer]);
+  }, [user?.uid, isHydrated, isPlaying, syncStateToServer, socket]);
 
   const handleTogglePlay = useCallback(() => {
+    if (!usePlayerStore.getState().canControlPlayback()) return;
+
     if (isPlaying) {
       pause();
-      if (socket) socket.emit('playback_state', { type: 'pause' });
+      if (socket) socket.emit('playback_state', { type: 'pause', time: audioRef.current?.currentTime || 0 });
       return;
     }
 
     resume();
-    if (socket) socket.emit('playback_state', { type: 'resume' });
+    if (socket) socket.emit('playback_state', { type: 'resume', time: audioRef.current?.currentTime || 0 });
   }, [isPlaying, pause, resume, socket]);
 
   const triggerAutoplay = useCallback(async () => {
@@ -395,6 +499,8 @@ export function useAudioPlayback() {
   }, [currentTrack, getAuthHeader, isFetchingAutoplay, play]);
 
   const handleSkipNext = useCallback(async () => {
+    if (!usePlayerStore.getState().canControlPlayback()) return;
+
     const state = usePlayerStore.getState();
 
     if (state.isRepeat && audioRef.current) {
@@ -413,6 +519,8 @@ export function useAudioPlayback() {
   }, [playNext, triggerAutoplay]);
 
   const handleTrackEnd = useCallback(async () => {
+    const state = usePlayerStore.getState();
+    if (state.partyId && !state.isPartyHost) return;
     await handleSkipNext();
   }, [handleSkipNext]);
 
@@ -500,6 +608,8 @@ export function useAudioPlayback() {
 
   const handleSeek = useCallback(
     (value: number[]) => {
+      if (!usePlayerStore.getState().canControlPlayback()) return;
+
       const seekPosition = value[0];
       if (seekPosition === undefined || !audioRef.current || !currentTrack)
         return;

@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ProgressBar } from './ProgressBar';
 import { VolumeControl } from './VolumeControl';
+import { ListenAlongPopover } from './ListenAlongPopover';
 import { cn } from '@/lib/utils';
 import { Track } from '@/store/usePlayerStore';
 import Link from 'next/link';
@@ -223,6 +224,7 @@ export function DesktopPlayer({
 
       {/* Secondary Controls (Volume etc.) */}
       <div className='hidden md:flex items-center justify-end w-[30%] min-w-[180px] gap-4'>
+        <ListenAlongPopover />
         <Link
           href='/playing'
           className='text-muted-foreground hover:text-foreground transition-colors'

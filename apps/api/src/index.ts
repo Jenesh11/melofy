@@ -4,6 +4,8 @@ import cors, { type CorsOptions } from 'cors';
 import { Server as SocketIOServer, type Socket as SocketIOSocket } from 'socket.io';
 import http from 'http';
 import helmet from 'helmet';
+import crypto from 'crypto';
+import { Redis } from '@upstash/redis';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import streamRouter from './routes/stream';
 import spotifyRouter from './routes/spotify';
@@ -11,8 +13,14 @@ import lyricsRouter from './routes/lyrics';
 import playerRouter from './routes/player';
 import { LavalinkManager } from 'lavalink-client';
 import { requireFirebaseAuth, verifyFirebaseIdToken } from './lib/firebaseAuth';
+import { registerJamHandlers } from './sockets/jam';
 
 const app = express();
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
 
 function resolveTrustProxySetting():
   | boolean
@@ -296,7 +304,7 @@ io.use(async (socket, next) => {
   }
 
   socket.data.userId = user.uid;
-  socket.data.username = user.email || user.uid;
+  socket.data.username = user.name || user.email || user.uid;
   socket.data.tokenExpiresAt = user.exp
     ? user.exp * 1000
     : Date.now() + 55 * 60 * 1000;
@@ -366,7 +374,7 @@ io.on('connection', (socket) => {
         return;
       }
 
-      socket.data.username = refreshedUser.email || refreshedUser.uid;
+      socket.data.username = refreshedUser.name || refreshedUser.email || refreshedUser.uid;
       socket.data.tokenExpiresAt = refreshedUser.exp
         ? refreshedUser.exp * 1000
         : Date.now() + 55 * 60 * 1000;
@@ -389,17 +397,7 @@ io.on('connection', (socket) => {
     console.log(`Socket ${socket.id} joined secure room ${secureRoomId}`);
   });
 
-  socket.on('queue_update', (data) => {
-    if (socket.data.roomId) {
-      socket.to(socket.data.roomId).emit('queue_update', data);
-    }
-  });
-
-  socket.on('playback_state', (data) => {
-    if (socket.data.roomId) {
-      socket.to(socket.data.roomId).emit('playback_state', data);
-    }
-  });
+  registerJamHandlers(io, socket, redis);
 
   socket.on('disconnect', () => {
     const timer = socket.data.authExpiryTimer as NodeJS.Timeout | undefined;

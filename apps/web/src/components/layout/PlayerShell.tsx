@@ -98,13 +98,21 @@ export function PlayerShell() {
       <audio
         ref={playback.audioRef}
         src={streamSrc}
+        onLoadedData={(e) => {
+          e.currentTarget.volume = playback.volume;
+        }}
         onTimeUpdate={(e) =>
           !playback.isDraggingSlider &&
           playback.setCurrentTime(e.currentTarget.currentTime)
         }
         onEnded={playback.handleTrackEnd}
         onWaiting={() => playback.setIsBuffering(true)}
-        onCanPlay={() => playback.setIsBuffering(false)}
+        onCanPlay={(e) => {
+          playback.setIsBuffering(false);
+          if (playback.isPlaying) {
+            e.currentTarget.play().catch(() => {});
+          }
+        }}
         onLoadStart={() => playback.setIsBuffering(true)}
         onPlaying={() => playback.setIsBuffering(false)}
         autoPlay={playback.isPlaying}
