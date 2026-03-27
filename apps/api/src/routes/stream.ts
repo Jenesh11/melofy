@@ -193,10 +193,9 @@ function parseItag(rawItag: string | undefined): number | null {
 
 function getItagCandidates(rawItag: string | undefined): Array<number | null> {
   const explicit = parseItag(rawItag);
-  if (explicit !== null) return [explicit, null];
+  if (explicit !== null) return [explicit];
 
-  // Let NodeLink choose automatically first, then try explicit YouTube audio itags.
-  return [null, 251, 250, 249, 140];
+  return [null];
 }
 
 function shouldRetryStatus(statusCode: number): boolean {

@@ -34,20 +34,20 @@ export const metadata: Metadata = {
   creator: 'Melofy',
   publisher: 'Melofy',
   icons: {
-    icon: '/logo.png',
-    apple: '/logo.png',
+    icon: 'https://i.ibb.co/HpfVk6KN/melofy.png',
+    apple: 'https://i.ibb.co/HpfVk6KN/melofy.png',
   },
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://melofy.vercel.app',
+    url: 'https://melofy.jene.in',
     siteName: 'Melofy',
     title: 'Melofy - Your World Of Music',
     description:
       'Experience sound like never before with Melofy. Minimalist, premium, and designed for audiophiles.',
     images: [
       {
-        url: '/logo.png',
+        url: 'https://i.ibb.co/HpfVk6KN/melofy.png',
         width: 512,
         height: 512,
         alt: 'Melofy Logo',
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Melofy - Your World Of Music',
     description: 'The most premium music experience on the web.',
-    images: ['/logo.png'],
+    images: ['https://i.ibb.co/HpfVk6KN/melofy.png'],
   },
 };
 
