@@ -20,8 +20,8 @@ const nextConfig: NextConfig = {
         destination: `${backendBaseUrl}/api/stream-ticket`,
       },
       {
-        source: '/socket.io/:path*',
-        destination: `${backendBaseUrl}/socket.io/:path*`,
+        source: '/api/socket.io/:path*',
+        destination: `${backendBaseUrl}/api/socket.io/:path*`,
       },
       {
         source: '/api/spotify/:path*',

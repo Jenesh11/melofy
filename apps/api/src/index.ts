@@ -103,6 +103,7 @@ app.use((req, _res, next) => {
 
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {
+  path: '/api/socket.io',
   cors: {
     origin: allowedOrigins,
     methods: ['GET', 'POST'],

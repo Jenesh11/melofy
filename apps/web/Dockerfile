@@ -17,6 +17,8 @@ ARG NEXT_PUBLIC_FIREBASE_APP_ID
 # Upstash Redis — accessed on the server during SSG, must also be present at build time
 ARG UPSTASH_REDIS_REST_URL
 ARG UPSTASH_REDIS_REST_TOKEN
+ARG BACKEND_API_URL
+ARG INTERNAL_API_URL
 
 # Promote ARGs to ENV so Next.js / Webpack can read them during `next build`
 ENV NEXT_PUBLIC_FIREBASE_API_KEY=$NEXT_PUBLIC_FIREBASE_API_KEY \
