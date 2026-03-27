@@ -49,6 +49,7 @@ function resolveTrustProxySetting():
 }
 
 app.set('trust proxy', resolveTrustProxySetting());
+console.log(`[API] Trust Proxy set to: ${process.env.TRUST_PROXY}`);
 
 const allowedOrigins = (process.env.CORS_ORIGINS || '')
   .split(',')
@@ -102,6 +103,9 @@ app.use((req, _res, next) => {
 });
 
 const server = http.createServer(app);
+server.on('request', (req) => {
+  console.log(`[API] ${req.method} ${req.url}`);
+});
 const io = new SocketIOServer(server, {
   path: '/api/socket.io',
   cors: {

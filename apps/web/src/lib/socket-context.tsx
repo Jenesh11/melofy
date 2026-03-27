@@ -70,7 +70,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || (isDev ? 'http://localhost:3001' : '/');
 
       const socketInstance = io(backendUrl, {
-        path: '/api/socket.io',
+        path: '/api/socket.io/',
         auth: {
           token,
         },
