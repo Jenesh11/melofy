@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import {
   getUserPlaylists,
@@ -21,26 +21,33 @@ export default function LibraryPage() {
   const [newName, setNewName] = useState('');
   const [isRenaming, setIsRenaming] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      fetchPlaylists();
-    } else {
-      setIsLoading(false);
-    }
-  }, [user]);
-
-  const fetchPlaylists = async () => {
+  const fetchPlaylists = useCallback(async () => {
     if (!user) return;
     try {
       const data = await getUserPlaylists(user.uid);
-      setPlaylists(data);
+      const sorted = [...data].sort((a, b) => {
+        const aIsLiked = a.isLikedSongs || a.name === 'Liked Songs';
+        const bIsLiked = b.isLikedSongs || b.name === 'Liked Songs';
+        if (aIsLiked && !bIsLiked) return -1;
+        if (!aIsLiked && bIsLiked) return 1;
+        return 0;
+      });
+      setPlaylists(sorted);
     } catch (error) {
       console.error('Error fetching playlists:', error);
       toast.error('Failed to load library');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchPlaylists();
+    } else {
+      setIsLoading(false);
+    }
+  }, [user, fetchPlaylists]);
 
   const handleDelete = async (id: string) => {
     try {

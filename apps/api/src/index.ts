@@ -198,12 +198,14 @@ app.use('/api/spotify', publicRateLimit, spotifyRouter);
 app.use('/api/lyrics', publicRateLimit, lyricsRouter);
 app.use('/api', playerRouter);
 
+import { fetchFullSpotifyPlaylist } from './lib/spotify';
+
 app.get('/api/search', requireFirebaseAuth, privateRateLimit, async (req, res) => {
   const query = req.query.q as string;
   if (!query) return res.status(400).json({ error: 'Missing query' });
 
   const trimmedQuery = query.trim();
-  if (trimmedQuery.length < 2 || trimmedQuery.length > 200) {
+  if (trimmedQuery.length < 2 || trimmedQuery.length > 500) {
     return res.status(400).json({ error: 'Invalid query length' });
   }
 
@@ -211,6 +213,52 @@ app.get('/api/search', requireFirebaseAuth, privateRateLimit, async (req, res) =
     const node = lavalink.nodeManager.leastUsedNodes()[0];
     if (!node)
       return res.status(500).json({ error: 'No NodeLink nodes available' });
+
+    // Handle Spotify Playlist URLs/URIs specially to bypass the 100 tracks limit
+    const spotifyPlaylistRegex = /(?:open\.spotify\.com\/playlist\/|spotify:playlist:)([a-zA-Z0-9]{22})/;
+    const match = trimmedQuery.match(spotifyPlaylistRegex);
+
+    if (match) {
+      const playlistId = match[1];
+      console.log(`[SpotifyImport] Detected Spotify playlist URL: ${playlistId}. Fetching full playlist...`);
+      
+      try {
+        const fullData = await fetchFullSpotifyPlaylist(playlistId);
+        
+        // Transform to Lavalink-like structure that the frontend expects
+        const tracks = (fullData.tracks?.items || [])
+          .map((item: any) => item.track)
+          .filter(Boolean)
+          .map((t: any) => ({
+            encoded: '', // Will be resolved by client on-demand in useAudioPlayback
+            info: {
+              identifier: t.id,
+              title: t.name,
+              author: t.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist',
+              length: t.duration_ms || 0,
+              duration: t.duration_ms || 0, // Explicitly provide duration for Firestore
+              artworkUrl: t.album?.images?.[0]?.url || '',
+              uri: `https://open.spotify.com/track/${t.id}`,
+              sourceName: 'spotify',
+              isSeekable: true,
+              isStream: false,
+              isrc: t.external_ids?.isrc || null
+            }
+          }));
+
+        return res.json({
+          loadType: 'playlist',
+          playlistInfo: {
+            name: fullData.name,
+            selectedTrack: 0
+          },
+          tracks
+        });
+      } catch (err) {
+        console.error('[SpotifyImport] Failed to fetch full playlist metadata:', err);
+        // Fallback to normal node search if manual fetch fails
+      }
+    }
 
     const result = await node.search(
       { query: trimmedQuery },

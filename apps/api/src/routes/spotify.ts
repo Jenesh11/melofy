@@ -1,7 +1,11 @@
 import { Router } from 'express';
-import axios from 'axios';
 import { Redis } from '@upstash/redis';
 import { requireFirebaseAuth } from '../lib/firebaseAuth';
+import { 
+  validateSpotifyId, 
+  spotifyGet, 
+  fetchFullSpotifyPlaylist 
+} from '../lib/spotify';
 
 const router = Router();
 
@@ -12,57 +16,6 @@ const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL || '',
   token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
 });
-
-let spotifyAccessToken = '';
-let tokenExpirationTime = 0;
-const SPOTIFY_ID_PATTERN = /^[a-zA-Z0-9]{22}$/;
-
-function validateSpotifyId(rawId: unknown): string | null {
-  if (typeof rawId !== 'string') return null;
-  const id = rawId.trim();
-  if (!SPOTIFY_ID_PATTERN.test(id)) return null;
-  return id;
-}
-
-async function getSpotifyToken() {
-  const clientId = process.env.SPOTIFY_CLIENT_ID;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error(
-      'SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET is missing in .env',
-    );
-  }
-
-  if (spotifyAccessToken && Date.now() < tokenExpirationTime) {
-    return spotifyAccessToken;
-  }
-
-  const tokenUrl = 'https://accounts.spotify.com/api/token';
-  const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString(
-    'base64',
-  );
-
-  const response = await axios.post(tokenUrl, 'grant_type=client_credentials', {
-    headers: {
-      Authorization: `Basic ${authHeader}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-  });
-
-  spotifyAccessToken = response.data.access_token;
-  tokenExpirationTime = Date.now() + (response.data.expires_in - 300) * 1000;
-  return spotifyAccessToken;
-}
-
-// Helper to call Spotify API
-async function spotifyGet(path: string) {
-  const token = await getSpotifyToken();
-  const res = await axios.get(`https://api.spotify.com/v1${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return res.data;
-}
 
 /**
  * GET /api/spotify/trending
@@ -318,43 +271,8 @@ router.get('/playlists/:id', async (req, res) => {
     // 2. Cache Miss: Fetch from Spotify API
     console.log(`[Spotify] 🌐 Fetching playlist ${id} from live API`);
 
-    // Use fields to limit response size. For playlist: we need id, name, description, images.
-    // For tracks: we need total, next url, and items containing the track object.
-    const playlistFields =
-      'id,name,description,images,tracks(total,next,items(track(id,name,artists,album,duration_ms)))';
-    const data = await spotifyGet(
-      `/playlists/${id}?fields=${encodeURIComponent(playlistFields)}`,
-    );
-
-    const allItems = [...(data.tracks?.items || [])];
-    let nextUrl = data.tracks?.next;
-
-    // Process pagination for large playlists loop
-    while (nextUrl) {
-      console.log(
-        `[Spotify] Fetching next batch of tracks for playlist ${id}...`,
-      );
-      const urlObj = new URL(nextUrl);
-
-      // Optimize pagination fetch with fields as well
-      const trackFields =
-        'next,items(track(id,name,artists,album,duration_ms))';
-      urlObj.searchParams.set('fields', trackFields);
-
-      const nextPath = urlObj.pathname.replace('/v1', '') + urlObj.search;
-
-      try {
-        const nextData = await spotifyGet(nextPath);
-        allItems.push(...(nextData.items || []));
-        nextUrl = nextData.next;
-      } catch (err) {
-        console.error(
-          `[Spotify] Error fetching next tracks batch for playlist ${id}:`,
-          err,
-        );
-        break; // Stop fetching on error but return what we currently have
-      }
-    }
+    const data = await fetchFullSpotifyPlaylist(id);
+    const allItems = data.tracks?.items || [];
 
     const formattedData = {
       id: data.id,

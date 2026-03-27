@@ -76,11 +76,17 @@ export function Sidebar() {
     return () => unsubscribe();
   }, [user]);
 
-  // Combine Firebase lists and locally stored Spotify lists.
-  const allPlaylists = useMemo(
-    () => [...(user ? firebasePlaylists : []), ...savedPlaylists],
-    [firebasePlaylists, savedPlaylists, user],
-  );
+  // Combine Firebase lists and locally stored Spotify lists, ensuring Liked Songs is on top.
+  const allPlaylists = useMemo(() => {
+    const combined = [...(user ? firebasePlaylists : []), ...savedPlaylists];
+    return combined.sort((a, b) => {
+      const aIsLiked = a.isLikedSongs || a.name === 'Liked Songs';
+      const bIsLiked = b.isLikedSongs || b.name === 'Liked Songs';
+      if (aIsLiked && !bIsLiked) return -1;
+      if (!aIsLiked && bIsLiked) return 1;
+      return 0;
+    });
+  }, [firebasePlaylists, savedPlaylists, user]);
   const savedPlaylistIds = useMemo(
     () => new Set(savedPlaylists.map((playlist) => playlist.id)),
     [savedPlaylists],
