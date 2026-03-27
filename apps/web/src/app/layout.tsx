@@ -15,6 +15,7 @@ import { Toaster } from 'sonner';
 import { PreMiDExposer } from '@/components/PreMiDExposer';
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://melofy.jene.in'),
   title: 'Melofy | Elevate Your Sound',
   description:
     'The ultimate destination for music lovers. Port your Spotify playlists, discover new sounds, and experience high-fidelity streaming in a stunning, minimalist interface.',
@@ -26,16 +27,19 @@ export const metadata: Metadata = {
     'melofy app',
     'melofy music app',
     'melofy music streaming',
-    'melofy music streaming app',
     'high fidelity audio',
     'personalized playlists',
   ],
-  authors: [{ name: 'Melofy Team' }],
+  authors: [{ name: 'Melofy Team', url: 'https://melofy.jene.in' }],
   creator: 'Melofy',
   publisher: 'Melofy',
   icons: {
-    icon: 'https://i.ibb.co/HpfVk6KN/melofy.png',
-    apple: 'https://i.ibb.co/HpfVk6KN/melofy.png',
+    icon: [
+      { url: '/logo.png' },
+      { url: '/logo.png', sizes: '32x32', type: 'image/png' },
+      { url: '/logo.png', sizes: '16x16', type: 'image/png' },
+    ],
+    apple: [{ url: '/logo.png', sizes: '180x180', type: 'image/png' }],
   },
   openGraph: {
     type: 'website',
@@ -47,7 +51,7 @@ export const metadata: Metadata = {
       'Experience sound like never before with Melofy. Minimalist, premium, and designed for audiophiles.',
     images: [
       {
-        url: 'https://i.ibb.co/HpfVk6KN/melofy.png',
+        url: '/logo.png',
         width: 512,
         height: 512,
         alt: 'Melofy Logo',
@@ -58,7 +62,19 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Melofy - Your World Of Music',
     description: 'The most premium music experience on the web.',
-    images: ['https://i.ibb.co/HpfVk6KN/melofy.png'],
+    images: ['/logo.png'],
+    creator: '@lazy_shrey',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
   },
 };
 

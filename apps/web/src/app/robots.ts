@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: '/',
       disallow: ['/api/', '/settings'],
     },
-    sitemap: 'https://melofy.vercel.app/sitemap.xml',
+    sitemap: 'https://melofy.jene.in/sitemap.xml',
   };
 }
