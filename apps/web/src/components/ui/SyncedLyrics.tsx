@@ -127,7 +127,7 @@ export const SyncedLyrics = () => {
     return () => {
       active = false;
     };
-  }, [currentTrack]);
+  }, [currentTrack, lyricsCache, setLyricsCache]);
 
   // Find the currently active line index based on playback progress
   const activeIndex = React.useMemo(() => {

@@ -2,9 +2,9 @@
 
 import { Search, User } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
+import Image from 'next/image';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { Button } from '@/components/ui/button';
-import { Music2 } from 'lucide-react';
 import Link from 'next/link';
 
 export function Topbar() {
@@ -28,10 +28,12 @@ export function Topbar() {
           href='/'
           className='flex md:hidden items-center gap-2 hover:opacity-80 transition-opacity'
         >
-          <div className='h-8 w-8 rounded-lg overflow-hidden flex items-center justify-center shrink-0'>
-            <img
+          <div className='h-8 w-8 rounded-lg overflow-hidden flex items-center justify-center shrink-0 relative'>
+            <Image
               src='/logo.png'
               alt='Melofy Logo'
+              width={32}
+              height={32}
               className='h-full w-full object-contain'
             />
           </div>
@@ -65,11 +67,13 @@ export function Topbar() {
             <span className='hidden sm:block text-sm mr-1 truncate max-w-[120px]'>
               {user?.displayName || 'Settings'}
             </span>
-            <div className='h-7 w-7 rounded-full bg-muted flex items-center justify-center shrink-0'>
+            <div className='h-7 w-7 rounded-full bg-muted flex items-center justify-center shrink-0 relative'>
               {user?.photoURL ? (
-                <img
+                <Image
                   src={user.photoURL}
                   alt='Profile'
+                  width={28}
+                  height={28}
                   referrerPolicy='no-referrer'
                   className='h-full w-full rounded-full object-cover'
                 />

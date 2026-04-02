@@ -5,7 +5,7 @@ import { Users, Copy, Check, LogOut, Loader2, Lock, Unlock } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { useSocket } from '@/lib/socket-context';
-import { usePlayerStore } from '@/store/usePlayerStore';
+import { usePlayerStore, Track } from '@/store/usePlayerStore';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 
@@ -73,7 +73,16 @@ export function ListenAlongPopover() {
     setIsLoading(true);
     let isHandled = false;
 
-      socket.emit('join_party', joinCode.trim(), (response: { ok: boolean; error?: string; initialState?: any; isHost?: boolean }) => {
+    socket.emit('join_party', joinCode.trim(), (response: { 
+      ok: boolean; 
+      error?: string; 
+      initialState?: { 
+        hostName?: string; 
+        currentTrack?: Track | null;
+        isPlaying?: boolean; 
+      }; 
+      isHost?: boolean 
+    }) => {
       isHandled = true;
       setIsLoading(false);
       if (response && response.ok) {
@@ -108,8 +117,9 @@ export function ListenAlongPopover() {
   };
 
   const handleLeaveParty = () => {
-    if (!socket || !isConnected) return;
-    socket.emit('leave_party');
+    if (socket && isConnected) {
+      socket.emit('leave_party');
+    }
     clearParty();
     toast.info('Left session');
     setIsOpen(false);

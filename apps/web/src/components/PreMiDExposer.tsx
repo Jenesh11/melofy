@@ -1,7 +1,19 @@
 'use client';
 
 import { useEffect } from 'react';
-import { usePlayerStore } from '@/store/usePlayerStore';
+import { usePlayerStore, Track } from '@/store/usePlayerStore';
+
+declare global {
+  interface Window {
+    melofy?: {
+      track: Track | null;
+      isPlaying: boolean;
+      progress: number;
+      partyId: string | null;
+      version: string;
+    };
+  }
+}
 
 /**
  * Exposes the player's current state to the window object for 
@@ -15,7 +27,7 @@ export function PreMiDExposer() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      (window as any).melofy = {
+      window.melofy = {
         track: currentTrack,
         isPlaying,
         progress,

@@ -66,8 +66,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       const token = await user.getIdToken();
       if (cancelled) return;
 
-      const isDev = process.env.NODE_ENV === 'development';
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || (isDev ? 'http://localhost:3001' : '/');
+      const backendUrl = process.env.BACKEND_API_URL || '/';
 
       const socketInstance = io(backendUrl, {
         path: '/api/socket.io/',

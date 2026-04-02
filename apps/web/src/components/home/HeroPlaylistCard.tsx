@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 interface HeroPlaylist {
   id: string;
@@ -26,8 +27,6 @@ export function HeroPlaylistCard({
   index,
 }: HeroPlaylistCardProps) {
   const router = useRouter();
-
-  // Hero card component with 'essence' design: highly blurred artwork background
 
   // Helper to decode HTML entities like &#x2F; to /
   const decodeHtmlEntities = (text: string) => {
@@ -62,10 +61,13 @@ export function HeroPlaylistCard({
       {/* Cinematic Blurred Background 'Essence' */}
       <div className='absolute inset-0 opacity-40 group-hover:opacity-60 transition-opacity duration-700 blur-[80px] scale-150 saturate-200'>
         {playlist.images?.[0]?.url && (
-          <img
+          <Image
             src={playlist.images[0].url}
-            className='w-full h-full object-cover'
+            fill
+            sizes='(max-width: 768px) 300px, 500px'
+            className='object-cover'
             alt=''
+            priority={index < 2}
           />
         )}
       </div>

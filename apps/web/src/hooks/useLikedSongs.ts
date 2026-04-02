@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { db } from '@/lib/firebase/config';
-import { collection, query, where, getDocs, updateDoc, doc, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { addPlaylist, Track as FirebaseTrack, Playlist } from '@/lib/firebase/playlists';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { addPlaylist, Track as FirebaseTrack } from '@/lib/firebase/playlists';
 import { Track as PlayerTrack } from '@/store/usePlayerStore';
+import { useLikedStore } from '@/store/useLikedStore';
 import { toast } from 'sonner';
 
 export const LIKED_SONGS_PLAYLIST_NAME = 'Liked Songs';
@@ -28,65 +29,14 @@ export function mapPlayerTrackToFirebaseTrack(track: PlayerTrack): FirebaseTrack
 
 export function useLikedSongs() {
   const { user } = useAuth();
-  const [likedPlaylistId, setLikedPlaylistId] = useState<string | null>(null);
-  const [likedTracks, setLikedTracks] = useState<FirebaseTrack[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchLikedSongs = useCallback(async () => {
-    if (!user) {
-      setLikedPlaylistId(null);
-      setLikedTracks([]);
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      // Try by flag first
-      let q = query(
-        collection(db, 'playlists'),
-        where('userId', '==', user.uid),
-        where('isLikedSongs', '==', true)
-      );
-      
-      let snapshot = await getDocs(q);
-      
-      // Fallback to name match for backward compatibility
-      if (snapshot.empty) {
-        q = query(
-          collection(db, 'playlists'),
-          where('userId', '==', user.uid),
-          where('name', '==', LIKED_SONGS_PLAYLIST_NAME)
-        );
-        snapshot = await getDocs(q);
-        
-        // If found by name, let's update it to add the flag
-        if (!snapshot.empty) {
-          const docSnap = snapshot.docs[0];
-          await updateDoc(doc(db, 'playlists', docSnap.id), { isLikedSongs: true });
-        }
-      }
-
-      if (!snapshot.empty) {
-        // Liked songs playlist exists
-        const docSnap = snapshot.docs[0];
-        setLikedPlaylistId(docSnap.id);
-        const data = docSnap.data() as Playlist;
-        setLikedTracks(data.tracks || []);
-      } else {
-        setLikedPlaylistId(null);
-        setLikedTracks([]);
-      }
-    } catch (error) {
-      console.error('[useLikedSongs] Error fetching liked songs:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    void fetchLikedSongs();
-  }, [fetchLikedSongs]);
+  const { 
+    likedTracks, 
+    likedPlaylistId, 
+    isLoading,
+    setLikedPlaylistId,
+    addLikedTrack,
+    removeLikedTrack,
+  } = useLikedStore();
 
   const isLiked = useCallback((trackId: string) => {
     return likedTracks.some(t => t.info.identifier === trackId);
@@ -104,11 +54,10 @@ export function useLikedSongs() {
 
       if (currentlyLiked) {
         // Optimistic update
-        setLikedTracks(prev => prev.filter(t => t.info.identifier !== track.id));
+        removeLikedTrack(track.id);
         
         if (likedPlaylistId) {
           const docRef = doc(db, 'playlists', likedPlaylistId);
-          // Find the exact object to pass to arrayRemove
           const trackToRemove = likedTracks.find(t => t.info.identifier === track.id);
           if (trackToRemove) {
             await updateDoc(docRef, {
@@ -120,10 +69,9 @@ export function useLikedSongs() {
         }
       } else {
         // Optimistic update
-        setLikedTracks(prev => [...prev, firebaseTrack]);
+        addLikedTrack(firebaseTrack);
 
         if (likedPlaylistId) {
-          // Update existing playlist
           const docRef = doc(db, 'playlists', likedPlaylistId);
           await updateDoc(docRef, {
             tracks: arrayUnion(firebaseTrack),
@@ -143,17 +91,14 @@ export function useLikedSongs() {
       }
     } catch (error) {
       console.error('[useLikedSongs] Error toggling like:', error);
-      toast.error('Failed to update Liked Songs');
-      // Revert optimistic update
-      void fetchLikedSongs();
+      toast.error('Failed to update Liked Songs. Your changes might not be saved.');
     }
-  }, [user, likedTracks, likedPlaylistId, isLiked, fetchLikedSongs]);
+  }, [user, likedTracks, likedPlaylistId, isLiked, addLikedTrack, removeLikedTrack, setLikedPlaylistId]);
 
   return {
     likedTracks,
     isLoading,
     isLiked,
     toggleLike,
-    refetch: fetchLikedSongs
   };
 }

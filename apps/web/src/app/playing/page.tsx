@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,7 +33,13 @@ export default function PlayingPage() {
   const [showLyrics, setShowLyrics] = useState(false);
   const { toggleLike, isLiked } = useLikedSongs();
   const [pipAvailable, setPipAvailable] = useState(false);
-  useEffect(() => { setPipAvailable(isPipSupported()); }, []);
+  useEffect(() => {
+    const supported = isPipSupported();
+    if (supported) {
+      const timeout = setTimeout(() => setPipAvailable(true), 0);
+      return () => clearTimeout(timeout);
+    }
+  }, []);
 
   const handleTogglePlay = () => {
     if (isPlaying) pause();
@@ -113,9 +120,11 @@ export default function PlayingPage() {
                 <div className='absolute -inset-10 bg-primary/20 blur-[60px] rounded-full opacity-50 group-hover:opacity-100 transition-opacity duration-1000' />
                 <div className='relative aspect-square rounded-[2rem] lg:rounded-[3rem] overflow-hidden shadow-2xl border border-foreground/10 bg-secondary/30 backdrop-blur-2xl'>
                   {currentTrack.artworkUrl ? (
-                    <img
+                    <Image
                       src={currentTrack.artworkUrl}
                       alt={currentTrack.title}
+                      width={400}
+                      height={400}
                       className='w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105'
                     />
                   ) : (

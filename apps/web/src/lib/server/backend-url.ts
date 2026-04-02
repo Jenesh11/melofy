@@ -6,9 +6,7 @@ function normalizeBaseUrl(url: string): string {
 
 export function getBackendBaseUrl(): string {
   const configured =
-    process.env.INTERNAL_API_URL ||
     process.env.BACKEND_API_URL ||
-    process.env.NEXT_PUBLIC_BACKEND_API_URL ||
     DEFAULT_BACKEND_URL;
 
   return normalizeBaseUrl(configured);

@@ -21,6 +21,7 @@ import { ProgressBar } from './ProgressBar';
 import { cn } from '@/lib/utils';
 import { Track } from '@/store/usePlayerStore';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 import { SyncedLyrics } from '@/components/ui/SyncedLyrics';
 import { ListenAlongPopover } from './ListenAlongPopover';
 
@@ -33,7 +34,6 @@ interface MobilePlayerProps {
   progressPercent: number;
   currentDisplayTime: string;
   durationTime: string;
-  isDraggingSlider: boolean;
   setIsDraggingSlider: (dragging: boolean) => void;
   setSliderValue: (value: number) => void;
   handleSeek: (value: number[]) => void;
@@ -57,7 +57,6 @@ export function MobilePlayer({
   progressPercent,
   currentDisplayTime,
   durationTime,
-  isDraggingSlider,
   setIsDraggingSlider,
   setSliderValue,
   handleSeek,
@@ -73,6 +72,7 @@ export function MobilePlayer({
 }: MobilePlayerProps) {
   const [showLyrics, setShowLyrics] = useState(false);
   const { isLiked, toggleLike } = useLikedSongs();
+  const [direction, setDirection] = useState(0); // 1 = next, -1 = prev
 
   if (!isExpanded) return null;
 
@@ -133,30 +133,68 @@ export function MobilePlayer({
         </div>
 
         {/* Large Artwork */}
-        <div className='w-full aspect-square rounded-[3rem] bg-zinc-900 overflow-hidden shadow-2xl mb-8 border border-white/10 shrink-0'>
-          {currentTrack.artworkUrl ? (
-            <img
-              src={currentTrack.artworkUrl}
-              alt={currentTrack.title}
-              className='w-full h-full object-cover shadow-2xl'
-            />
-          ) : (
-            <div className='w-full h-full flex items-center justify-center'>
-              <div className='h-24 w-24 text-white/20' />
-            </div>
-          )}
+        <div className='relative w-full aspect-square mb-8 shrink-0'>
+          <AnimatePresence mode='wait' initial={false} custom={direction}>
+            <motion.div
+              key={currentTrack.id}
+              custom={direction}
+              initial={{ opacity: 0, scale: 0.9, x: direction > 0 ? 40 : -40 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 0.9, x: direction > 0 ? -40 : 40 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              drag='x'
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.2}
+              onDragEnd={(_, info) => {
+                const swipeThreshold = 50;
+                const velocityThreshold = 500;
+                if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) {
+                  setDirection(1);
+                  handleSkipNext();
+                } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
+                  setDirection(-1);
+                  playPrevious();
+                }
+              }}
+              className='w-full h-full rounded-[3rem] bg-zinc-900 overflow-hidden shadow-2xl border border-white/10 touch-none'
+            >
+              {currentTrack.artworkUrl ? (
+                <Image
+                  src={currentTrack.artworkUrl}
+                  alt={currentTrack.title}
+                  width={400}
+                  height={400}
+                  className='w-full h-full object-cover shadow-2xl pointer-events-none'
+                />
+              ) : (
+                <div className='w-full h-full flex items-center justify-center'>
+                  <div className='h-24 w-24 text-white/20' />
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* Title & Artist & Like */}
         <div className='flex items-center justify-between gap-4 mb-3 w-full px-2'>
-          <div className='flex flex-col items-start min-w-0 flex-1'>
-            <h2 className='text-3xl font-black text-white truncate drop-shadow-lg tracking-tight w-full text-left'>
-              {currentTrack.title}
-            </h2>
-            <p className='text-xl text-white/60 truncate mt-1 font-medium w-full text-left'>
-              {currentTrack.artist}
-            </p>
-          </div>
+          <AnimatePresence mode='wait' initial={false} custom={direction}>
+            <motion.div 
+              key={currentTrack.id}
+              custom={direction}
+              initial={{ opacity: 0, x: direction > 0 ? 20 : -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: direction > 0 ? -20 : 20 }}
+              transition={{ duration: 0.2 }}
+              className='flex flex-col items-start min-w-0 flex-1'
+            >
+              <h2 className='text-3xl font-black text-white truncate drop-shadow-lg tracking-tight w-full text-left'>
+                {currentTrack.title}
+              </h2>
+              <p className='text-xl text-white/60 truncate mt-1 font-medium w-full text-left'>
+                {currentTrack.artist}
+              </p>
+            </motion.div>
+          </AnimatePresence>
           <Button
             variant='ghost'
             size='icon'

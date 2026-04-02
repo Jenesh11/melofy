@@ -15,6 +15,7 @@ interface LibraryState {
   savedPlaylists: SavedCollection[];
   addPlaylist: (playlist: SavedCollection) => void;
   removePlaylist: (id: string) => void;
+  renamePlaylist: (id: string, name: string) => void;
   isSaved: (id: string) => boolean;
 }
 
@@ -41,6 +42,12 @@ export const useLibraryStore = create<LibraryState>()(
       removePlaylist: (id) =>
         set((state) => ({
           savedPlaylists: state.savedPlaylists.filter((p) => p.id !== id),
+        })),
+      renamePlaylist: (id, name) =>
+        set((state) => ({
+          savedPlaylists: state.savedPlaylists.map((p) =>
+            p.id === id ? { ...p, name } : p,
+          ),
         })),
       isSaved: (id) => get().savedPlaylists.some((p) => p.id === id),
     }),

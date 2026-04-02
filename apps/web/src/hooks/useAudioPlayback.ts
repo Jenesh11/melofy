@@ -5,518 +5,99 @@ import {
   useRef,
   useState,
 } from 'react';
-import { usePlayerStore, Track, PartyListener } from '@/store/usePlayerStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useSocket } from '@/lib/socket-context';
 import { useAuth } from '@/lib/firebase/auth-context';
-import { toast } from 'sonner';
 
-interface RemotePlaybackState {
-  type: 'play_track' | 'pause' | 'resume' | 'seek' | 'sync';
-  track?: Track;
-  time?: number;
-  isPlaying?: boolean;
-}
-
-interface AutoplayTrackData {
-  encoded: string;
-  id: string;
-  title: string;
-  artist: string;
-  duration: number;
-  artwork: string;
-  uri: string;
-  isrc?: string;
-  source?: string;
-}
-
-interface AutoplayResponse {
-  tracks?: AutoplayTrackData[];
-}
+// Sub-hooks for modular logic
+import { useMediaSession } from './useMediaSession';
+import { usePlayerSync } from './usePlayerSync';
+import { usePartyEvents } from './usePartyEvents';
+import { useTrackDiscovery } from './useTrackDiscovery';
 
 export function useAudioPlayback() {
-  const currentTrack = usePlayerStore((state) => state.currentTrack);
-  const isPlaying = usePlayerStore((state) => state.isPlaying);
-  const queue = usePlayerStore((state) => state.queue);
-  const history = usePlayerStore((state) => state.history);
-  const playNext = usePlayerStore((state) => state.playNext);
-  const playPrevious = usePlayerStore((state) => state.playPrevious);
-  const pause = usePlayerStore((state) => state.pause);
-  const resume = usePlayerStore((state) => state.resume);
-  const volume = usePlayerStore((state) => state.volume);
-  const setVolume = usePlayerStore((state) => state.setVolume);
-  const play = usePlayerStore((state) => state.play);
-  const updateTrackUrl = usePlayerStore((state) => state.updateTrackUrl);
-  const isShuffle = usePlayerStore((state) => state.isShuffle);
-  const isRepeat = usePlayerStore((state) => state.isRepeat);
-  const toggleShuffle = usePlayerStore((state) => state.toggleShuffle);
-  const toggleRepeat = usePlayerStore((state) => state.toggleRepeat);
-  const toggleAutoplay = usePlayerStore((state) => state.toggleAutoplay);
-  const hydrateState = usePlayerStore((state) => state.hydrateState);
-  const activePlaylistContext = usePlayerStore(
-    (state) => state.activePlaylistContext,
-  );
-  const activeCollectionId = usePlayerStore((state) => state.activeCollectionId);
-  const activeCollectionType = usePlayerStore(
-    (state) => state.activeCollectionType,
-  );
-  const isAutoplay = usePlayerStore((state) => state.isAutoplay);
-  const resetStore = usePlayerStore((state) => state.reset);
-  const isPartyHost = usePlayerStore((state) => state.isPartyHost);
-  const partyId = usePlayerStore((state) => state.partyId);
+  // Store selectors
+  const {
+    currentTrack,
+    isPlaying,
+    isShuffle,
+    isRepeat,
+    isAutoplay,
+    volume,
+    playNext,
+    playPrevious,
+    pause,
+    resume,
+    setVolume,
+    toggleShuffle,
+    toggleRepeat,
+    toggleAutoplay,
+    canControlPlayback,
+  } = usePlayerStore(useShallow((state) => ({
+    currentTrack: state.currentTrack,
+    isPlaying: state.isPlaying,
+    isShuffle: state.isShuffle,
+    isRepeat: state.isRepeat,
+    isAutoplay: state.isAutoplay,
+    volume: state.volume,
+    playNext: state.playNext,
+    playPrevious: state.playPrevious,
+    pause: state.pause,
+    resume: state.resume,
+    setVolume: state.setVolume,
+    toggleShuffle: state.toggleShuffle,
+    toggleRepeat: state.toggleRepeat,
+    toggleAutoplay: state.toggleAutoplay,
+    canControlPlayback: state.canControlPlayback,
+  })));
 
   const { user } = useAuth();
   const { socket } = useSocket();
 
-  const getAuthHeader = useCallback(async () => {
-    if (!user) return null;
-    const token = await user.getIdToken();
-    return { Authorization: `Bearer ${token}` };
-  }, [user]);
-
+  // Core Refs and State
   const audioRef = useRef<HTMLAudioElement>(null);
   const [currentTime, setLocalTime] = useState(0);
   const [isDraggingSlider, setIsDraggingSlider] = useState(false);
   const [sliderValue, setSliderValue] = useState(0);
-  const [isBuffering, setIsBuffering] = useState(false);
-  const [isFetchingAutoplay, setIsFetchingAutoplay] = useState(false);
 
-  const lastReceivedTrackRef = useRef<string | null>(null);
-  const stateSyncTimer = useRef<NodeJS.Timeout | null>(null);
-  const pendingTrackResolutionRef = useRef<Map<string, Promise<void>>>(
-    new Map(),
-  );
-
+  // Helper to sync time to both local state and store
   const setCurrentTime = useCallback((time: number) => {
     setLocalTime(time);
     usePlayerStore.setState({ progress: Math.floor(time * 1000) });
   }, []);
 
-  useEffect(() => {
-    if (!socket) return;
+  // 1. Persistence & Hydration
+  const { isHydrated, syncStateToServer } = usePlayerSync(audioRef, setLocalTime);
 
-    const handlePlaybackState = (data: RemotePlaybackState) => {
-      if (data.type === 'play_track' && data.track) {
-        lastReceivedTrackRef.current = data.track.id;
-        usePlayerStore.getState().play(data.track, true);
-        if (typeof data.time === 'number' && audioRef.current) {
-          audioRef.current.currentTime = data.time;
-        }
-      } else if (data.type === 'pause') {
-        usePlayerStore.getState().pause(true);
-        if (typeof data.time === 'number' && audioRef.current) {
-          audioRef.current.currentTime = data.time;
-        }
-      } else if (data.type === 'resume') {
-        usePlayerStore.getState().resume(true);
-        if (typeof data.time === 'number' && audioRef.current) {
-          audioRef.current.currentTime = data.time;
-        }
-      } else if (
-        data.type === 'seek' &&
-        audioRef.current &&
-        typeof data.time === 'number'
-      ) {
-        audioRef.current.currentTime = data.time;
-      } else if (
-        data.type === 'sync' &&
-        audioRef.current &&
-        typeof data.time === 'number'
-      ) {
-        if (Math.abs(audioRef.current.currentTime - data.time) > 2) {
-          audioRef.current.currentTime = data.time;
-        }
-        if (data.isPlaying && audioRef.current.paused) {
-          usePlayerStore.getState().resume(true);
-        } else if (!data.isPlaying && !audioRef.current.paused) {
-          usePlayerStore.getState().pause(true);
-        }
-      }
-    };
-    const handleListenerControl = (data: { canControl: boolean }) => {
-      usePlayerStore.getState().setListenersCanControl(data.canControl);
-    };
-    const handleListenersUpdate = (data: { listeners: PartyListener[] }) => {
-      usePlayerStore.getState().setPartyListeners(data.listeners);
-    };
-    const handleListenerJoined = (data: { username: string }) => {
-      toast.success(`${data.username} joined the session`);
-    };
-    const handleListenerLeft = (data: { username: string }) => {
-      toast.info(`${data.username} left the session`);
-    };
+  // 2. Track resolution & Autoplay
+  const { isBuffering, setIsBuffering, triggerAutoplay } = useTrackDiscovery();
 
-    socket.on('playback_state', handlePlaybackState);
-    socket.on('listener_control_updated', handleListenerControl);
-    socket.on('listeners_update', handleListenersUpdate);
-    socket.on('listener_joined', handleListenerJoined);
-    socket.on('listener_left', handleListenerLeft);
-    return () => {
-      socket.off('playback_state', handlePlaybackState);
-      socket.off('listener_control_updated', handleListenerControl);
-      socket.off('listeners_update', handleListenersUpdate);
-      socket.off('listener_joined', handleListenerJoined);
-      socket.off('listener_left', handleListenerLeft);
-    };
-  }, [socket]);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-
-    if (isPlaying) {
-      audioRef.current.play().catch(console.error);
-      return;
-    }
-
-    audioRef.current.pause();
-  }, [isPlaying]);
-
-  useEffect(() => {
-    if (socket && currentTrack) {
-      if (lastReceivedTrackRef.current === currentTrack.id) {
-        lastReceivedTrackRef.current = null;
-        return;
-      }
-      
-      socket.emit('playback_state', {
-        type: 'play_track',
-        track: currentTrack,
-        time: audioRef.current?.currentTime || 0,
-      });
-    }
-  }, [currentTrack, socket]);
-
-  // Immediate sync when host creates a party
-  const [prevPartyId, setPrevPartyId] = useState<string | null>(null);
-  useEffect(() => {
-    if (isPartyHost && partyId && partyId !== prevPartyId && socket && currentTrack) {
-      setPrevPartyId(partyId);
-      socket.emit('playback_state', {
-        type: 'play_track',
-        track: currentTrack,
-        time: audioRef.current?.currentTime || 0,
-      });
-      if (isPlaying) {
-        socket.emit('playback_state', {
-          type: 'resume',
-          time: audioRef.current?.currentTime || 0,
-        });
-      }
-    }
-  }, [isPartyHost, partyId, prevPartyId, socket, currentTrack, isPlaying]);
-
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = volume;
-    }
-  }, [volume]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const resolveMissingUrl = async () => {
-      if (!currentTrack || currentTrack.url) return;
-
-      const activeResolution = pendingTrackResolutionRef.current.get(
-        currentTrack.id,
-      );
-      if (activeResolution) return;
-
-      const resolutionPromise = (async () => {
-        setIsBuffering(true);
-
-        try {
-          const searchQuery = `${currentTrack.title} ${currentTrack.artist}`;
-          const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`, {
-            headers: (await getAuthHeader()) || {},
-          });
-          const data = await res.json();
-
-          if (cancelled || !data?.tracks?.length) return;
-
-          const found = data.tracks[0];
-          if (!found?.encoded) return;
-
-          updateTrackUrl(currentTrack.id, found.encoded, found.info.identifier);
-        } catch (error) {
-          console.error('[PlayerShell] URL resolution failed:', error);
-        } finally {
-          pendingTrackResolutionRef.current.delete(currentTrack.id);
-          if (!cancelled) {
-            setIsBuffering(false);
-          }
-        }
-      })();
-
-      pendingTrackResolutionRef.current.set(currentTrack.id, resolutionPromise);
-      await resolutionPromise;
-    };
-
-    void resolveMissingUrl();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentTrack, getAuthHeader, updateTrackUrl]);
-
-  const [isHydrated, setIsHydrated] = useState(false);
-
-  // Reset store when user changes to prevent cross-user contamination
-  useEffect(() => {
-    resetStore();
-    setIsHydrated(false);
-  }, [user?.uid, resetStore]);
-
-  useEffect(() => {
-    if (!user?.uid) return;
-
-    getAuthHeader()
-      .then((headers) => {
-        if (!headers) {
-          setIsHydrated(true);
-          return null;
-        }
-        return fetch('/api/player-state', { headers });
-      })
-      .then((res) => {
-        if (res === null) return;
-        if (!res || !res.ok) throw new Error('Failed to fetch player state');
-        return res.json();
-      })
-      .then((data) => {
-        if (!data?.state) {
-          setIsHydrated(true); // Confirmed no state exists for this user
-          return;
-        }
-
-        let state = data.state;
-        if (typeof state === 'string') {
-          try {
-            state = JSON.parse(state);
-          } catch {
-            console.error('[PlayerState] Failed to parse state string');
-            // Don't mark as hydrated if parsing fails to avoid overwriting with blank
-            return;
-          }
-        }
-
-        hydrateState({
-          currentTrack: state.currentTrack,
-          queue: state.queue || [],
-          history: state.history || [],
-          isShuffle: state.isShuffle || false,
-          isRepeat: state.isRepeat || false,
-          volume: state.volume ?? 0.8,
-          activePlaylistContext: state.activePlaylistContext || null,
-          activeCollectionId: state.activeCollectionId || null,
-          activeCollectionType: state.activeCollectionType || null,
-          partyId: state.partyId || null,
-          hostName: (state as any).hostName || null,
-          isPartyHost: state.isPartyHost || false,
-          listenersCanControl: state.listenersCanControl || false,
-        });
-
-        if (audioRef.current && state.currentTime) {
-          audioRef.current.currentTime = state.currentTime;
-          setCurrentTime(state.currentTime);
-        }
-
-        // Only mark as hydrated AFTER the store has been updated
-        setIsHydrated(true);
-      })
-      .catch((err) => {
-        console.error('[PlayerState] Hydration failed:', err);
-        // Note: we do NOT set isHydrated(true) here. 
-        // This prevents the sync effect from running and wiping the server state.
-      });
-  }, [user?.uid, getAuthHeader, hydrateState, setCurrentTime]);
-
-  const syncStateToServer = useCallback(async () => {
-    if (!user?.uid || !isHydrated) return;
-
-    // Prune history to last 50 items to keep payload size manageable
-    const prunedHistory = history.slice(-50);
-
-    const stateToSave = {
-      currentTrack,
-      queue,
-      history: prunedHistory,
-      isShuffle,
-      isRepeat,
-      volume,
-      currentTime: audioRef.current?.currentTime || 0,
-      activePlaylistContext,
-      activeCollectionId,
-      activeCollectionType,
-      partyId: usePlayerStore.getState().partyId,
-      isPartyHost: usePlayerStore.getState().isPartyHost,
-      listenersCanControl: usePlayerStore.getState().listenersCanControl,
-    };
-
-    try {
-      const authHeaders = await getAuthHeader();
-      if (!authHeaders) return;
-
-      await fetch('/api/player-state', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders,
-        },
-        body: JSON.stringify({ state: stateToSave }),
-      });
-    } catch (error) {
-      console.error('[PlayerState] Sync failed:', error);
-    }
-  }, [
-    user?.uid,
-    isHydrated,
-    history,
-    currentTrack,
-    queue,
-    isShuffle,
-    isRepeat,
-    volume,
-    activePlaylistContext,
-    activeCollectionId,
-    activeCollectionType,
-    getAuthHeader,
-  ]);
-
-  useEffect(() => {
-    if (!user?.uid || !isHydrated) return;
-
-    if (stateSyncTimer.current) {
-      clearTimeout(stateSyncTimer.current);
-    }
-
-    stateSyncTimer.current = setTimeout(() => {
-      syncStateToServer();
-    }, 2000);
-
-    return () => {
-      if (stateSyncTimer.current) {
-        clearTimeout(stateSyncTimer.current);
-      }
-    };
-  }, [syncStateToServer, user?.uid, isHydrated]);
-
-  const hasAttemptedRejoin = useRef(false);
-  useEffect(() => {
-    if (isHydrated && partyId && socket && !hasAttemptedRejoin.current) {
-      hasAttemptedRejoin.current = true;
-      socket.emit('join_party', partyId, (response: any) => {
-        if (response?.ok && response.initialState) {
-          usePlayerStore.getState().setParty(partyId, !!response.isHost, response.initialState.hostName);
-          usePlayerStore.getState().setListenersCanControl(!!response.initialState.listenersCanControl);
-          if (response.initialState.listeners) {
-            usePlayerStore.getState().setPartyListeners(response.initialState.listeners);
-          }
-        } else {
-          usePlayerStore.getState().clearParty();
-        }
-      });
-    }
-  }, [isHydrated, partyId, socket]);
-
-  // Periodic position sync (heartbeat) every 10 seconds while playing
-  useEffect(() => {
-    if (!user?.uid || !isHydrated || !isPlaying) return;
-
-    const intervalId = setInterval(() => {
-      if (!audioRef.current || audioRef.current.paused) return;
-      syncStateToServer();
-
-      if (socket && usePlayerStore.getState().isPartyHost) {
-        socket.emit('playback_state', {
-          type: 'sync',
-          time: audioRef.current.currentTime || 0,
-          isPlaying: true,
-        });
-      }
-    }, 10000); 
-
-    return () => clearInterval(intervalId);
-  }, [user?.uid, isHydrated, isPlaying, syncStateToServer, socket]);
-
+  // Handlers for controls
   const handleTogglePlay = useCallback(() => {
-    if (!usePlayerStore.getState().canControlPlayback()) return;
-
+    if (!canControlPlayback()) return;
     if (isPlaying) {
       pause();
       if (socket) socket.emit('playback_state', { type: 'pause', time: audioRef.current?.currentTime || 0 });
-      return;
+    } else {
+      resume();
+      if (socket) socket.emit('playback_state', { type: 'resume', time: audioRef.current?.currentTime || 0 });
     }
-
-    resume();
-    if (socket) socket.emit('playback_state', { type: 'resume', time: audioRef.current?.currentTime || 0 });
-  }, [isPlaying, pause, resume, socket]);
-
-  const triggerAutoplay = useCallback(async () => {
-    const state = usePlayerStore.getState();
-    if (!state.isAutoplay || !currentTrack || isFetchingAutoplay) return;
-
-    setIsFetchingAutoplay(true);
-    try {
-      // Prioritize Spotify ID for NodeLink sprec: recommendations
-      const params = new URLSearchParams();
-      if (currentTrack.id) params.append('spotifyId', currentTrack.id);
-      if (currentTrack.identifier) params.append('videoId', currentTrack.identifier);
-      params.append('query', `${currentTrack.title} ${currentTrack.artist}`);
-
-      const res = await fetch(`/api/recommendations?${params.toString()}`, {
-        headers: (await getAuthHeader()) || {},
-      });
-      const data = (await res.json()) as AutoplayResponse;
-
-      if (!data?.tracks?.length) return;
-
-      // Avoid playing the same track if recommended. The backend now also filters, 
-      // but we filter here for absolute certainty on the client side.
-      const nextTrackData =
-        data.tracks.find(
-          (track) => 
-            track.id !== currentTrack.identifier && 
-            track.title.toLowerCase() !== currentTrack.title.toLowerCase(),
-        ) || data.tracks[0];
-
-      if (!nextTrackData) return;
-
-      const newTrack: Track = {
-        id: nextTrackData.id,
-        identifier: nextTrackData.id,
-        title: nextTrackData.title,
-        artist: nextTrackData.artist,
-        artworkUrl: nextTrackData.artwork,
-        duration: nextTrackData.duration,
-        url: nextTrackData.encoded,
-      };
-      play(newTrack);
-    } catch (error) {
-      console.error('Autoplay failed:', error);
-    } finally {
-      setIsFetchingAutoplay(false);
-    }
-  }, [currentTrack, getAuthHeader, isFetchingAutoplay, play]);
+  }, [isPlaying, pause, resume, socket, canControlPlayback]);
 
   const handleSkipNext = useCallback(async () => {
-    if (!usePlayerStore.getState().canControlPlayback()) return;
-
-    const state = usePlayerStore.getState();
-
-    if (state.isRepeat && audioRef.current) {
+    if (!canControlPlayback()) return;
+    if (isRepeat && audioRef.current) {
       audioRef.current.currentTime = 0;
       audioRef.current.play().catch(console.error);
       usePlayerStore.setState({ progress: 0 });
       return;
     }
-
     playNext();
-
-    const nextState = usePlayerStore.getState();
-    if (!nextState.isPlaying) {
+    if (!usePlayerStore.getState().isPlaying) {
       await triggerAutoplay();
     }
-  }, [playNext, triggerAutoplay]);
+  }, [playNext, triggerAutoplay, isRepeat, canControlPlayback]);
 
   const handleTrackEnd = useCallback(async () => {
     const state = usePlayerStore.getState();
@@ -524,82 +105,65 @@ export function useAudioPlayback() {
     await handleSkipNext();
   }, [handleSkipNext]);
 
+  // 3. MediaSession Interface
+  useMediaSession({
+    audioRef,
+    currentTrack,
+    isPlaying,
+    isDraggingSlider,
+    resume,
+    pause,
+    playPrevious,
+    handleSkipNext,
+    setLocalTime,
+  });
+
+  // 4. Socket/Party Orchestration
+  usePartyEvents({
+    socket,
+    audioRef,
+    currentTrack,
+    isPlaying,
+    isHydrated,
+    userUid: user?.uid,
+    syncStateToServer,
+  });
+
+  // Core Play/Pause Effect for the Ref
   useEffect(() => {
-    if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
-
-    if (currentTrack) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: currentTrack.title,
-        artist: currentTrack.artist,
-        album: 'Melofy',
-        artwork: [96, 128, 192, 256, 384, 512].map((size) => ({
-          src: currentTrack.artworkUrl,
-          sizes: `${size}x${size}`,
-          type: 'image/png',
-        })),
-      });
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isPlaying) {
+      audio.play().catch(console.error);
+    } else {
+      audio.pause();
     }
+  }, [isPlaying]);
 
-    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  // Volume sync
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume;
+  }, [volume]);
 
-    if ('setPositionState' in navigator.mediaSession && currentTrack) {
-      try {
-        navigator.mediaSession.setPositionState({
-          duration: currentTrack.duration / 1000,
-          playbackRate: 1,
-          position: currentTime,
-        });
-      } catch (error) {
-        console.error('Error updating MediaSession position state:', error);
-      }
-    }
-
-    const actionHandlers: [MediaSessionAction, () => void][] = [
-      ['play', resume],
-      ['pause', pause],
-      ['previoustrack', playPrevious],
-      ['nexttrack', handleSkipNext],
-    ];
-
-    for (const [action, handler] of actionHandlers) {
-      try {
-        navigator.mediaSession.setActionHandler(action, handler);
-      } catch (error) {
-        console.error(`Media session action "${action}" could not be set.`, error);
-      }
-    }
-
-    return () => {
-      for (const [action] of actionHandlers) {
-        try {
-          navigator.mediaSession.setActionHandler(action, null);
-        } catch {
-          // Some actions are not supported in all browsers.
-        }
-      }
-    };
-  }, [currentTrack, isPlaying, resume, pause, playPrevious, handleSkipNext]);
-
+  // Global Hotkeys
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement ||
         (event.target as HTMLElement).isContentEditable
-      ) {
-        return;
-      }
+      ) return;
 
       if (event.code === 'Space' || event.key === ' ') {
         event.preventDefault();
         handleTogglePlay();
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleTogglePlay]);
 
+  // UI Support Helpers
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
@@ -608,33 +172,25 @@ export function useAudioPlayback() {
   };
 
   const currentDisplayTimeMs = isDraggingSlider
-    ? currentTrack
-      ? (sliderValue / 100) * currentTrack.duration
-      : 0
+    ? currentTrack ? (sliderValue / 100) * currentTrack.duration : 0
     : currentTime * 1000;
 
-  const progressPercent =
-    currentTrack && currentTrack.duration > 0
-      ? (currentDisplayTimeMs / currentTrack.duration) * 100
-      : 0;
+  const progressPercent = currentTrack && currentTrack.duration > 0
+    ? (currentDisplayTimeMs / currentTrack.duration) * 100
+    : 0;
 
-  const handleSeek = useCallback(
-    (value: number[]) => {
-      if (!usePlayerStore.getState().canControlPlayback()) return;
+  const handleSeek = useCallback((value: number[]) => {
+    const seekPosition = value[0];
+    if (seekPosition === undefined || !audioRef.current || !currentTrack) return;
+    if (!canControlPlayback()) return;
 
-      const seekPosition = value[0];
-      if (seekPosition === undefined || !audioRef.current || !currentTrack)
-        return;
+    const time = (seekPosition / 100) * (currentTrack.duration / 1000);
+    audioRef.current.currentTime = time;
+    if (socket) socket.emit('playback_state', { type: 'seek', time });
 
-      const time = (seekPosition / 100) * (currentTrack.duration / 1000);
-      audioRef.current.currentTime = time;
-      if (socket) socket.emit('playback_state', { type: 'seek', time });
-
-      // Immediate sync on seek
-      syncStateToServer();
-    },
-    [currentTrack, socket, syncStateToServer],
-  );
+    // Immediate sync
+    syncStateToServer();
+  }, [currentTrack, socket, syncStateToServer, canControlPlayback]);
 
   const handleVolumeWheel = (event: WheelEvent) => {
     const delta = event.deltaY > 0 ? -0.05 : 0.05;

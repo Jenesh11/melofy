@@ -2,8 +2,7 @@
 
 import React from 'react';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ExternalLink, CheckCircle2, Monitor, Download, Chrome } from 'lucide-react';
+import { ExternalLink, CheckCircle2, Monitor, Chrome } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';

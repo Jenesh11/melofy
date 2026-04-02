@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, useEffect, useMemo } from 'react';
 import {
   Home,
@@ -117,27 +118,31 @@ export function Sidebar() {
             'flex items-center gap-2 px-2 pb-8 pt-2 transition-all duration-300 cursor-pointer hover:opacity-80 active:scale-95',
           )}
         >
-          <div className='h-8 w-8 overflow-hidden flex items-center justify-center shrink-0 shadow-lg shadow-primary/20 rounded-lg'>
-            <img
+          <div className='h-8 w-8 overflow-hidden flex items-center justify-center shrink-0 shadow-lg shadow-primary/20 rounded-lg relative'>
+            <Image
               src='/logo.png'
               alt='Melofy Logo'
+              width={32}
+              height={32}
               className='h-full w-full object-contain'
             />
           </div>
-          <h1 className='text-xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent'>
+          <h1 className='text-xl font-bold tracking-tight bg-linear-to-br from-foreground to-foreground/60 bg-clip-text text-transparent'>
             Melofy
           </h1>
         </Link>
       ) : (
         <div className='flex items-center gap-2 px-2 pb-8 pt-2 cursor-default'>
-          <div className='h-8 w-8 overflow-hidden flex items-center justify-center shrink-0 shadow-lg shadow-primary/20 rounded-lg'>
-            <img
+          <div className='h-8 w-8 overflow-hidden flex items-center justify-center shrink-0 shadow-lg shadow-primary/20 rounded-lg relative'>
+            <Image
               src='/logo.png'
               alt='Melofy Logo'
+              width={32}
+              height={32}
               className='h-full w-full object-contain'
             />
           </div>
-          <h1 className='text-xl font-bold tracking-tight bg-gradient-to-br from-foreground to-foreground/60 bg-clip-text text-transparent'>
+          <h1 className='text-xl font-bold tracking-tight bg-linear-to-br from-foreground to-foreground/60 bg-clip-text text-transparent'>
             Melofy
           </h1>
         </div>
@@ -186,21 +191,23 @@ export function Sidebar() {
                       >
                         <div className='flex items-center justify-center w-8 h-8 rounded-md bg-sidebar-accent/20 border border-sidebar-border overflow-hidden shrink-0 shadow-sm'>
                           {playlist.isLikedSongs || playlist.name === 'Liked Songs' ? (
-                            <div className='h-full w-full flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500'>
+                            <div className='h-full w-full flex items-center justify-center bg-linear-to-br from-indigo-500 via-purple-500 to-pink-500'>
                               <Heart className='h-4 w-4 text-white fill-white shadow-md' />
                             </div>
                           ) : playlist.artworkUrl ||
                           ('coverUrl' in playlist &&
                             typeof playlist.coverUrl === 'string' &&
                             playlist.coverUrl) ? (
-                            <img
+                            <Image
                               src={
-                                playlist.artworkUrl ||
+                                (playlist.artworkUrl ||
                                 ('coverUrl' in playlist
                                   ? playlist.coverUrl
-                                  : undefined)
+                                  : undefined)) as string
                               }
                               alt={playlist.name}
+                              width={32}
+                              height={32}
                               className='h-full w-full object-cover group-hover:scale-110 transition-transform duration-300'
                             />
                           ) : (

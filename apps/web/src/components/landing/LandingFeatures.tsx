@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export function LandingFeatures() {
   const features = [
@@ -78,8 +79,8 @@ export function LandingFeatures() {
               <span className='text-primary italic pr-2'>feel</span> the music.
             </h2>
             <p className='text-muted-foreground max-w-2xl mx-auto text-lg font-light'>
-              Melofy is built by audiophiles, for audiophiles. We've packed
-              every feature you've ever wanted into a stunning, minimal
+              Melofy is built by audiophiles, for audiophiles. We&apos;ve packed
+              every feature you&apos;ve ever wanted into a stunning, minimal
               interface.
             </p>
           </div>
@@ -113,8 +114,10 @@ export function LandingFeatures() {
         <div className='max-w-7xl mx-auto w-full flex flex-col lg:flex-row items-center gap-20'>
           <div className='flex-1 relative order-2 lg:order-1'>
             <div className='relative z-10 rounded-3xl border border-border overflow-hidden shadow-2xl shadow-primary/5 aspect-video bg-card group items-center'>
-              <img
+              <Image
                 src='https://images.unsplash.com/photo-1493225255756-d9584f8606e9?q=80&w=1000&auto=format&fit=crop'
+                width={800}
+                height={450}
                 className='w-full h-full object-cover opacity-50 grayscale group-hover:grayscale-0 group-hover:opacity-80 transition-all duration-1000'
                 alt='vibe'
               />
@@ -192,8 +195,10 @@ export function LandingFeatures() {
 
           <div className='flex-1 relative'>
             <div className='relative z-10 rounded-3xl border border-border overflow-hidden shadow-2xl shadow-blue-500/5 aspect-video bg-card group h-fit'>
-              <img
+              <Image
                 src='https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=1000&auto=format&fit=crop'
+                width={800}
+                height={450}
                 className='w-full h-full object-cover opacity-50 grayscale group-hover:grayscale-0 group-hover:opacity-80 transition-all duration-1000'
                 alt='dj'
               />

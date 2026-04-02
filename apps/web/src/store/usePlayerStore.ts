@@ -16,6 +16,11 @@ export interface PartyListener {
   username: string;
 }
 
+export interface LyricsData {
+  syncedLyrics: string;
+  plainLyrics: string;
+}
+
 interface PlayerState {
   currentTrack: Track | null;
   isPlaying: boolean;
@@ -36,7 +41,7 @@ interface PlayerState {
   isPartyHost: boolean;
   listenersCanControl: boolean;
   partyListeners: PartyListener[];
-  lyricsCache: Record<string, any>;
+  lyricsCache: Record<string, LyricsData>;
 
   // Actions
   canControlPlayback: () => boolean;
@@ -60,7 +65,7 @@ interface PlayerState {
   toggleShuffle: () => void;
   toggleRepeat: () => void;
   toggleAutoplay: () => void;
-  setLyrics: (id: string, lyrics: any) => void;
+  setLyrics: (id: string, lyrics: LyricsData) => void;
   updateTrackUrl: (id: string, url: string, identifier?: string) => void;
   hydrateState: (state: Partial<PlayerState>) => void;
   setPlaying: (isPlaying: boolean) => void;
@@ -292,7 +297,15 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       };
     }),
   hydrateState: (newState) =>
-    set((state) => ({ ...state, ...newState, isPlaying: false, partyId: newState.partyId || null, hostName: (newState as any).hostName || null, isPartyHost: newState.isPartyHost || false, listenersCanControl: newState.listenersCanControl || false })),
+    set((state) => ({
+      ...state,
+      ...newState,
+      isPlaying: false,
+      partyId: newState.partyId || null,
+      hostName: newState.hostName || null,
+      isPartyHost: newState.isPartyHost || false,
+      listenersCanControl: newState.listenersCanControl || false,
+    })),
   setPlaying: (isPlaying) => set({ isPlaying }),
   reset: () => set(initialState),
   setParty: (partyId, isHost, hostName) => set({ partyId, isPartyHost: isHost, hostName: hostName || null }),

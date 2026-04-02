@@ -8,7 +8,9 @@ import {
   doc,
   serverTimestamp,
   orderBy,
-  updateDoc
+  updateDoc,
+  Timestamp,
+  FieldValue
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -35,7 +37,7 @@ export interface Playlist {
   trackCount: number;
   coverUrl?: string;
   artworkUrl?: string;
-  createdAt?: any;
+  createdAt?: Timestamp | FieldValue;
   tracks: Track[];
   isLikedSongs?: boolean;
 }
@@ -57,9 +59,8 @@ export async function addPlaylist(userId: string, playlistData: Omit<Playlist, '
     if (!existingSnap.empty) {
       // Update the existing playlist instead of duplicating
       const existingDoc = existingSnap.docs[0];
-      const docRef = doc(db, 'playlists', existingDoc.id);
       
-      await updateDoc(docRef, {
+      await updateDoc(doc(db, 'playlists', existingDoc.id), {
         ...playlistData,
         // we can leave createdAt the way it is on the document
       });
@@ -106,7 +107,6 @@ export async function getUserPlaylists(userId: string): Promise<Playlist[]> {
  */
 export async function getPlaylistById(playlistId: string): Promise<Playlist | null> {
   try {
-    const docRef = doc(db, 'playlists', playlistId);
     const docSnap = await getDocs(query(collection(db, 'playlists'), where('__name__', '==', playlistId)));
     
     if (docSnap.empty) return null;

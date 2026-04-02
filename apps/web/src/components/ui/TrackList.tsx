@@ -178,7 +178,10 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
               )}
             </span>
 
-            <div className='flex items-center gap-3 min-w-0 cursor-pointer' onClick={() => handlePlay(item, index)}>
+            <div
+              className='flex items-center gap-3 min-w-0 cursor-pointer'
+              onClick={() => handlePlay(item, index)}
+            >
               <div className='h-10 w-10 rounded-lg bg-muted shrink-0 overflow-hidden'>
                 {item.artworkUrl ? (
                   <img
@@ -212,7 +215,10 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
               {item.album || item.artist}
             </span>
 
-            <span className='text-xs text-muted-foreground tabular-nums font-light flex justify-end items-center cursor-pointer' onClick={() => handlePlay(item, index)}>
+            <span
+              className='text-xs text-muted-foreground tabular-nums font-light flex justify-end items-center cursor-pointer'
+              onClick={() => handlePlay(item, index)}
+            >
               {formatDuration(item.duration)}
             </span>
 
@@ -221,8 +227,12 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
                 e.stopPropagation();
                 toggleLike(contextTracks[index]);
               }}
-              className='flex items-center justify-center h-8 w-8 rounded-full hover:bg-foreground/10 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 placeholder-shown:opacity-100'
-              style={{ opacity: isLiked(contextTracks[index]?.id || '') ? 1 : undefined }}
+              className='flex items-center justify-center h-8 w-8 rounded-full hover:bg-foreground/10 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100'
+              style={{
+                opacity: isLiked(contextTracks[index]?.id || '')
+                  ? 1
+                  : undefined,
+              }}
             >
               <Heart
                 className={cn(

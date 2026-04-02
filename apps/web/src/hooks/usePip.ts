@@ -36,7 +36,7 @@ export function useDocPip(
     }
 
     try {
-      // @ts-ignore — Document PiP API
+      // @ts-expect-error — Document PiP API is not in core TS types yet
       const win: Window = await window.documentPictureInPicture.requestWindow({
         width: PIP_W,
         height: PIP_H,

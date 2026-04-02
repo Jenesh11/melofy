@@ -11,13 +11,14 @@ import {
   Heart,
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Playlist } from '@/lib/firebase/playlists';
 
 interface LibraryPlaylistGridProps {
   playlists: Playlist[];
   isLoading: boolean;
-  user: any;
+  user: unknown;
   onInitiateRename: (id: string, currentName: string) => void;
   onDelete: (id: string) => void;
 }
@@ -89,9 +90,11 @@ export function LibraryPlaylistGrid({
                           <Heart className='h-16 w-16 text-white fill-white drop-shadow-lg' />
                         </div>
                       ) : playlist.artworkUrl ? (
-                        <img
+                        <Image
                           src={playlist.artworkUrl}
                           alt={playlist.name}
+                          width={300}
+                          height={300}
                           className='h-full w-full object-cover'
                         />
                       ) : (
@@ -117,7 +120,11 @@ export function LibraryPlaylistGrid({
                         {playlist.name}
                       </h3>
                       <p className='text-muted-foreground text-[10px] uppercase tracking-widest font-medium'>
-                        Spotify Import
+                        {playlist.isLikedSongs || playlist.name === 'Liked Songs'
+                          ? 'System Playlist'
+                          : 'type' in playlist 
+                          ? 'Melofy Playlist' 
+                          : 'Spotify Import'}
                       </p>
                     </div>
                   </Link>
@@ -175,7 +182,7 @@ export function LibraryPlaylistGrid({
                                 className='w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-red-500 hover:bg-red-500/10 rounded-xl transition-colors'
                                 onClick={() => {
                                   setActiveMenuId(null);
-                                  playlist.id && onDelete(playlist.id);
+                                  if (playlist.id) onDelete(playlist.id);
                                 }}
                               >
                                 <Trash2 className='h-4 w-4' />

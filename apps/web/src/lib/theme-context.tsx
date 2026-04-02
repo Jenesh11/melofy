@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-type Essence =
+export type Essence =
   | 'monochrome'
   | 'emerald'
   | 'golden'
@@ -21,32 +21,28 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [essence, setEssenceState] = useState<Essence>('monochrome');
-  const [mode, setModeState] = useState<Mode>('dark');
+  const [essence, setEssenceState] = useState<Essence>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('melofy-essence') as Essence) || 'monochrome';
+    }
+    return 'monochrome';
+  });
+  const [mode, setModeState] = useState<Mode>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('melofy-mode') as Mode) || 'dark';
+    }
+    return 'dark';
+  });
 
-  // Load from localStorage on mount
+  // Apply initial theme on mount and keep sync
   useEffect(() => {
-    const savedEssence = localStorage.getItem('melofy-essence') as Essence;
-    if (savedEssence) {
-      setEssenceState(savedEssence);
-      document.documentElement.setAttribute('data-essence', savedEssence);
-    } else {
-      document.documentElement.setAttribute('data-essence', 'monochrome');
-    }
-
-    const savedMode = localStorage.getItem('melofy-mode') as Mode;
-    if (savedMode) {
-      setModeState(savedMode);
-      if (savedMode === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    } else {
-      // Default to dark
+    document.documentElement.setAttribute('data-essence', essence);
+    if (mode === 'dark') {
       document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
     }
-  }, []);
+  }, [essence, mode]);
 
   const setEssence = (newEssence: Essence) => {
     setEssenceState(newEssence);

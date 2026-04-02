@@ -118,7 +118,7 @@ cp apps/api/.env.example apps/api/.env
 
 Important production vars:
 - `apps/api`: `FIREBASE_API_KEY`, `CORS_ORIGINS`, NodeLink + Spotify + Upstash vars
-- `apps/web`: Firebase public vars, Upstash vars, and `BACKEND_API_URL` (or `INTERNAL_API_URL`)
+- `apps/web`: Firebase public vars, Upstash vars, and `BACKEND_API_URL`
 
 ### 3️⃣ Launch the Engines
 

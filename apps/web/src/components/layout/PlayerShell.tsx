@@ -105,10 +105,6 @@ export function PlayerShell() {
         onLoadedData={(e) => {
           e.currentTarget.volume = playback.volume;
         }}
-        onTimeUpdate={(e) =>
-          !playback.isDraggingSlider &&
-          playback.setCurrentTime(e.currentTarget.currentTime)
-        }
         onEnded={playback.handleTrackEnd}
         onWaiting={() => playback.setIsBuffering(true)}
         onCanPlay={(e) => {

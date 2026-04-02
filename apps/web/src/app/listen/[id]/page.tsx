@@ -1,12 +1,29 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useSocket } from '@/lib/socket-context';
-import { usePlayerStore } from '@/store/usePlayerStore';
+import { usePlayerStore, Track } from '@/store/usePlayerStore';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+
+interface PartyInfoResponse {
+  ok: boolean;
+  hostName?: string;
+  currentTrack?: Track;
+}
+
+interface JoinPartyResponse {
+  ok: boolean;
+  isHost?: boolean;
+  initialState?: {
+    listenersCanControl?: boolean;
+    currentTrack?: Track;
+    isPlaying?: boolean;
+  };
+  error?: string;
+}
 
 export default function ListenJoinPage() {
   const { id } = useParams<{ id: string }>();
@@ -17,7 +34,7 @@ export default function ListenJoinPage() {
 
   const [status, setStatus] = useState('Ready to sync');
   const [isJoining, setIsJoining] = useState(false);
-  const [partyInfo, setPartyInfo] = useState<{ hostName?: string; currentTrack?: any } | null>(null);
+  const [partyInfo, setPartyInfo] = useState<{ hostName?: string; currentTrack?: Track } | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -30,7 +47,7 @@ export default function ListenJoinPage() {
     }
 
     if (socket && isConnected && id) {
-      socket.emit('get_party_info', id.toUpperCase(), (response: any) => {
+      socket.emit('get_party_info', id.toUpperCase(), (response: PartyInfoResponse) => {
         if (response.ok) {
           setPartyInfo({ hostName: response.hostName, currentTrack: response.currentTrack });
         }
@@ -47,7 +64,7 @@ export default function ListenJoinPage() {
     setIsJoining(true);
     setStatus(`Connecting to session...`);
 
-    socket.emit('join_party', id.toUpperCase(), (response: any) => {
+    socket.emit('join_party', id.toUpperCase(), (response: JoinPartyResponse) => {
       if (response.ok) {
         setParty(id.toUpperCase(), !!response.isHost);
         

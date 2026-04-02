@@ -19,11 +19,12 @@ import { VolumeControl } from './VolumeControl';
 import { ListenAlongPopover } from './ListenAlongPopover';
 import { cn } from '@/lib/utils';
 import { Track } from '@/store/usePlayerStore';
-import Link from 'next/link';
+import Image from 'next/image';
 import { useLikedSongs } from '@/hooks/useLikedSongs';
 import { isPipSupported } from '@/hooks/usePip';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 
 interface DesktopPlayerProps {
   currentTrack: Track;
@@ -71,7 +72,6 @@ export function DesktopPlayer({
   progressPercent,
   currentDisplayTime,
   durationTime,
-  isDraggingSlider,
   setIsDraggingSlider,
   setSliderValue,
   handleSeek,
@@ -86,16 +86,56 @@ export function DesktopPlayer({
 }: DesktopPlayerProps) {
   const { isLiked, toggleLike } = useLikedSongs();
   const [pipAvailable, setPipAvailable] = useState(false);
-  useEffect(() => { setPipAvailable(isPipSupported()); }, []);
+  const [direction, setDirection] = useState(0); // 1 = next, -1 = prev
+  const [isMobile, setIsMobile] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    const supported = isPipSupported();
+    if (supported) {
+      const timeout = setTimeout(() => setPipAvailable(true), 0);
+      return () => clearTimeout(timeout);
+    }
+  }, []);
 
   return (
-    <div
+    <motion.div
+      drag={isMobile ? 'x' : false}
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.15}
+      onDragEnd={(_, info) => {
+        const swipeThreshold = 50;
+        const velocityThreshold = 500;
+        
+        if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) {
+          setDirection(1);
+          handleSkipNext();
+        } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
+          setDirection(-1);
+          playPrevious();
+        }
+      }}
       className={cn(
         'relative h-14 md:h-20 border-t border-border bg-background md:bg-background/60 backdrop-blur-3xl px-2 md:px-4 flex items-center justify-between w-full mx-auto md:max-w-none rounded-md md:rounded-none mb-16 md:mb-0 shadow-lg md:shadow-none transition-all',
-        'cursor-pointer md:cursor-default',
+        'cursor-pointer md:cursor-default touch-none',
       )}
-      onClick={() => {
-        if (window.innerWidth < 768) onExpand();
+      onTap={(e) => {
+        // Only trigger expansion/navigation if the tap was on a safe area (not a button)
+        const target = e.target as HTMLElement;
+        if (target.closest('button')) return;
+        
+        if (isMobile) {
+          onExpand();
+        } else {
+          router.push('/playing');
+        }
       }}
     >
       {/* Current Track Info */}
@@ -120,33 +160,37 @@ export function DesktopPlayer({
           />
         </AnimatePresence>
 
-        <Link
-          href='/playing'
-          className='relative z-10 flex items-center gap-3 cursor-pointer group/info overflow-hidden flex-1 min-w-0 py-2 px-1'
-          onClick={(e) => {
-            if (window.innerWidth < 768) {
-              e.preventDefault();
-              onExpand();
-            }
-          }}
-        >
-          <div className='h-10 w-10 md:h-14 md:w-14 rounded-md bg-muted overflow-hidden shrink-0'>
-            <img
-              src={currentTrack.artworkUrl}
-              alt={currentTrack.title}
-              loading='lazy'
-              className='h-full w-full object-cover group-hover/info:scale-105 transition-transform duration-300'
-            />
-          </div>
-          <div className='flex flex-col min-w-0'>
-            <p className='text-sm font-semibold text-foreground truncate group-hover/info:underline'>
-              {currentTrack.title}
-            </p>
-            <p className='text-xs text-muted-foreground truncate group-hover/info:text-foreground transition-colors'>
-              {currentTrack.artist}
-            </p>
-          </div>
-        </Link>
+        <AnimatePresence mode='wait' initial={false} custom={direction}>
+          <motion.div
+            key={currentTrack.id}
+            custom={direction}
+            initial={{ opacity: 0, x: direction > 0 ? 20 : -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: direction > 0 ? -20 : 20 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className='relative z-10 flex-1 min-w-0'
+          >
+            <div className='flex items-center gap-3 overflow-hidden py-2 px-1 pointer-events-none'>
+              <div className='h-10 w-10 md:h-14 md:w-14 rounded-md bg-muted overflow-hidden shrink-0 relative'>
+                <Image
+                  src={currentTrack.artworkUrl}
+                  alt={currentTrack.title}
+                  width={56}
+                  height={56}
+                  className='h-full w-full object-cover group-hover/info:scale-105 transition-transform duration-500'
+                />
+              </div>
+              <div className='flex flex-col min-w-0'>
+                <p className='text-sm font-semibold text-foreground truncate group-hover/info:underline decoration-1 underline-offset-4'>
+                  {currentTrack.title}
+                </p>
+                <p className='text-xs text-muted-foreground truncate group-hover/info:text-foreground transition-colors'>
+                  {currentTrack.artist}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* Primary Controls */}
@@ -195,6 +239,27 @@ export function DesktopPlayer({
             }}
           >
             <SkipBack className='h-4 w-4 fill-current' />
+          </Button>
+          <Button
+            variant='ghost'
+            size='icon'
+            className={cn(
+              'flex md:hidden h-9 w-9 shrink-0 transition-colors',
+              isLiked(currentTrack.id)
+                ? 'text-primary'
+                : 'text-muted-foreground',
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleLike(currentTrack);
+            }}
+          >
+            <Heart
+              className={cn(
+                'h-5 w-5',
+                isLiked(currentTrack.id) && 'fill-current',
+              )}
+            />
           </Button>
           <Button
             variant='default'
@@ -319,6 +384,6 @@ export function DesktopPlayer({
           onWheel={handleVolumeWheel}
         />
       </div>
-    </div>
+    </motion.div>
   );
 }

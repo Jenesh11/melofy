@@ -11,10 +11,12 @@ import { useEffect } from 'react';
 
 import { ThemeProvider } from '@/lib/theme-context';
 import { cn } from '@/lib/utils';
+import { LikedSongsSync } from '@/components/layout/LikedSongsSync';
 
 export function AppWrapper({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
+      <LikedSongsSync />
       <AppContent>{children}</AppContent>
     </ThemeProvider>
   );

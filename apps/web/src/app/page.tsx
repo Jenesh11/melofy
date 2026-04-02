@@ -10,7 +10,6 @@ import { TrackCarousel } from '@/components/home/TrackCarousel';
 import { PlaylistGrid } from '@/components/home/PlaylistGrid';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
 import { HeroPlaylistCard } from '@/components/home/HeroPlaylistCard';
 import { HistoryCarousel } from '@/components/home/HistoryCarousel';
 import { useSpotifyCollection } from '@/hooks/useSpotifyCollection';
@@ -19,7 +18,7 @@ import {
   mapSpotifyTrackToPlayerTrack,
   type SpotifyTrackLike,
 } from '@/lib/track-mappers';
-import { useHomeStore, type SpotifyCollectionSummary } from '@/store/useHomeStore';
+import { useHomeStore } from '@/store/useHomeStore';
 
 export default function Home() {
   const { user, loading } = useAuth();

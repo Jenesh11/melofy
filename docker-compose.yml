@@ -50,13 +50,11 @@ services:
         UPSTASH_REDIS_REST_URL: ${UPSTASH_REDIS_REST_URL}
         UPSTASH_REDIS_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN}
         BACKEND_API_URL: ${BACKEND_API_URL:-http://api:3001}
-        INTERNAL_API_URL: ${INTERNAL_API_URL:-http://api:3001}
     ports:
       - "${WEB_PORT:-3000}:3000"
     environment:
       NODE_ENV: production
       PORT: 3000
-      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://api:3001}
       BACKEND_API_URL: ${BACKEND_API_URL:-http://api:3001}
       # The web app might also need these at runtime for server actions
       UPSTASH_REDIS_REST_URL: ${UPSTASH_REDIS_REST_URL}

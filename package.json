@@ -10,6 +10,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "nodelink": "cd ../../test/stream/NodeLink && npm start",
     "lint": "turbo run lint",
     "start": "turbo run start",
     "test": "turbo run test"

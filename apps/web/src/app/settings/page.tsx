@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/lib/firebase/auth-context';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import {
   User,
@@ -21,7 +22,7 @@ import { motion } from 'framer-motion';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { Switch } from '@/components/ui/Switch';
 import { PreMidGuide } from '@/components/settings/PreMidGuide';
-import { useTheme } from '@/lib/theme-context';
+import { useTheme, Essence } from '@/lib/theme-context';
 import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
@@ -91,9 +92,16 @@ export default function SettingsPage() {
               <div className='absolute -bottom-24 -right-24 h-64 w-64 bg-primary/5 blur-[80px] rounded-full' />
               
               <div className='relative z-10 flex flex-col md:flex-row gap-8 items-center'>
-                <div className='h-24 w-24 rounded-full overflow-hidden shrink-0 border-4 border-primary/10 shadow-2xl bg-muted flex items-center justify-center'>
+                <div className='h-24 w-24 rounded-full overflow-hidden shrink-0 border-4 border-primary/10 shadow-2xl bg-muted flex items-center justify-center relative'>
                   {user.photoURL ? (
-                    <img src={user.photoURL} alt='Profile' referrerPolicy='no-referrer' className='h-full w-full object-cover' />
+                    <Image
+                      src={user.photoURL}
+                      alt='Profile'
+                      width={96}
+                      height={96}
+                      referrerPolicy='no-referrer'
+                      className='h-full w-full object-cover'
+                    />
                   ) : (
                     <User className='h-10 w-10 text-muted-foreground' />
                   )}
@@ -178,7 +186,7 @@ export default function SettingsPage() {
                     {themes.map((t) => (
                       <button
                         key={t.id}
-                        onClick={() => setEssence(t.id as any)}
+                        onClick={() => setEssence(t.id as Essence)}
                         className={cn(
                           'flex items-center justify-center p-2 rounded-xl transition-all border group relative',
                           essence === t.id ? 'bg-primary/10 border-primary shadow-lg' : 'bg-foreground/5 border-transparent hover:border-foreground/10'

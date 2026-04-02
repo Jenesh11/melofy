@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Music2,
   Play,
-  Disc,
   Loader2,
   AlertCircle,
   RefreshCw,
@@ -24,10 +23,10 @@ export function LoginView() {
     setError(null);
     try {
       await signInWithGoogle();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       // Firebase error codes handle: auth/popup-closed-by-user etc.
-      if (err.code === 'auth/popup-closed-by-user') {
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'auth/popup-closed-by-user') {
         setError('Login was cancelled. Please try again.');
       } else {
         setError('Login failed. Please check your connection and try again.');
