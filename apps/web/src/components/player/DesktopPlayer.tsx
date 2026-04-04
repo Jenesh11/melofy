@@ -86,7 +86,7 @@ export function DesktopPlayer({
 }: DesktopPlayerProps) {
   const { isLiked, toggleLike } = useLikedSongs();
   const [pipAvailable, setPipAvailable] = useState(false);
-  const [direction, setDirection] = useState(0); // 1 = next, -1 = prev
+  const [direction, setDirection] = useState(1); // 1 = next, -1 = prev
   const [isMobile, setIsMobile] = useState(false);
   const router = useRouter();
 
@@ -127,19 +127,23 @@ export function DesktopPlayer({
         'cursor-pointer md:cursor-default touch-none',
       )}
       onTap={(e) => {
-        // Only trigger expansion/navigation if the tap was on a safe area (not a button)
+        // On mobile, tap on the bar expands the player.
+        // On desktop, navigation is restricted to clicking the track info.
+        if (!isMobile) return;
+
         const target = e.target as HTMLElement;
-        if (target.closest('button')) return;
+        if (target.closest('button') || target.closest('[role="slider"]') || target.closest('.no-nav')) return;
         
         if (isMobile) {
           onExpand();
-        } else {
-          router.push('/playing');
         }
       }}
     >
       {/* Current Track Info */}
-      <div className='relative flex items-center flex-1 md:flex-none md:w-[35%] md:min-w-[240px] gap-2 pl-1 md:pl-0 overflow-hidden group/bar'>
+      <div 
+        className='relative flex items-center flex-1 md:flex-none md:w-[35%] md:min-w-[240px] gap-2 pl-1 md:pl-0 overflow-hidden group/info md:cursor-pointer'
+        onClick={() => !isMobile && router.push('/playing')}
+      >
         {/* Blended Background Artwork */}
         <AnimatePresence mode='wait'>
           <motion.div
@@ -170,7 +174,7 @@ export function DesktopPlayer({
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className='relative z-10 flex-1 min-w-0'
           >
-            <div className='flex items-center gap-3 overflow-hidden py-2 px-1 pointer-events-none'>
+            <div className='flex items-center gap-3 overflow-hidden py-2 px-1'>
               <div className='h-10 w-10 md:h-14 md:w-14 rounded-md bg-muted overflow-hidden shrink-0 relative'>
                 <Image
                   src={currentTrack.artworkUrl}
@@ -235,6 +239,7 @@ export function DesktopPlayer({
             className='hidden md:inline-flex h-8 w-8 text-muted-foreground hover:text-foreground'
             onClick={(e) => {
               e.stopPropagation();
+              setDirection(-1);
               playPrevious();
             }}
           >
@@ -283,7 +288,11 @@ export function DesktopPlayer({
             variant='ghost'
             size='icon'
             className='hidden md:inline-flex h-8 w-8 text-muted-foreground hover:text-foreground'
-            onClick={handleSkipNext}
+            onClick={(e) => {
+              e.stopPropagation();
+              setDirection(1);
+              handleSkipNext();
+            }}
           >
             <SkipForward className='h-4 w-4 fill-current' />
           </Button>
@@ -305,22 +314,26 @@ export function DesktopPlayer({
           </Button>
         </div>
 
-        {/* Desktop Progress Bar */}
-        <ProgressBar
-          progressPercent={progressPercent}
-          currentDisplayTime={currentDisplayTime}
-          durationTime={durationTime}
-          onPointerDown={() => setIsDraggingSlider(true)}
-          onPointerUp={() => setIsDraggingSlider(false)}
-          onValueChange={setSliderValue}
-          onValueCommit={handleSeek}
-          className='hidden md:flex w-full items-center gap-2 mt-1 px-8'
-          showLabels={true}
-        />
+        <div 
+          className='hidden md:block w-full'
+          onClick={(e) => e.stopPropagation()}
+        >
+          <ProgressBar
+            progressPercent={progressPercent}
+            currentDisplayTime={currentDisplayTime}
+            durationTime={durationTime}
+            onPointerDown={() => setIsDraggingSlider(true)}
+            onPointerUp={() => setIsDraggingSlider(false)}
+            onValueChange={setSliderValue}
+            onValueCommit={handleSeek}
+            className='hidden md:flex w-full items-center gap-2 mt-1 px-8 no-nav'
+            showLabels={true}
+          />
+        </div>
       </div>
 
       {/* Mobile Thin Progress Bar at bottom */}
-      <div className='md:hidden absolute bottom-0 left-0 right-0 h-0.5 bg-muted/30'>
+      <div className='md:hidden absolute bottom-0 left-0 right-0 h-0.5 bg-muted/30 no-nav'>
         <div
           className='absolute left-0 top-0 bottom-0 bg-primary rounded-r-full transition-all duration-100 ease-linear'
           style={{ width: `${progressPercent}%` }}
@@ -378,11 +391,13 @@ export function DesktopPlayer({
             <PictureInPicture2 className='h-5 w-5' />
           </Button>
         )}
-        <VolumeControl
-          volume={volume}
-          setVolume={setVolume}
-          onWheel={handleVolumeWheel}
-        />
+        <div className="no-nav" onClick={(e) => e.stopPropagation()}>
+          <VolumeControl
+            volume={volume}
+            setVolume={setVolume}
+            onWheel={handleVolumeWheel}
+          />
+        </div>
       </div>
     </motion.div>
   );
