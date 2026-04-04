@@ -68,7 +68,7 @@ export function useAudioPlayback() {
   }, []);
 
   // 1. Persistence & Hydration
-  const { isHydrated, syncStateToServer } = usePlayerSync(audioRef, setLocalTime);
+  const { isHydrated, syncStateToServer } = usePlayerSync(audioRef, setCurrentTime);
 
   // 2. Track resolution & Autoplay
   const { isBuffering, setIsBuffering, triggerAutoplay } = useTrackDiscovery();
@@ -115,7 +115,7 @@ export function useAudioPlayback() {
     pause,
     playPrevious,
     handleSkipNext,
-    setLocalTime,
+    setLocalTime: setCurrentTime,
   });
 
   // 4. Socket/Party Orchestration
