@@ -43,6 +43,14 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'images.unsplash.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'i.ytimg.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'img.youtube.com',
+      },
     ],
   },
   async rewrites() {
@@ -70,6 +78,22 @@ const nextConfig: NextConfig = {
       {
         source: '/api/lyrics',
         destination: `${backendBaseUrl}/api/lyrics`,
+      },
+      {
+        source: '/api/search',
+        destination: `${backendBaseUrl}/api/search`,
+      },
+      {
+        source: '/api/recommendations',
+        destination: `${backendBaseUrl}/api/recommendations`,
+      },
+      {
+        source: '/api/player/:path*',
+        destination: `${backendBaseUrl}/api/player/:path*`,
+      },
+      {
+        source: '/api/jam/:path*',
+        destination: `${backendBaseUrl}/api/jam/:path*`,
       },
     ];
   },

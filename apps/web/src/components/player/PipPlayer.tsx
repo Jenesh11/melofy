@@ -1,7 +1,7 @@
-import { SkipBack, SkipForward, Play, Pause, Loader2, Heart, X, Shuffle, Repeat, Music2 } from 'lucide-react';
+import { SkipBack, SkipForward, Play, Pause, Loader2, Heart, X, Shuffle, Repeat, Music2, Volume2, VolumeX } from 'lucide-react';
 import { Track } from '@/store/usePlayerStore';
 import { cn } from '@/lib/utils';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface PipPlayerProps {
   currentTrack: Track | null;
@@ -13,6 +13,8 @@ interface PipPlayerProps {
   isLiked: boolean;
   isShuffle: boolean;
   isRepeat: boolean;
+  volume: number;
+  setVolume: (v: number) => void;
   toggleLike: (track: Track) => void;
   toggleShuffle: () => void;
   toggleRepeat: () => void;
@@ -33,6 +35,8 @@ export function PipPlayer({
   isLiked,
   isShuffle,
   isRepeat,
+  volume,
+  setVolume,
   toggleLike,
   toggleShuffle,
   toggleRepeat,
@@ -43,6 +47,7 @@ export function PipPlayer({
   onClose,
 }: PipPlayerProps) {
   const bgRef = useRef<HTMLDivElement>(null);
+  const [isDraggingVolume, setIsDraggingVolume] = useState(false);
 
   // Update background image when track changes (inline style to avoid reflow)
   useEffect(() => {
@@ -280,6 +285,40 @@ export function PipPlayer({
             >
               <Repeat size={15} />
             </button>
+
+            {/* Volume beside Shuffle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 4, marginRight: 4, flex: 1, maxWidth: 120 }}>
+              <button
+                onClick={() => setVolume(volume === 0 ? 0.8 : 0)}
+                style={{ ...iconBtn('rgba(255,255,255,0.45)'), padding: 4 }}
+                title={volume === 0 ? 'Unmute' : 'Mute'}
+              >
+                {volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
+              </button>
+
+              <div
+                style={{ flex: 1, height: 24, display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative' }}
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  setVolume(Math.max(0, Math.min(1, x / rect.width)));
+                }}
+                onMouseDown={() => setIsDraggingVolume(true)}
+                onMouseMove={(e) => {
+                  if (!isDraggingVolume) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  setVolume(Math.max(0, Math.min(1, x / rect.width)));
+                }}
+                onMouseUp={() => setIsDraggingVolume(false)}
+                onMouseLeave={() => setIsDraggingVolume(false)}
+              >
+                <div style={{ height: 3, width: '100%', background: 'rgba(255,255,255,0.15)', borderRadius: 2, overflow: 'hidden', position: 'relative' }}>
+                  <div style={{ height: '100%', width: `${volume * 100}%`, background: 'rgba(255,255,255,0.8)', borderRadius: 2, transition: isDraggingVolume ? 'none' : 'width 0.05s linear' }} />
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>

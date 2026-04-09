@@ -33,7 +33,7 @@ interface PlayerState {
   isAutoplay: boolean;
   activePlaylistContext: Track[] | null;
   activeCollectionId: string | null;
-  activeCollectionType: 'spotify' | 'custom' | null;
+  activeCollectionType: 'spotify' | 'custom' | 'youtube' | null;
 
   // Party State
   partyId: string | null;
@@ -57,7 +57,7 @@ interface PlayerState {
   playPlaylist: (
     tracks: Track[],
     collectionId?: string,
-    collectionType?: 'spotify' | 'custom',
+    collectionType?: 'spotify' | 'custom' | 'youtube',
     force?: boolean
   ) => void;
   playNext: (force?: boolean) => void;

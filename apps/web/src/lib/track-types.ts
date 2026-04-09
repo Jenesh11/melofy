@@ -7,4 +7,5 @@ export interface TrackItem {
   duration: number;
   album?: string;
   encoded?: string;
+  source?: string;
 }

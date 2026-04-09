@@ -248,12 +248,28 @@ function applyUpstreamHeaders(
   if (typeof expires === 'string') res.setHeader('Expires', expires);
 }
 
+/**
+ * In-flight deduplication map: while a NodeLink /v4/trackstream request is
+ * pending for a given (encodedTrack, itag) pair, every additional caller
+ * receives the SAME promise instead of firing a duplicate HTTP request.
+ * The entry is removed once the promise settles (resolve or reject).
+ */
+const inflightTrackResolves = new Map<string, Promise<string>>();
+
 function requestTrackstreamUrl(
   node: NodeLike,
   encodedTrack: string,
   itag: number | null,
 ): Promise<string> {
-  return new Promise((resolve, reject) => {
+  const cacheKey = `${encodedTrack}:${itag === null ? 'auto' : itag}`;
+
+  const existing = inflightTrackResolves.get(cacheKey);
+  if (existing) {
+    console.log(`[TrackResolve] Joining in-flight resolution for key=${cacheKey}`);
+    return existing;
+  }
+
+  const promise = new Promise<string>((resolve, reject) => {
     const protocol = node.options.secure ? 'https' : 'http';
     const baseUrl = `${protocol}://${node.options.host}:${node.options.port}`;
     const query =
@@ -333,7 +349,14 @@ function requestTrackstreamUrl(
     });
 
     req.on('error', reject);
+  }).finally(() => {
+    // Remove the entry once settled so failed resolutions can be retried
+    // and so the map doesn't grow unboundedly.
+    inflightTrackResolves.delete(cacheKey);
   });
+
+  inflightTrackResolves.set(cacheKey, promise);
+  return promise;
 }
 
 function resolveRedirectUrl(currentUrl: string, location: string): string | null {

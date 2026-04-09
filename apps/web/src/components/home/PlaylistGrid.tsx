@@ -2,7 +2,7 @@
 
 import { useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Disc, Play } from 'lucide-react';
+import { Disc, Play, Plus } from 'lucide-react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { resolvePlayableTrack, TrackItem } from '@/components/ui/TrackList';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,7 @@ interface PlaylistGridProps {
   isAlbum?: boolean;
   isCarousel?: boolean;
   onPlayPlaylist?: (playlist: PlaylistGridItem) => void;
+  onImport?: (playlist: PlaylistGridItem) => void;
 }
 
 export function PlaylistGrid({
@@ -37,6 +38,7 @@ export function PlaylistGrid({
   isAlbum = false,
   isCarousel = false,
   onPlayPlaylist,
+  onImport,
 }: PlaylistGridProps) {
   const playInContext = usePlayerStore((state) => state.playInContext);
   const currentTrack = usePlayerStore((state) => state.currentTrack);
@@ -151,7 +153,7 @@ export function PlaylistGrid({
             onClick={() => router.push(`/playlist/${item.id}`)}
           >
             <div className='aspect-square rounded-[2rem] bg-muted relative overflow-hidden shadow-xl group-hover:shadow-primary/10 transition-all duration-500'>
-              <div className='absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10'>
+              <div className='absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-10'>
                 <Button
                   size='icon'
                   className='h-14 w-14 rounded-full bg-primary text-primary-foreground hover:scale-110 transition-all shadow-2xl'
@@ -162,6 +164,19 @@ export function PlaylistGrid({
                 >
                   <Play className='h-7 w-7 fill-current transition-colors ml-1' />
                 </Button>
+                {onImport && (
+                  <Button
+                    size='icon'
+                    variant='outline'
+                    className='h-14 w-14 rounded-full border-white/10 bg-white/5 hover:bg-white/10 text-white hover:scale-110 transition-all shadow-2xl'
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onImport(item);
+                    }}
+                  >
+                    <Plus className='h-7 w-7' />
+                  </Button>
+                )}
               </div>
 
               <div className='h-full w-full bg-linear-to-br from-muted to-background group-hover:scale-110 transition-transform duration-700 flex items-center justify-center'>

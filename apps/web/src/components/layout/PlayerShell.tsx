@@ -11,15 +11,13 @@ import { useDocPip } from '@/hooks/usePip';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
 import { useLikedSongs } from '@/hooks/useLikedSongs';
-import { AnimatePresence, motion } from 'framer-motion';
-import { X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { SyncedLyrics } from '@/components/ui/SyncedLyrics';
+import { useLyricsPanelStore } from '@/store/useLyricsPanelStore';
 
 export function PlayerShell() {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isLyricsOpen, setIsLyricsOpen] = useState(false);
   const [streamSrc, setStreamSrc] = useState<string | undefined>(undefined);
+
+  const { isOpen: isLyricsOpen, toggle: toggleLyricsPanel } = useLyricsPanelStore();
 
   const playback = useAudioPlayback();
   const { user } = useAuth();
@@ -143,7 +141,7 @@ export function PlayerShell() {
             onOpenPip={pip.openPip}
             isPipOpen={pip.isPipOpen}
             isLyricsOpen={isLyricsOpen}
-            toggleLyrics={() => setIsLyricsOpen(!isLyricsOpen)}
+            toggleLyrics={toggleLyricsPanel}
           />
         </>
       ) : (
@@ -151,45 +149,6 @@ export function PlayerShell() {
           Select a track to start listening
         </div>
       )}
-
-      {/* Lyrics Modal Overlay */}
-      <AnimatePresence>
-        {isLyricsOpen && playback.currentTrack && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 md:p-8'
-          >
-            <div
-              className='absolute inset-0 cursor-pointer'
-              onClick={() => setIsLyricsOpen(false)}
-            />
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className='relative w-full max-w-4xl h-[80vh] bg-black/80 backdrop-blur-3xl border border-white/10 rounded-[2rem] shadow-2xl overflow-hidden flex flex-col'
-            >
-              <div className='absolute top-4 right-4 z-50'>
-                <Button
-                  variant='ghost'
-                  size='icon'
-                  onClick={() => setIsLyricsOpen(false)}
-                  className='text-white/60 hover:text-white hover:bg-white/10 rounded-full h-12 w-12'
-                >
-                  <X className='h-8 w-8' />
-                </Button>
-              </div>
-
-              <div className='flex-1 min-h-0 relative'>
-                <SyncedLyrics />
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Document PiP portal — renders inside the floating window */}
       {pip.isPipOpen && pip.pipWindow &&
@@ -204,6 +163,8 @@ export function PlayerShell() {
             isLiked={playback.currentTrack ? isLiked(playback.currentTrack.id) : false}
             isShuffle={playback.isShuffle}
             isRepeat={playback.isRepeat}
+            volume={playback.volume}
+            setVolume={playback.setVolume}
             toggleLike={toggleLike}
             toggleShuffle={playback.toggleShuffle}
             toggleRepeat={playback.toggleRepeat}

@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 import { ThemeProvider } from '@/lib/theme-context';
 import { cn } from '@/lib/utils';
 import { LikedSongsSync } from '@/components/layout/LikedSongsSync';
+import { LyricsPanel } from '@/components/layout/LyricsPanel';
 
 export function AppWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -73,8 +74,8 @@ function AppContent({ children }: { children: React.ReactNode }) {
         <div className='hidden md:flex h-full'>
           <Sidebar />
         </div>
-        <main className='flex-1 overflow-y-auto bg-linear-to-b from-card/30 via-background to-background custom-scrollbar relative scroll-smooth flex flex-col'>
-          <div className='shrink-0 sticky top-0 z-50'>
+        <main className={cn('flex-1 overflow-y-auto custom-scrollbar relative scroll-smooth flex flex-col', pathname === '/playing' ? 'bg-background' : 'bg-linear-to-b from-card/30 via-background to-background')}>
+          <div className={cn('shrink-0 sticky top-0 z-50', pathname === '/playing' && 'hidden')}>
             <Topbar />
           </div>
           <div
@@ -86,6 +87,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
             {children}
           </div>
         </main>
+        <LyricsPanel />
       </div>
 
       {/* Desktop PlayerShell / Mobile MiniPlayer + BottomNav container */}

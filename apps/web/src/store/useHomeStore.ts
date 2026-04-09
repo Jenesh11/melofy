@@ -26,6 +26,7 @@ interface HomeStore {
   recommendations: SpotifyTrackLike[];
   mixes: SpotifyCollectionSummary[];
   popularPlaylists: SpotifyCollectionSummary[];
+  discoveryMixes: SpotifyCollectionSummary[];
   hasFetched: boolean;
 
   setTrending: (data: SpotifyTrendingItem[]) => void;
@@ -33,6 +34,7 @@ interface HomeStore {
   setRecommendations: (data: SpotifyTrackLike[]) => void;
   setMixes: (data: SpotifyCollectionSummary[]) => void;
   setPopularPlaylists: (data: SpotifyCollectionSummary[]) => void;
+  setDiscoveryMixes: (data: SpotifyCollectionSummary[]) => void;
   setHasFetched: (status: boolean) => void;
 }
 
@@ -42,6 +44,7 @@ export const useHomeStore = create<HomeStore>((set) => ({
   recommendations: [],
   mixes: [],
   popularPlaylists: [],
+  discoveryMixes: [],
   hasFetched: false,
 
   setTrending: (data) => set({ trending: data }),
@@ -49,5 +52,6 @@ export const useHomeStore = create<HomeStore>((set) => ({
   setRecommendations: (data) => set({ recommendations: data }),
   setMixes: (data) => set({ mixes: data }),
   setPopularPlaylists: (data) => set({ popularPlaylists: data }),
+  setDiscoveryMixes: (data) => set({ discoveryMixes: data }),
   setHasFetched: (status) => set({ hasFetched: status }),
 }));

@@ -36,12 +36,14 @@ export default function Home() {
     recommendations,
     mixes,
     popularPlaylists,
+    discoveryMixes,
     hasFetched,
     setTrending,
     setNewReleases,
     setRecommendations,
     setMixes,
     setPopularPlaylists,
+    setDiscoveryMixes,
     setHasFetched,
   } = useHomeStore();
   const [isFetching, setIsFetching] = useState(!hasFetched);
@@ -116,6 +118,17 @@ export default function Home() {
         if (mixRes.ok) setMixes(await mixRes.json());
         if (popularRes.ok) setPopularPlaylists(await popularRes.json());
 
+        // Fetch Discovery Mixes based on history
+        if (history.length > 0) {
+          const artists = history.map(t => t.artist).filter(Boolean);
+          const discRes = await fetch('/api/spotify/discovery', {
+            method: 'POST',
+            headers: { ...authHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ artists }),
+          });
+          if (discRes.ok) setDiscoveryMixes(await discRes.json());
+        }
+
         const genres = ['pop', 'hip-hop', 'r&b', 'indie', 'electronic', 'soul'];
         const randomGenre = genres[Math.floor(Math.random() * genres.length)];
         const recRes = await fetch(
@@ -134,7 +147,7 @@ export default function Home() {
     };
 
     void fetchDashboardData();
-  }, [user, hasFetched, setTrending, setNewReleases, setMixes, setPopularPlaylists, setRecommendations, setHasFetched]);
+  }, [user, hasFetched, history, setTrending, setNewReleases, setMixes, setPopularPlaylists, setDiscoveryMixes, setRecommendations, setHasFetched]);
 
   if (loading) return <div className='min-h-screen bg-background' />;
 
@@ -235,6 +248,14 @@ export default function Home() {
             onPause={pause}
             onResume={resume}
           />
+
+          {discoveryMixes.length > 0 && (
+            <PlaylistGrid
+              title='Made For You'
+              items={discoveryMixes}
+              onPlayPlaylist={handlePlaySpotifyCollection}
+            />
+          )}
 
           <PlaylistGrid
             title='Popular Playlists'

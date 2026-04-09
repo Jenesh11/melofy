@@ -16,6 +16,7 @@ import {
   mapTrackItemToPlayerTrack,
   type SpotifyTrackLike,
 } from '@/lib/track-mappers';
+import Image from 'next/image';
 
 interface SpotifyPlaylistData {
   id?: string;
@@ -53,7 +54,8 @@ type PlaylistData = SpotifyPlaylistData | CustomPlaylistData;
 
 export default function PlaylistPage() {
   const params = useParams();
-  const id = params.id as string;
+  const rawId = params.id as string;
+  const id = decodeURIComponent(rawId);
   const { user } = useAuth();
   const playPlaylist = usePlayerStore((state) => state.playPlaylist);
   const savedPlaylists = useLibraryStore((state) => state.savedPlaylists);
@@ -63,6 +65,7 @@ export default function PlaylistPage() {
   const [playlist, setPlaylist] = useState<PlaylistData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSpotifySource, setIsSpotifySource] = useState(false);
+  const [isYoutubeSource, setIsYoutubeSource] = useState(false);
 
   const saved = useMemo(
     () => savedPlaylists.some((entry) => entry.id === id),
@@ -89,9 +92,65 @@ export default function PlaylistPage() {
         return;
       }
 
+      // Handle YouTube fallback
+      if (id.startsWith('youtube:')) {
+        const ytId = id.replace('youtube:', '');
+        try {
+          const authHeaders = await getFirebaseAuthHeaders(user);
+          // Use the full URL to ensure NodeLink identifies it as a playlist
+          const targetUrl = ytId.startsWith('http') ? ytId : `https://www.youtube.com/playlist?list=${ytId}`;
+          const res = await fetch(`/api/search?q=${encodeURIComponent(targetUrl)}`, {
+            headers: authHeaders,
+          });
+
+          if (res.ok) {
+            const ytData = await res.json();
+            if (ytData.loadType === 'playlist' && ytData.tracks) {
+              const mapped: CustomPlaylistData = {
+                name: ytData.playlistInfo?.name || 'YouTube Playlist',
+                artworkUrl: ytData.tracks?.[0]?.info?.artworkUrl || `https://img.youtube.com/vi/${ytData.tracks?.[0]?.info?.identifier}/mqdefault.jpg`,
+                tracks: ytData.tracks.map((t: {
+                  info: {
+                    identifier: string;
+                    title: string;
+                    author: string;
+                    artworkUrl?: string;
+                    duration?: number;
+                    length?: number;
+                  };
+                  encoded: string;
+                }) => ({
+                  info: {
+                    identifier: t.info.identifier,
+                    title: t.info.title,
+                    author: t.info.author,
+                    artworkUrl: t.info.artworkUrl,
+                    duration: t.info.duration || t.info.length || 0,
+                  },
+                  encoded: t.encoded
+                }))
+              };
+              setPlaylist(mapped);
+              setIsYoutubeSource(true);
+              setIsSpotifySource(false);
+            } else {
+              setPlaylist(null);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching YouTube playlist:', error);
+          setPlaylist(null);
+        } finally {
+          setIsLoading(false);
+        }
+        return;
+      }
+
       try {
         const authHeaders = await getFirebaseAuthHeaders(user);
-        const res = await fetch(`/api/spotify/playlists/${id}`, {
+        // Clean up Spotify ID if it has prefixes
+        const cleanSpotifyId = id.replace('spotify:playlist:', '').replace('spotify:album:', '');
+        const res = await fetch(`/api/spotify/playlists/${cleanSpotifyId}`, {
           headers: authHeaders,
         });
 
@@ -99,6 +158,18 @@ export default function PlaylistPage() {
           const spotifyData = (await res.json()) as SpotifyPlaylistData;
           setPlaylist(spotifyData);
           setIsSpotifySource(true);
+          setIsYoutubeSource(false);
+        } else if (id.length === 22) {
+          // One more try for albums if playlist failed
+          const albumRes = await fetch(`/api/spotify/albums/${cleanSpotifyId}/tracks`, {
+            headers: authHeaders,
+          });
+          if (albumRes.ok) {
+             // Handle album data structure... (keep it simple for now or assume its a playlist mostly)
+             setPlaylist(null); 
+          } else {
+            setPlaylist(null);
+          }
         } else {
           setPlaylist(null);
         }
@@ -146,8 +217,12 @@ export default function PlaylistPage() {
   );
 
   const handlePlayPlaylist = useCallback(() => {
-    playPlaylist(tracksToPlay, id, isSpotifySource ? 'spotify' : 'custom');
-  }, [id, isSpotifySource, playPlaylist, tracksToPlay]);
+    let source: 'spotify' | 'custom' | 'youtube' = 'custom';
+    if (isSpotifySource) source = 'spotify';
+    else if (isYoutubeSource) source = 'youtube';
+    
+    playPlaylist(tracksToPlay, id, source);
+  }, [id, isSpotifySource, isYoutubeSource, playPlaylist, tracksToPlay]);
 
   const handleToggleSave = useCallback(() => {
     if (!playlist) return;
@@ -212,9 +287,11 @@ export default function PlaylistPage() {
               <Heart className='h-24 w-24 text-white fill-white drop-shadow-lg' />
             </div>
           ) : playlist.artworkUrl ? (
-            <img
+            <Image
               src={playlist.artworkUrl}
               alt={playlist.name}
+              width={300}
+              height={300}
               className='h-full w-full object-cover'
             />
           ) : (
@@ -226,7 +303,7 @@ export default function PlaylistPage() {
 
         <div className='flex flex-col gap-2'>
           <p className='text-primary font-bold tracking-widest text-[10px] uppercase'>
-            {isSpotifySource ? 'Spotify Playlist' : 'Playlist'}
+            {isSpotifySource ? 'Spotify Playlist' : isYoutubeSource ? 'YouTube Playlist' : 'Playlist'}
           </p>
           <h1 className='text-5xl md:text-7xl font-bold text-foreground tracking-tighter mb-2 line-clamp-2'>
             {playlist.name}
@@ -238,7 +315,7 @@ export default function PlaylistPage() {
           )}
           <div className='flex items-center gap-2 text-muted-foreground text-sm font-light mt-2'>
             <span className='font-semibold text-foreground'>
-              {isSpotifySource ? 'Spotify' : user?.displayName || 'User'}
+              {isSpotifySource ? 'Spotify' : isYoutubeSource ? 'YouTube' : user?.displayName || 'User'}
             </span>
             <span>&middot;</span>
             <span>

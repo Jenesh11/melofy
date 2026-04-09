@@ -6,6 +6,7 @@ import { addPlaylist, Track as FirebaseTrack } from '@/lib/firebase/playlists';
 import { Track as PlayerTrack } from '@/store/usePlayerStore';
 import { useLikedStore } from '@/store/useLikedStore';
 import { toast } from 'sonner';
+import { Heart, HeartOff } from 'lucide-react';
 
 export const LIKED_SONGS_PLAYLIST_NAME = 'Liked Songs';
 
@@ -64,7 +65,21 @@ export function useLikedSongs() {
               tracks: arrayRemove(trackToRemove),
               trackCount: Math.max(0, likedTracks.length - 1)
             });
-            toast.success('Removed from Liked Songs');
+            toast('Removed from Liked Songs', {
+              className: 'bg-primary text-primary-foreground border-none shadow-2xl',
+              description: (
+                <div className="flex items-center gap-2 mt-1">
+                  {track.artworkUrl && (
+                    <img src={track.artworkUrl} alt="" className="h-8 w-8 rounded-md object-cover shadow-md brightness-90" />
+                  )}
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-bold text-xs truncate opacity-90">{track.title}</span>
+                  </div>
+                </div>
+              ),
+              icon: <HeartOff className="h-4 w-4" />,
+              duration: 2000,
+            });
           }
         }
       } else {
@@ -87,7 +102,21 @@ export function useLikedSongs() {
           });
           setLikedPlaylistId(res.id);
         }
-        toast.success('Added to Liked Songs');
+        toast('Added to Liked Songs', {
+          className: 'bg-primary text-primary-foreground border-none shadow-2xl',
+          description: (
+            <div className="flex items-center gap-2 mt-1">
+              {track.artworkUrl && (
+                <img src={track.artworkUrl} alt="" className="h-8 w-8 rounded-md object-cover shadow-md brightness-90" />
+              )}
+              <div className="flex flex-col min-w-0">
+                <span className="font-bold text-xs truncate opacity-90">{track.title}</span>
+              </div>
+            </div>
+          ),
+          icon: <Heart className="fill-current h-4 w-4" />,
+          duration: 2500,
+        });
       }
     } catch (error) {
       console.error('[useLikedSongs] Error toggling like:', error);

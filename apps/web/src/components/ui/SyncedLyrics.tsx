@@ -39,7 +39,7 @@ const parseSyncedLyrics = (lrc: string): LyricLine[] => {
 };
 
 // Premium Synced Lyrics Component (with Caching)
-export const SyncedLyrics = () => {
+export const SyncedLyrics = ({ compact = false }: { compact?: boolean }) => {
   const currentTrack = usePlayerStore((state) => state.currentTrack);
   const progress = usePlayerStore((state) => state.progress);
   const lyricsCache = usePlayerStore((state) => state.lyricsCache);
@@ -224,7 +224,8 @@ export const SyncedLyrics = () => {
                   y: isActive ? 0 : 5,
                 }}
                 transition={{ duration: 0.4, ease: 'easeOut' }}
-                className={`text-2xl md:text-4xl lg:text-5xl font-black tracking-tight cursor-default transition-all duration-300 text-center
+                className={`font-black tracking-tight cursor-default transition-all duration-300 text-center
+                                 ${compact ? 'text-lg md:text-xl' : 'text-2xl md:text-4xl lg:text-5xl'}
                                  ${isActive ? 'text-foreground drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'text-foreground/50 hover:text-foreground/80'}
                              `}
               >

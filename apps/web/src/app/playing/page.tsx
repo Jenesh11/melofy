@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SyncedLyrics } from '@/components/ui/SyncedLyrics';
 import { useLikedSongs } from '@/hooks/useLikedSongs';
 import { openPip, isPipSupported } from '@/hooks/usePip';
+import { useLyricsPanelStore } from '@/store/useLyricsPanelStore';
 
 export default function PlayingPage() {
   const currentTrack = usePlayerStore((state) => state.currentTrack);
@@ -31,8 +32,10 @@ export default function PlayingPage() {
   const resume = usePlayerStore((state) => state.resume);
   const router = useRouter();
   const [showLyrics, setShowLyrics] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
   const { toggleLike, isLiked } = useLikedSongs();
   const [pipAvailable, setPipAvailable] = useState(false);
+  const isPanelOpen = useLyricsPanelStore((s) => s.isOpen);
   useEffect(() => {
     const supported = isPipSupported();
     if (supported) {
@@ -45,6 +48,15 @@ export default function PlayingPage() {
     if (isPlaying) pause();
     else resume();
   };
+
+  // Fade the entire page out before navigating so neither the backdrop
+  // nor the content can flash on the destination page.
+  const handleBack = useCallback(() => {
+    setIsLeaving(true);
+    setTimeout(() => {
+      router.back();
+    }, 180);
+  }, [router]);
 
   const handleShare = () => {
     if (!currentTrack) return;
@@ -65,37 +77,42 @@ export default function PlayingPage() {
   };
 
   return (
-    <div className='relative flex-1 h-full w-full overflow-hidden bg-background flex flex-col px-6 pt-6 md:px-12 md:pt-8 transition-colors duration-500'>
+    <div
+      className='relative flex-1 h-full w-full overflow-hidden bg-background flex flex-col px-6 pt-6 md:px-12 md:pt-8'
+      style={{
+        opacity: isLeaving ? 0 : 1,
+        transition: 'opacity 0.18s ease',
+      }}
+    >
       {/* Dynamic Cinematic Backdrop (The "Essence") */}
-      <AnimatePresence mode='wait'>
-        {currentTrack && (
-          <motion.div
-            key={currentTrack.artworkUrl}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.5 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1.5 }}
-            className='absolute inset-0 pointer-events-none'
-          >
-            <div
-              className='absolute inset-0 blur-[120px] scale-150 saturate-200'
-              style={{
-                backgroundImage: `url(${currentTrack.artworkUrl})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-              }}
-            />
-            {/* Theme-aware scrim */}
-            <div className='absolute inset-0 bg-background/60 dark:bg-black/60 backdrop-blur-3xl' />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Cinematic backdrop — set to opacity-0 instantly via isLeaving so it
+          never flashes during the frame gap before Next.js tears down the route. */}
+      {currentTrack && (
+        <motion.div
+          key={currentTrack.artworkUrl}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.5 }}
+          transition={{ duration: 0.6 }}
+          className='absolute inset-0 pointer-events-none'
+        >
+          <div
+            className='absolute inset-0 blur-[120px] scale-150 saturate-200'
+            style={{
+              backgroundImage: `url(${currentTrack.artworkUrl})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+          />
+          {/* Theme-aware scrim */}
+          <div className='absolute inset-0 bg-background/60 dark:bg-black/60 backdrop-blur-3xl' />
+        </motion.div>
+      )}
 
       {/* Top Navigation Bar */}
       <div className='relative z-1 w-full flex justify-between items-center'>
         <Button
           variant='ghost'
-          onClick={() => router.back()}
+          onClick={handleBack}
           className='text-foreground/60 hover:text-foreground hover:bg-foreground/10 rounded-full'
         >
           <ChevronLeft className='mr-2 h-5 w-5' />
@@ -113,10 +130,22 @@ export default function PlayingPage() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -30, scale: 1.05 }}
               transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-              className={`flex flex-col lg:flex-row gap-12 lg:gap-20 items-center w-full max-w-5xl mx-auto transition-all duration-700 ${showLyrics ? 'scale-90 opacity-0 pointer-events-none' : 'scale-100 opacity-100'}`}
+              className={[
+                'flex items-center w-full mx-auto transition-all duration-500',
+                // When lyrics panel is open, shrink row-layout breakpoint (xl) and tighten gap
+                isPanelOpen
+                  ? 'flex-col xl:flex-row gap-8 xl:gap-12 max-w-3xl'
+                  : 'flex-col lg:flex-row gap-12 lg:gap-20 max-w-5xl',
+                showLyrics ? 'scale-90 opacity-0 pointer-events-none' : 'scale-100 opacity-100',
+              ].join(' ')}
             >
               {/* Artwork Card with Frost Effect */}
-              <div className='relative group shrink-0 w-full max-w-[280px] sm:max-w-[320px] md:max-w-[400px]'>
+              <div className={[
+                'relative group shrink-0 w-full transition-all duration-500',
+                isPanelOpen
+                  ? 'max-w-[220px] md:max-w-[260px] xl:max-w-[300px]'
+                  : 'max-w-[280px] sm:max-w-[320px] md:max-w-[400px]',
+              ].join(' ')}>
                 <div className='absolute -inset-10 bg-primary/20 blur-[60px] rounded-full opacity-50 group-hover:opacity-100 transition-opacity duration-1000' />
                 <div className='relative aspect-square rounded-[2rem] lg:rounded-[3rem] overflow-hidden shadow-2xl border border-foreground/10 bg-secondary/30 backdrop-blur-2xl'>
                   {currentTrack.artworkUrl ? (
@@ -150,7 +179,12 @@ export default function PlayingPage() {
               </div>
 
               {/* Text Info & Controls */}
-              <div className='flex flex-col items-center lg:items-start text-center lg:text-left gap-6 lg:gap-8 w-full min-w-0'>
+              <div className={[
+                'flex flex-col w-full min-w-0 transition-all duration-500',
+                isPanelOpen
+                  ? 'items-center xl:items-start text-center xl:text-left gap-4 xl:gap-6'
+                  : 'items-center lg:items-start text-center lg:text-left gap-6 lg:gap-8',
+              ].join(' ')}>
                 <div className='space-y-4 w-full'>
                   <motion.p
                     initial={{ opacity: 0, y: -10 }}
@@ -159,15 +193,26 @@ export default function PlayingPage() {
                   >
                     Now Playing
                   </motion.p>
-                  <h1 className='text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-black text-foreground tracking-tighter leading-[1.1] drop-shadow-2xl line-clamp-2'>
+                  <h1 className={[
+                    'font-black text-foreground tracking-tighter leading-[1.1] drop-shadow-2xl line-clamp-2 transition-all duration-500',
+                    isPanelOpen
+                      ? 'text-2xl md:text-3xl xl:text-4xl xxl:text-5xl'
+                      : 'text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl',
+                  ].join(' ')}>
                     {currentTrack.title}
                   </h1>
-                  <p className='text-xl md:text-3xl lg:text-4xl text-foreground/50 font-medium tracking-tight truncate'>
+                  <p className={[
+                    'text-foreground/50 font-medium tracking-tight truncate transition-all duration-500',
+                    isPanelOpen ? 'text-base md:text-xl xl:text-2xl' : 'text-xl md:text-3xl lg:text-4xl',
+                  ].join(' ')}>
                     {currentTrack.artist}
                   </p>
                 </div>
 
-                <div className='flex items-center justify-center lg:justify-start gap-4 mt-2 lg:mt-6'>
+                <div className={[
+                    'flex items-center justify-center mt-2 gap-3 flex-wrap transition-all duration-500',
+                    isPanelOpen ? 'xl:justify-start xl:mt-4' : 'lg:justify-start lg:mt-6',
+                  ].join(' ')}>
                   <Button
                     size='lg'
                     className='bg-foreground text-background font-black h-16 w-16 md:w-auto md:px-12 rounded-full hover:scale-105 transition-all active:scale-95 shadow-xl border-none text-base'

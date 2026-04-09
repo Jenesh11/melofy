@@ -86,7 +86,7 @@ export function ImportPlaylistCard({
           Import Playlist
         </CardTitle>
         <CardDescription className='text-muted-foreground font-light'>
-          Paste a Spotify playlist URL to instantly port your favorite tracks.
+          Paste a Spotify or youtube playlist URL to instantly port your favorite tracks.
         </CardDescription>
       </CardHeader>
       <CardContent className='p-8 pt-0 space-y-6'>

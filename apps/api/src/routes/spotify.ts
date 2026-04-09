@@ -27,7 +27,8 @@ router.get('/trending', async (req, res) => {
     // This is a publicly accessible playlist, not a Spotify editorial featured list
     // The Top 50 - Global is accessible via playlist tracks endpoint
     const playlistId = '37i9dQZEVXbMDoHDwVN2tF';
-    const data = await spotifyGet(`/playlists/${playlistId}/tracks?limit=50`);
+    // 2026 Update: Even if playlists allow more, we cap to 10 for consistency and performance
+    const data = await spotifyGet(`/playlists/${playlistId}/tracks?limit=10`);
     res.json(data.items.filter((item: any) => item.track));
   } catch (error: any) {
     // Fallback: use search API for popular tracks
@@ -36,7 +37,7 @@ router.get('/trending', async (req, res) => {
         '[Spotify] Playlist fallback — using search API for trending',
       );
       const data = await spotifyGet(
-        `/search?q=year:2024-2025&type=track&limit=50&market=US`,
+        `/search?q=year:2024-2025&type=track&limit=10&market=US`,
       );
       // Transform to match the {track} shape expected by frontend
       res.json(data.tracks.items.map((track: any) => ({ track })));
@@ -52,15 +53,18 @@ router.get('/trending', async (req, res) => {
 
 /**
  * GET /api/spotify/new-releases
- * Uses the browse/new-releases endpoint (still available)
+ * 2026 Update: /browse/new-releases is removed for Dev mode apps.
+ * Replacement: Use the search API for recently released albums.
  */
 router.get('/new-releases', async (req, res) => {
   try {
-    const data = await spotifyGet(`/browse/new-releases?limit=15&country=US`);
+    // Search for albums released in the current year
+    const year = new Date().getFullYear();
+    const data = await spotifyGet(`/search?q=year:${year}&type=album&limit=10&market=US`);
     res.json(data.albums.items);
   } catch (error: any) {
     console.error(
-      '[Spotify] New releases error:',
+      '[Spotify] New releases error (search fallback):',
       error?.response?.data || error.message,
     );
     res.status(500).json({ error: 'Failed to fetch new releases' });
@@ -95,7 +99,7 @@ router.get('/recommendations', async (req, res) => {
 
   try {
     const data = await spotifyGet(
-      `/search?q=${encodeURIComponent(query)}&type=track&limit=50&market=US`,
+      `/search?q=${encodeURIComponent(query)}&type=track&limit=10&market=US`,
     );
     res.json(data.tracks.items);
   } catch (error: any) {
@@ -113,11 +117,11 @@ router.get('/recommendations', async (req, res) => {
  */
 router.get('/popular-playlists', async (req, res) => {
   const SEARCH_QUERIES = [
-    "Today's Top Hits",
-    'RapCaviar',
-    'New Music Friday',
-    'mint',
-    'Rock Classics',
+    "Top hits",
+    'Rap hits',
+    'New Music',
+    'Bollywood hits',
+    'Rock',
     'Punjabi',
     'Hot Country',
     'Peaceful Piano',
@@ -147,6 +151,43 @@ router.get('/popular-playlists', async (req, res) => {
       error?.response?.data || error.message,
     );
     res.status(500).json({ error: 'Failed to fetch popular playlists' });
+  }
+});
+
+/**
+ * POST /api/spotify/discovery
+ * Takes a list of artist names from user history and returns curated "Mix" playlists.
+ */
+router.post('/discovery', async (req, res) => {
+  const { artists } = req.body as { artists: string[] };
+  if (!artists || !Array.isArray(artists) || artists.length === 0) {
+    return res.status(400).json({ error: 'Missing artists in request body' });
+  }
+
+  // Get unique artists and limit to top 5 to avoid too many requests
+  const uniqueArtists = Array.from(new Set(artists)).slice(0, 5);
+
+  try {
+    const results = await Promise.allSettled(
+      uniqueArtists.map((artist) =>
+        spotifyGet(
+          `/search?q=${encodeURIComponent(artist + ' Mix')}&type=playlist&limit=1&market=US`,
+        ),
+      ),
+    );
+
+    const recommendations = results
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+      .map((r) => r.value?.playlists?.items?.[0])
+      .filter(Boolean);
+
+    res.json(recommendations);
+  } catch (error: any) {
+    console.error(
+      '[Spotify] Discovery error:',
+      error?.response?.data || error.message,
+    );
+    res.status(500).json({ error: 'Failed to fetch discovery mixes' });
   }
 });
 
@@ -307,7 +348,7 @@ router.get('/search', async (req, res) => {
 
   try {
     const data = await spotifyGet(
-      `/search?q=${encodeURIComponent(q)}&type=${type}&limit=20&market=US`,
+      `/search?q=${encodeURIComponent(q)}&type=${type}&limit=10&market=US`,
     );
     res.json(data);
   } catch (error: any) {
