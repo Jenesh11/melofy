@@ -141,6 +141,18 @@ Join our Discord server to get updates, report bugs, or just hang out with the d
   </a>
 </div>
 
+<br />
+
+### Support the Project 💖
+
+If you appreciate the work and want to support the development of Melofy, consider buying me a coffee!
+
+<div align="center">
+  <a href="https://payments.cashfree.com/forms/shrey">
+    <img src="https://img.shields.io/badge/Donate-Buy%20Me%20A%20Coffee-a3d4ec?style=for-the-badge&logo=coffee&logoColor=black" alt="Buy me a coffee" />
+  </a>
+</div>
+
 ---
 
 <div align="center">

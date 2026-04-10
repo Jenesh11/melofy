@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Github, Globe } from 'lucide-react';
+import { DonateButton } from '@/components/common/DonateButton';
 
 export function LandingFooter() {
   return (
@@ -23,6 +24,7 @@ export function LandingFooter() {
             The ultimate destination for music lovers. Designed with passion for
             the perfect listening experience.
           </p>
+          <DonateButton />
           <div className='flex items-center gap-4 text-muted-foreground/40'>
             <Link href='/github'>
               <Github className='w-5 h-5 hover:text-foreground cursor-pointer transition-colors' />

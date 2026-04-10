@@ -25,6 +25,8 @@ import { PreMidGuide } from '@/components/settings/PreMidGuide';
 import { useTheme, Essence } from '@/lib/theme-context';
 import { cn } from '@/lib/utils';
 
+import { DonateButton } from '@/components/common/DonateButton';
+
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const { essence, setEssence, mode, setMode } = useTheme();
@@ -233,6 +235,17 @@ export default function SettingsPage() {
             <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Integrations</h2>
           </div>
           <PreMidGuide />
+
+          <div className='flex items-center gap-2 px-2 mt-4'>
+            <Sparkles className='h-4 w-4 text-primary' />
+            <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Support Melofy</h2>
+          </div>
+          <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] flex flex-col gap-4'>
+            <p className='text-sm text-muted-foreground'>
+              Enjoying Melofy? Consider supporting the development to help keep the music playing.
+            </p>
+            <DonateButton className="self-center md:self-start" />
+          </Card>
         </div>
       </div>
     </div>
