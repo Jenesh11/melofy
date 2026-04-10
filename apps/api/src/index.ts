@@ -4,7 +4,6 @@ import cors, { type CorsOptions } from 'cors';
 import { Server as SocketIOServer, type Socket as SocketIOSocket } from 'socket.io';
 import http from 'http';
 import helmet from 'helmet';
-import crypto from 'crypto';
 import { Redis } from '@upstash/redis';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import streamRouter from './routes/stream';
@@ -123,7 +122,6 @@ export const lavalink = new LavalinkManager({
       port: parseInt(process.env.LAVALINK_PORT!),
       secure: process.env.LAVALINK_SECURE === 'true',
       id: process.env.LAVALINK_NAME!,
-      nodeType: 'NodeLink',
     },
   ],
   sendToShard: () => {},

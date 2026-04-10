@@ -5,10 +5,15 @@ import {
   User,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
+  signInWithCredential,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { app, db } from '@/lib/firebase/config';
 import { getAuth } from 'firebase/auth';
 import { addPlaylist } from '@/lib/firebase/playlists';
@@ -69,7 +74,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      if (Capacitor.isNativePlatform()) {
+        const result = await FirebaseAuthentication.signInWithGoogle();
+        if (result.credential?.idToken) {
+           const credential = GoogleAuthProvider.credential(result.credential.idToken);
+           await signInWithCredential(auth, credential);
+        } else {
+           throw new Error("No ID Token found from Native Google Sign In");
+        }
+      } else {
+        await signInWithPopup(auth, googleProvider);
+      }
     } catch (error) {
       console.error('Error signing in with Google', error);
       throw error;

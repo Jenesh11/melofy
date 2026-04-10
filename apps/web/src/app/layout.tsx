@@ -13,6 +13,7 @@ import { SocketProvider } from '@/lib/socket-context';
 import { AppWrapper } from '@/components/layout/AppWrapper';
 import { Toaster } from 'sonner';
 import { PreMiDExposer } from '@/components/PreMiDExposer';
+import { CapacitorHardwareBackButton } from '@/components/CapacitorHardwareBackButton';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://melofy.jene.in'),
@@ -95,6 +96,7 @@ export default function RootLayout({
           >
             <SocketProvider>
               <PreMiDExposer />
+              <CapacitorHardwareBackButton />
               <AppWrapper>{children}</AppWrapper>
               <Toaster richColors position='bottom-right' />
             </SocketProvider>
