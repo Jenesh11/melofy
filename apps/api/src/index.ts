@@ -122,8 +122,7 @@ export const lavalink = new LavalinkManager({
       host: process.env.LAVALINK_HOST!,
       port: parseInt(process.env.LAVALINK_PORT!),
       secure: process.env.LAVALINK_SECURE === 'true',
-      id: process.env.LAVALINK_NAME!,
-      nodeType: 'NodeLink',
+      id: process.env.LAVALINK_NAME!
     },
   ],
   sendToShard: () => {},
