@@ -13,6 +13,8 @@ import { ThemeProvider } from '@/lib/theme-context';
 import { cn } from '@/lib/utils';
 import { LikedSongsSync } from '@/components/layout/LikedSongsSync';
 import { LyricsPanel } from '@/components/layout/LyricsPanel';
+import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 
 export function AppWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -42,6 +44,24 @@ function AppContent({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, isPublicRoute, router]);
 
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    const backButtonHandler = App.addListener('backButton', ({ canGoBack }) => {
+      if (canGoBack) {
+        window.history.back();
+      } else {
+        // Typically on home the first 'back' should minimize or exit
+        // but we'll choose exit here for simple behavior on root
+        App.exitApp();
+      }
+    });
+
+    return () => {
+      backButtonHandler.then((h) => h.remove());
+    };
+  }, []);
+
   if (loading) {
     return (
       <div className='h-screen w-full flex flex-col items-center justify-center bg-background gap-4'>
@@ -69,7 +89,13 @@ function AppContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className='flex flex-col h-svh overflow-hidden bg-background text-foreground'>
+    <div 
+      className='flex flex-col h-svh overflow-hidden bg-background text-foreground'
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)'
+      }}
+    >
       <div className='flex flex-1 overflow-hidden transition-all duration-300'>
         <div className='hidden md:flex h-full'>
           <Sidebar />

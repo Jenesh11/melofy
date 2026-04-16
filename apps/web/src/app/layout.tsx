@@ -13,6 +13,15 @@ import { SocketProvider } from '@/lib/socket-context';
 import { AppWrapper } from '@/components/layout/AppWrapper';
 import { Toaster } from 'sonner';
 import { PreMiDExposer } from '@/components/PreMiDExposer';
+import type { Viewport } from 'next';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://melofy.jene.in'),

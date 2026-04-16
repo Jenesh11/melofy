@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network Security Configuration for Melofy
+  ─────────────────────────────────────────
+  During LOCAL DEVELOPMENT: allows cleartext (http://) traffic to your
+  local Next.js dev server at 192.168.29.192.
+
+  FOR PRODUCTION: remove the <domain-config> block below and set
+  cleartext="false" in the base-config (https only).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- ── LOCAL DEV: allow http to LAN Next.js server ────────────────── -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.29.192</domain>
+    </domain-config>
+    <!-- ─────────────────────────────────────────────────────────────────── -->
+</network-security-config>

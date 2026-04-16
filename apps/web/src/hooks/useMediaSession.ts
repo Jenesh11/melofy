@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { Track } from '@/store/usePlayerStore';
+import { Capacitor } from '@capacitor/core';
+import { MediaSession } from '@capgo/capacitor-media-session';
 
 interface MediaSessionProps {
   audioRef: React.RefObject<HTMLAudioElement | null>;
@@ -26,26 +28,58 @@ export function useMediaSession({
 }: MediaSessionProps) {
   // Handle Metadata and Action Handlers
   useEffect(() => {
-    if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
+    if (typeof window === 'undefined') return;
 
-    if (currentTrack) {
-      // Force refresh for Android/Chrome stability
-      navigator.mediaSession.metadata = null;
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: currentTrack.title,
-        artist: currentTrack.artist,
-        album: 'Melofy',
-        artwork: [96, 128, 192, 256, 384, 512].map((size) => ({
-          src: currentTrack.artworkUrl,
-          sizes: `${size}x${size}`,
-          type: 'image/png',
-        })),
-      });
-    }
+    const setupMediaSession = async () => {
+      const isNative = Capacitor.isNativePlatform();
 
-    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+      if (isNative) {
+        if (currentTrack) {
+          await MediaSession.setMetadata({
+            title: currentTrack.title,
+            artist: currentTrack.artist,
+            album: 'Melofy',
+            artwork: [
+              {
+                src: currentTrack.artworkUrl,
+                sizes: '512x512',
+                type: 'image/png',
+              }
+            ],
+          });
+        }
+        await MediaSession.setPlaybackState({
+          playbackState: isPlaying ? 'playing' : 'paused'
+        });
 
-    const actionHandlers: [MediaSessionAction, (details: MediaSessionActionDetails) => void][] = [
+      } else {
+        if (!('mediaSession' in navigator)) return;
+        
+        if (currentTrack) {
+          navigator.mediaSession.metadata = new MediaMetadata({
+            title: currentTrack.title,
+            artist: currentTrack.artist,
+            album: 'Melofy',
+            artwork: [96, 128, 192, 256, 384, 512].map((size) => ({
+              src: currentTrack.artworkUrl,
+              sizes: `${size}x${size}`,
+              type: 'image/png',
+            })),
+          });
+        }
+        navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+      }
+    };
+    
+    setupMediaSession();
+
+  }, [currentTrack, isPlaying]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isNative = Capacitor.isNativePlatform();
+
+    const actionHandlers: [string, (details: { seekOffset?: number | null; seekTime?: number | null }) => void][] = [
       ['play', () => {
         resume();
       }],
@@ -63,14 +97,6 @@ export function useMediaSession({
           const skipTime = details.seekOffset || 10;
           const newTime = Math.max(audioRef.current.currentTime - skipTime, 0);
           audioRef.current.currentTime = newTime;
-          
-          if ('setPositionState' in navigator.mediaSession) {
-            navigator.mediaSession.setPositionState({
-              duration: audioRef.current.duration,
-              playbackRate: audioRef.current.playbackRate,
-              position: newTime,
-            });
-          }
         }
       }],
       ['seekforward', (details) => {
@@ -78,62 +104,66 @@ export function useMediaSession({
           const skipTime = details.seekOffset || 10;
           const newTime = Math.min(audioRef.current.currentTime + skipTime, audioRef.current.duration);
           audioRef.current.currentTime = newTime;
-
-          if ('setPositionState' in navigator.mediaSession) {
-            navigator.mediaSession.setPositionState({
-              duration: audioRef.current.duration,
-              playbackRate: audioRef.current.playbackRate,
-              position: newTime,
-            });
-          }
         }
       }],
       ['seekto', (details) => {
-        if (audioRef.current && details.seekTime !== undefined) {
+        if (audioRef.current && details.seekTime != null) {
           audioRef.current.currentTime = details.seekTime;
-
-          if ('setPositionState' in navigator.mediaSession) {
-            navigator.mediaSession.setPositionState({
-              duration: audioRef.current.duration,
-              playbackRate: audioRef.current.playbackRate,
-              position: details.seekTime,
-            });
-          }
         }
       }],
     ];
 
-    for (const [action, handler] of actionHandlers) {
-      try {
-        navigator.mediaSession.setActionHandler(action, handler);
-      } catch (error) {
-        console.error(`Media session action "${action}" could not be set.`, error);
+    type CapgoMediaSessionAction = 'play' | 'pause' | 'seekbackward' | 'seekforward' | 'previoustrack' | 'nexttrack' | 'seekto' | 'stop';
+
+    if (isNative) {
+      for (const [action, handler] of actionHandlers) {
+        MediaSession.setActionHandler({ action: action as CapgoMediaSessionAction }, handler);
+      }
+    } else {
+      if (!('mediaSession' in navigator)) return;
+      for (const [action, handler] of actionHandlers) {
+        try {
+          // Cast the string to the native MediaSessionAction type
+          navigator.mediaSession.setActionHandler(action as globalThis.MediaSessionAction, handler);
+        } catch (e) {}
       }
     }
 
     return () => {
-      for (const [action] of actionHandlers) {
-        try {
-          navigator.mediaSession.setActionHandler(action, null);
-        } catch {
-          // Some actions are not supported in all browsers.
+      if (isNative) {
+        for (const [action] of actionHandlers) {
+          MediaSession.setActionHandler({ action: action as CapgoMediaSessionAction }, null).catch(() => {});
+        }
+      } else {
+        if (!('mediaSession' in navigator)) return;
+        for (const [action] of actionHandlers) {
+          try {
+            navigator.mediaSession.setActionHandler(action as globalThis.MediaSessionAction, null);
+          } catch (e) {}
         }
       }
     };
-  }, [currentTrack, isPlaying, resume, pause, playPrevious, handleSkipNext, audioRef]);
+  }, [resume, pause, playPrevious, handleSkipNext, audioRef]);
 
   // Synchronize audio state directly with MediaSession and React state
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || typeof window === 'undefined' || !('mediaSession' in navigator)) return;
+    if (!audio || typeof window === 'undefined') return;
+    const isNative = Capacitor.isNativePlatform();
 
     const updatePosition = () => {
-      if ('setPositionState' in navigator.mediaSession) {
-        const duration = (audio && isFinite(audio.duration) && audio.duration > 0) 
-          ? audio.duration 
-          : (currentTrack?.duration ? currentTrack.duration / 1000 : 0);
+      const duration = (audio && isFinite(audio.duration) && audio.duration > 0) 
+        ? audio.duration 
+        : (currentTrack?.duration ? currentTrack.duration / 1000 : 0);
 
-        if (isFinite(duration) && duration > 0) {
+      if (isFinite(duration) && duration > 0) {
+        if (isNative) {
+          MediaSession.setPositionState({
+            duration,
+            playbackRate: audio.playbackRate,
+            position: audio.currentTime,
+          });
+        } else if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
           navigator.mediaSession.setPositionState({
             duration,
             playbackRate: audio.playbackRate,
@@ -155,11 +185,19 @@ export function useMediaSession({
     };
 
     const onPlay = () => {
-      navigator.mediaSession.playbackState = 'playing';
+      if (isNative) {
+        MediaSession.setPlaybackState({ playbackState: 'playing' });
+      } else if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'playing';
+      }
     };
 
     const onPause = () => {
-      navigator.mediaSession.playbackState = 'paused';
+      if (isNative) {
+        MediaSession.setPlaybackState({ playbackState: 'paused' });
+      } else if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
+      }
     };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
@@ -175,3 +213,4 @@ export function useMediaSession({
     };
   }, [currentTrack, isDraggingSlider, audioRef, setLocalTime]);
 }
+

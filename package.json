@@ -1,7 +1,7 @@
 {
   "name": "melofy",
   "private": true,
-  "version": "4.0.0",
+  "version": "5.0.0",
   "packageManager": "npm@10.8.2",
   "workspaces": [
     "apps/*",
