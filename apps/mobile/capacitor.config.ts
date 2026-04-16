@@ -11,6 +11,7 @@ const config: CapacitorConfig = {
     // Point this at your running Next.js dev server (same LAN IP).
     // For production, replace with your deployed URL, e.g. https://melofy.jene.in
     url: 'https://melofy.jene.in',
+    allowNavigation: ['melofy.jene.in'],
     cleartext: false, // required for http:// (local dev only)
     // ─────────────────────────────────────────────────────────────────────────
     androidScheme: 'https',
