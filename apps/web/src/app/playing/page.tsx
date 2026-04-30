@@ -24,6 +24,7 @@ import { SyncedLyrics } from '@/components/ui/SyncedLyrics';
 import { useLikedSongs } from '@/hooks/useLikedSongs';
 import { openPip, isPipSupported } from '@/hooks/usePip';
 import { useLyricsPanelStore } from '@/store/useLyricsPanelStore';
+import { Drawer } from 'vaul';
 
 export default function PlayingPage() {
   const currentTrack = usePlayerStore((state) => state.currentTrack);
@@ -36,6 +37,17 @@ export default function PlayingPage() {
   const { toggleLike, isLiked } = useLikedSongs();
   const [pipAvailable, setPipAvailable] = useState(false);
   const isPanelOpen = useLyricsPanelStore((s) => s.isOpen);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   useEffect(() => {
     const supported = isPipSupported();
     if (supported) {
@@ -92,11 +104,12 @@ export default function PlayingPage() {
 
   return (
     <motion.div
-      drag='y'
+      drag={isMobile ? 'y' : false}
       dragConstraints={{ top: 0, bottom: 0 }}
-      dragElastic={{ top: 0, bottom: 0.5 }}
+      dragElastic={0.8}
+      dragTransition={{ bounceStiffness: 600, bounceDamping: 20 }}
       onDragEnd={(_, info) => {
-        if (info.offset.y > 100 || info.velocity.y > 500) {
+        if (info.offset.y > 80 || info.velocity.y > 400) {
           handleBack();
         }
       }}
@@ -106,28 +119,19 @@ export default function PlayingPage() {
         transition: 'opacity 0.18s ease',
       }}
     >
-      {/* Dynamic Cinematic Backdrop (The "Essence") */}
-      {/* Cinematic backdrop — set to opacity-0 instantly via isLeaving so it
-          never flashes during the frame gap before Next.js tears down the route. */}
-      {currentTrack && (
-        <motion.div
-          key={currentTrack.artworkUrl}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.5 }}
-          transition={{ duration: 0.6 }}
-          className='absolute inset-0 pointer-events-none'
-        >
+      {/* Simple Cinematic Backdrop */}
+      {currentTrack?.artworkUrl && (
+        <div className='absolute inset-0 pointer-events-none'>
           <div
-            className='absolute inset-0 blur-[120px] scale-150 saturate-200'
+            className='absolute inset-0 blur-[80px] scale-125 opacity-50 saturate-150 transition-all duration-700'
             style={{
               backgroundImage: `url(${currentTrack.artworkUrl})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
             }}
           />
-          {/* Theme-aware scrim */}
-          <div className='absolute inset-0 bg-background/60 dark:bg-black/60 backdrop-blur-3xl' />
-        </motion.div>
+          <div className='absolute inset-0 bg-background/60 dark:bg-black/60' />
+        </div>
       )}
 
       {/* Top Navigation Bar */}
@@ -161,14 +165,13 @@ export default function PlayingPage() {
                 showLyrics ? 'scale-90 opacity-0 pointer-events-none' : 'scale-100 opacity-100',
               ].join(' ')}
             >
-              {/* Artwork Card with Frost Effect */}
+              {/* Artwork Card */}
               <div className={[
                 'relative group shrink-0 w-full transition-all duration-500',
                 isPanelOpen
                   ? 'max-w-[220px] md:max-w-[260px] xl:max-w-[300px]'
                   : 'max-w-[280px] sm:max-w-[320px] md:max-w-[400px]',
               ].join(' ')}>
-                <div className='absolute -inset-10 bg-primary/20 blur-[60px] rounded-full opacity-50 group-hover:opacity-100 transition-opacity duration-1000' />
                 <div className='relative aspect-square rounded-[2rem] lg:rounded-[3rem] overflow-hidden shadow-2xl border border-foreground/10 bg-secondary/30 backdrop-blur-2xl'>
                   {currentTrack.artworkUrl ? (
                     <Image
@@ -329,51 +332,40 @@ export default function PlayingPage() {
           )}
         </AnimatePresence>
 
-        {/* Lyrics Modal Overlay */}
-        <AnimatePresence>
-          {showLyrics && currentTrack && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.4 }}
-              className='fixed inset-0 z-50 flex items-center justify-center bg-background/40 backdrop-blur-md p-4 md:p-8'
-            >
-              {/* Click outside to close */}
-              <div
-                className='absolute inset-0 cursor-pointer'
-                onClick={() => setShowLyrics(false)}
-              />
-
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                className='relative w-full max-w-4xl h-[80vh] bg-background/60 backdrop-blur-3xl border border-foreground/10 rounded-[2rem] shadow-2xl overflow-hidden flex flex-col'
-              >
-                <div className='absolute top-4 right-4 z-50'>
-                  <Button
-                    variant='ghost'
-                    size='icon'
-                    onClick={() => setShowLyrics(false)}
-                    className='text-foreground/60 hover:text-foreground hover:bg-foreground/10 rounded-full h-10 w-10 md:h-12 md:w-12 bg-background/20 backdrop-blur-sm shadow-sm'
-                  >
-                    <X className='h-6 w-6 md:h-8 md:w-8' />
+        {/* Lyrics Drawer / Modal */}
+        <Drawer.Root 
+          open={showLyrics} 
+          onOpenChange={setShowLyrics}
+          shouldScaleBackground={true}
+        >
+          <Drawer.Portal>
+            <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" />
+            <Drawer.Content className="bg-background flex flex-col rounded-t-[32px] h-[92vh] fixed bottom-0 left-0 right-0 z-[101] border-t border-foreground/10 outline-none">
+              <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-foreground/20 mt-4 mb-2" />
+              
+              <div className="flex items-center justify-between px-6 py-2 shrink-0">
+                <div className="flex flex-col">
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-0.5">Now Reading</p>
+                  <h2 className="text-xl font-bold tracking-tight text-foreground line-clamp-1">
+                    {currentTrack?.title}
+                  </h2>
+                </div>
+                <Drawer.Close asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full hover:bg-foreground/5 h-10 w-10">
+                    <X className="h-6 w-6" />
                   </Button>
-                </div>
+                </Drawer.Close>
+              </div>
 
-                <div className='flex-1 min-h-0 relative px-2 md:px-8'>
-                  <SyncedLyrics />
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <div className="flex-1 min-h-0 overflow-hidden relative px-2 md:px-8">
+                <SyncedLyrics />
+              </div>
+            </Drawer.Content>
+          </Drawer.Portal>
+        </Drawer.Root>
       </div>
 
-      {/* Subtle overlay texture */}
-      <div className='absolute inset-0 pointer-events-none opacity-[0.03] bg-[url("https://www.transparenttextures.com/patterns/p6.png")] mix-blend-overlay z-0' />
+
     </motion.div>
   );
 }

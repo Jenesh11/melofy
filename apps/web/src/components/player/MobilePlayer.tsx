@@ -24,6 +24,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import { SyncedLyrics } from '@/components/ui/SyncedLyrics';
 import { ListenAlongPopover } from './ListenAlongPopover';
+import { Drawer } from 'vaul';
 
 interface MobilePlayerProps {
   isExpanded: boolean;
@@ -77,17 +78,15 @@ export function MobilePlayer({
   if (!isExpanded) return null;
 
   return (
-    <motion.div
-      drag='y'
-      dragConstraints={{ top: 0, bottom: 0 }}
-      dragElastic={{ top: 0, bottom: 0.5 }}
-      onDragEnd={(_, info) => {
-        if (info.offset.y > 100 || info.velocity.y > 500) {
-          setIsExpanded(false);
-        }
-      }}
-      className='md:hidden fixed inset-0 z-100 bg-black text-white flex flex-col overflow-hidden'
+    <Drawer.Root 
+      open={isExpanded} 
+      onOpenChange={(open) => !open && setIsExpanded(false)}
+      shouldScaleBackground={true}
     >
+      <Drawer.Portal>
+        <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" />
+        <Drawer.Content className='md:hidden fixed inset-0 z-[101] bg-black text-white flex flex-col overflow-hidden outline-none'>
+          <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-white/20 mt-4 mb-2 z-[110]" />
       {/* Background Essence */}
       <AnimatePresence mode='wait'>
         {currentTrack && (
@@ -318,56 +317,51 @@ export function MobilePlayer({
         </div>
       </div>
 
-      {/* Lyrics Modal */}
-      <AnimatePresence>
-        {showLyrics && (
-          <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            drag='y'
-            dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0, bottom: 0.5 }}
-            onDragEnd={(_, info) => {
-              if (info.offset.y > 100 || info.velocity.y > 500) {
-                setShowLyrics(false);
-              }
-            }}
-            className='absolute inset-0 z-50 bg-black/80 backdrop-blur-3xl flex flex-col'
-          >
+      {/* Lyrics Drawer */}
+      <Drawer.Root 
+        open={showLyrics} 
+        onOpenChange={setShowLyrics}
+      >
+        <Drawer.Portal>
+          <Drawer.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110]" />
+          <Drawer.Content className='fixed inset-0 z-[120] bg-black/80 backdrop-blur-3xl flex flex-col outline-none'>
+            <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-white/20 mt-4 mb-2" />
             <div className='flex items-center justify-between p-6 shrink-0 border-b border-white/10'>
               <h3 className='text-xl font-bold text-white tracking-widest uppercase'>
                 Lyrics
               </h3>
-              <Button
-                variant='ghost'
-                size='icon'
-                onClick={() => setShowLyrics(false)}
-                className='text-white hover:bg-white/20 rounded-full'
-              >
-                <X className='h-6 w-6' />
-              </Button>
+              <Drawer.Close asChild>
+                <Button
+                  variant='ghost'
+                  size='icon'
+                  className='text-white hover:bg-white/20 rounded-full'
+                >
+                  <X className='h-6 w-6' />
+                </Button>
+              </Drawer.Close>
             </div>
             <div className='flex-1 overflow-hidden'>
               <SyncedLyrics />
             </div>
             <div className='p-6 pb-8 shrink-0'>
-              <Button
-                variant='ghost'
-                onClick={() => setShowLyrics(false)}
-                className='w-full h-14 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl flex items-center justify-center gap-3 text-white/90 font-bold transition-all active:scale-95 shrink-0'
-              >
-                <X className='h-5 w-5' />
-                <span>Close lyrics</span>
-              </Button>
+              <Drawer.Close asChild>
+                <Button
+                  variant='ghost'
+                  className='w-full h-14 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl flex items-center justify-center gap-3 text-white/90 font-bold transition-all active:scale-95 shrink-0'
+                >
+                  <X className='h-5 w-5' />
+                  <span>Close lyrics</span>
+                </Button>
+              </Drawer.Close>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </Drawer.Content>
+        </Drawer.Portal>
+      </Drawer.Root>
 
       {/* Subtle overlay texture */}
       <div className='absolute inset-0 pointer-events-none opacity-[0.03] bg-[url("https://www.transparenttextures.com/patterns/p6.png")] mix-blend-overlay z-0' />
-    </motion.div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   );
 }
