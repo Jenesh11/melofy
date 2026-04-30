@@ -47,3 +47,4 @@ next-env.d.ts
 
 # Firebase service account key
 serviceAccountKey.json
+/graphify-out

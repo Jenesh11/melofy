@@ -27,13 +27,24 @@ export function PreMiDExposer() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.melofy = {
-        track: currentTrack,
-        isPlaying,
-        progress,
-        partyId,
-        version: '1.0.1',
-      };
+      if (!window.melofy) {
+        window.melofy = {
+          track: currentTrack,
+          isPlaying,
+          progress,
+          partyId,
+          version: '5.0.1',
+        };
+      } else {
+        window.melofy.track = currentTrack;
+        window.melofy.isPlaying = isPlaying;
+        window.melofy.progress = progress;
+        window.melofy.partyId = partyId;
+        window.melofy.version = '5.0.1';
+      }
+      
+      // Dispatch event to proactively notify external listeners (like PreMiD)
+      window.dispatchEvent(new CustomEvent('melofy_state_update', { detail: window.melofy }));
     }
   }, [currentTrack, isPlaying, progress, partyId]);
 

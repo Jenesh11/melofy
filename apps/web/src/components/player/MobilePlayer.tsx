@@ -77,7 +77,17 @@ export function MobilePlayer({
   if (!isExpanded) return null;
 
   return (
-    <div className='md:hidden fixed inset-0 z-100 bg-black text-white flex flex-col overflow-hidden'>
+    <motion.div
+      drag='y'
+      dragConstraints={{ top: 0, bottom: 0 }}
+      dragElastic={{ top: 0, bottom: 0.5 }}
+      onDragEnd={(_, info) => {
+        if (info.offset.y > 100 || info.velocity.y > 500) {
+          setIsExpanded(false);
+        }
+      }}
+      className='md:hidden fixed inset-0 z-100 bg-black text-white flex flex-col overflow-hidden'
+    >
       {/* Background Essence */}
       <AnimatePresence mode='wait'>
         {currentTrack && (
@@ -104,7 +114,7 @@ export function MobilePlayer({
 
       <div className='relative z-10 w-full h-full flex flex-col pt-6 pb-8 px-6 overflow-y-auto custom-scrollbar'>
         {/* Top Header */}
-        <div className='flex items-center justify-between mb-8'>
+        <div className='flex items-center justify-between mb-4 shrink-0'>
           <Button
             variant='ghost'
             size='icon'
@@ -131,6 +141,9 @@ export function MobilePlayer({
             </Button>
           </div>
         </div>
+
+        {/* Main Content wrapper for centering */}
+        <div className='flex-1 flex flex-col justify-center min-h-[min-content] py-4'>
 
         {/* Large Artwork */}
         <div className='relative w-full aspect-square mb-8 shrink-0'>
@@ -244,7 +257,10 @@ export function MobilePlayer({
             variant='ghost'
             size='icon'
             className='h-14 w-14 text-white hover:bg-white/10'
-            onClick={playPrevious}
+            onClick={() => {
+              setDirection(-1);
+              playPrevious();
+            }}
           >
             <SkipBack className='h-8 w-8 fill-current' />
           </Button>
@@ -269,7 +285,10 @@ export function MobilePlayer({
             variant='ghost'
             size='icon'
             className='h-14 w-14 text-white hover:bg-white/10'
-            onClick={() => handleSkipNext()}
+            onClick={() => {
+              setDirection(1);
+              handleSkipNext();
+            }}
           >
             <SkipForward className='h-8 w-8 fill-current' />
           </Button>
@@ -291,11 +310,12 @@ export function MobilePlayer({
         <Button
           variant='ghost'
           onClick={() => setShowLyrics(true)}
-          className='w-full h-14 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl flex items-center justify-center gap-3 text-white/90 font-bold transition-all active:scale-95'
+          className='w-full h-14 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl flex items-center justify-center gap-3 text-white/90 font-bold transition-all active:scale-95 shrink-0'
         >
           <Mic2 className='h-5 w-5' />
           <span>Show lyrics</span>
         </Button>
+        </div>
       </div>
 
       {/* Lyrics Modal */}
@@ -306,6 +326,14 @@ export function MobilePlayer({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            drag='y'
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.5 }}
+            onDragEnd={(_, info) => {
+              if (info.offset.y > 100 || info.velocity.y > 500) {
+                setShowLyrics(false);
+              }
+            }}
             className='absolute inset-0 z-50 bg-black/80 backdrop-blur-3xl flex flex-col'
           >
             <div className='flex items-center justify-between p-6 shrink-0 border-b border-white/10'>
@@ -324,12 +352,22 @@ export function MobilePlayer({
             <div className='flex-1 overflow-hidden'>
               <SyncedLyrics />
             </div>
+            <div className='p-6 pb-8 shrink-0'>
+              <Button
+                variant='ghost'
+                onClick={() => setShowLyrics(false)}
+                className='w-full h-14 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl flex items-center justify-center gap-3 text-white/90 font-bold transition-all active:scale-95 shrink-0'
+              >
+                <X className='h-5 w-5' />
+                <span>Close lyrics</span>
+              </Button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Subtle overlay texture */}
       <div className='absolute inset-0 pointer-events-none opacity-[0.03] bg-[url("https://www.transparenttextures.com/patterns/p6.png")] mix-blend-overlay z-0' />
-    </div>
+    </motion.div>
   );
 }

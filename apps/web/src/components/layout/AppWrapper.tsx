@@ -13,12 +13,14 @@ import { ThemeProvider } from '@/lib/theme-context';
 import { cn } from '@/lib/utils';
 import { LikedSongsSync } from '@/components/layout/LikedSongsSync';
 import { LyricsPanel } from '@/components/layout/LyricsPanel';
+import { OfflineScreen } from '@/components/layout/OfflineScreen';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 
 export function AppWrapper({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
+      <OfflineScreen />
       <LikedSongsSync />
       <AppContent>{children}</AppContent>
     </ThemeProvider>
@@ -48,11 +50,20 @@ function AppContent({ children }: { children: React.ReactNode }) {
     if (!Capacitor.isNativePlatform()) return;
 
     const backButtonHandler = App.addListener('backButton', ({ canGoBack }) => {
-      if (canGoBack) {
-        window.history.back();
+      const event = new CustomEvent('hardwareBack', { cancelable: true });
+      window.dispatchEvent(event);
+      
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      if (pathname !== '/' && pathname !== '/login') {
+        if (window.history.length > 1 || canGoBack) {
+          window.history.back();
+        } else {
+          router.push('/');
+        }
       } else {
-        // Typically on home the first 'back' should minimize or exit
-        // but we'll choose exit here for simple behavior on root
         App.exitApp();
       }
     });

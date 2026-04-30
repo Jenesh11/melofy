@@ -94,6 +94,15 @@ export function LandingHero() {
                 <ChevronRight className='ml-2 w-5 h-5' />
               </Button>
             </Link>
+            <a href='https://github.com/ShreyJaiswal1/melofy/releases/download/1.0.0/Melofy.apk' target='_blank' rel='noopener noreferrer'>
+              <Button
+                variant='outline'
+                size='lg'
+                className='h-14 px-10 rounded-full font-bold text-lg hover:scale-105 transition-transform shadow-xl shadow-foreground/5'
+              >
+                Download for Android
+              </Button>
+            </a>
           </div>
         </motion.div>
 

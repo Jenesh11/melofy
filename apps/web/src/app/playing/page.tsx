@@ -58,6 +58,20 @@ export default function PlayingPage() {
     }, 180);
   }, [router]);
 
+  useEffect(() => {
+    const handleHardwareBack = (e: Event) => {
+      e.preventDefault();
+      if (showLyrics) {
+        setShowLyrics(false);
+      } else {
+        handleBack();
+      }
+    };
+    
+    window.addEventListener('hardwareBack', handleHardwareBack);
+    return () => window.removeEventListener('hardwareBack', handleHardwareBack);
+  }, [showLyrics, handleBack]);
+
   const handleShare = () => {
     if (!currentTrack) return;
 
@@ -77,7 +91,15 @@ export default function PlayingPage() {
   };
 
   return (
-    <div
+    <motion.div
+      drag='y'
+      dragConstraints={{ top: 0, bottom: 0 }}
+      dragElastic={{ top: 0, bottom: 0.5 }}
+      onDragEnd={(_, info) => {
+        if (info.offset.y > 100 || info.velocity.y > 500) {
+          handleBack();
+        }
+      }}
       className='relative flex-1 h-full w-full overflow-hidden bg-background flex flex-col px-6 pt-6 md:px-12 md:pt-8'
       style={{
         opacity: isLeaving ? 0 : 1,
@@ -352,6 +374,6 @@ export default function PlayingPage() {
 
       {/* Subtle overlay texture */}
       <div className='absolute inset-0 pointer-events-none opacity-[0.03] bg-[url("https://www.transparenttextures.com/patterns/p6.png")] mix-blend-overlay z-0' />
-    </div>
+    </motion.div>
   );
 }
