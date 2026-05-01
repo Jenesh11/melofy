@@ -110,10 +110,10 @@ export function LandingFeatures() {
       </section>
 
       {/* Content Section 1: Visual Experience */}
-      <section className='py-32 px-6 overflow-hidden'>
+      <section className='py-32 px-6'>
         <div className='max-w-7xl mx-auto w-full flex flex-col lg:flex-row items-center gap-20'>
           <div className='flex-1 relative order-2 lg:order-1'>
-            <div className='relative z-10 rounded-3xl border border-border overflow-hidden shadow-2xl shadow-primary/5 aspect-video bg-card group items-center'>
+            <div className='relative z-10 rounded-3xl border border-border overflow-hidden shadow-2xl shadow-primary/5 aspect-video bg-card group h-fit flex items-center justify-center'>
               <Image
                 src='https://images.unsplash.com/photo-1493225255756-d9584f8606e9?q=80&w=1000&auto=format&fit=crop'
                 width={800}
@@ -218,10 +218,10 @@ export function LandingFeatures() {
       </section>
 
       {/* CTA Section */}
-      <section className='py-40 px-6 relative overflow-hidden'>
+      <section className='py-40 px-6 relative'>
         <div className='absolute inset-0 bg-primary/10 blur-[120px] rounded-full -z-10 animate-pulse' />
         <div className='max-w-4xl mx-auto text-center flex flex-col gap-10'>
-          <h2 className='text-6xl md:text-8xl font-black text-foreground tracking-tighter leading-none'>
+          <h2 className='text-6xl md:text-8xl font-black text-foreground tracking-tighter leading-[0.9]'>
             Ready to start <br />
             Your Journey?
           </h2>

@@ -192,9 +192,13 @@
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: color-mix(in oklch, var(--foreground) 10%, transparent);
+    background: transparent;
     border-radius: 10px;
-    transition: background 0.2s ease;
+    transition: background 0.3s ease;
+  }
+
+  .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--foreground) 10%, transparent);
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
@@ -202,7 +206,12 @@
   }
 
   .custom-scrollbar {
+    /* Always reserve scrollbar space so layout never shifts on hover */
     scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .custom-scrollbar:hover {
     scrollbar-color: color-mix(in oklch, var(--foreground) 10%, transparent) transparent;
   }
 

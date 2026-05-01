@@ -5,6 +5,7 @@ import { Server as SocketIOServer, type Socket as SocketIOSocket } from 'socket.
 import http from 'http';
 import helmet from 'helmet';
 import crypto from 'crypto';
+import { fetchFullSpotifyPlaylist } from './lib/spotify';
 import { Redis } from '@upstash/redis';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import streamRouter from './routes/stream';
@@ -70,7 +71,17 @@ const corsOptions: CorsOptions = {
   credentials: true,
 };
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'none'"],
+      scriptSrc: ["'none'"],
+      styleSrc: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '2mb' }));
 
@@ -80,13 +91,6 @@ function getAuthenticatedRateLimitKey(req: express.Request): string {
   return `ip:${ipKeyGenerator(ip)}`;
 }
 
-const publicRateLimit = rateLimit({
-  windowMs: 60 * 1000,
-  max: 120,
-  message: { error: 'Too many requests' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
 const privateRateLimit = rateLimit({
   windowMs: 60 * 1000,
@@ -97,15 +101,20 @@ const privateRateLimit = rateLimit({
   legacyHeaders: false,
 });
 
-app.use((req, _res, next) => {
+app.use((req, res, next) => {
   console.log(`[HTTP] ${req.method} ${req.path}`);
+  // 30s timeout for non-stream routes
+  if (!req.path.includes('/stream')) {
+    res.setTimeout(30_000, () => {
+      if (!res.headersSent) {
+        res.status(408).json({ error: 'Request timeout' });
+      }
+    });
+  }
   next();
 });
 
 const server = http.createServer(app);
-server.on('request', (req) => {
-  console.log(`[API] ${req.method} ${req.url}`);
-});
 const io = new SocketIOServer(server, {
   path: '/api/socket.io',
   cors: {
@@ -185,19 +194,40 @@ lavalink.nodeManager.on('disconnect', (node, reason) => {
 
 lavalink.init({ id: '123456789012345678', username: 'MelofyBackend' });
 
-app.get('/health', (_req, res) => {
+app.get('/health', async (_req, res) => {
+  let redisOk = false;
+  try {
+    const start = Date.now();
+    await redis.ping();
+    console.log(`[Health] Redis: ok (${Date.now() - start}ms)`);
+    redisOk = true;
+  } catch (err) {
+    console.error('[Health] Redis: error', err);
+  }
+
+  const nodes = lavalink.nodeManager.nodes;
+  const connectedNodes = Array.from(nodes.values()).filter(n => n.connected).length;
+
+  const overallStatus = redisOk && connectedNodes > 0
+    ? 'ok'
+    : connectedNodes > 0 || redisOk
+      ? 'degraded'
+      : 'offline';
+
   res.json({
-    status: 'ok',
-    node: lavalink.nodeManager.nodes.size > 0 ? 'connected' : 'disconnected',
+    status: overallStatus,
+    systems: {
+      api: 'ok',
+      redis: redisOk ? 'ok' : 'error',
+      lavalink: connectedNodes > 0 ? 'ok' : 'offline',
+    }
   });
 });
 
 app.use('/api', streamRouter);
-app.use('/api/spotify', publicRateLimit, spotifyRouter);
-app.use('/api/lyrics', publicRateLimit, lyricsRouter);
-app.use('/api', playerRouter);
-
-import { fetchFullSpotifyPlaylist } from './lib/spotify';
+app.use('/api/spotify', privateRateLimit, spotifyRouter);
+app.use('/api/lyrics', requireFirebaseAuth, privateRateLimit, lyricsRouter);
+app.use('/api', privateRateLimit, playerRouter);
 
 app.get('/api/search', requireFirebaseAuth, privateRateLimit, async (req, res) => {
   const query = req.query.q as string;
@@ -208,7 +238,16 @@ app.get('/api/search', requireFirebaseAuth, privateRateLimit, async (req, res) =
     return res.status(400).json({ error: 'Invalid query length' });
   }
 
+  const cacheKey = `search:${trimmedQuery.toLowerCase()}`;
+
   try {
+    // Try to get from cache
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      console.log(`[SearchCache] Hit for: ${trimmedQuery}`);
+      return res.json(cached);
+    }
+
     const node = lavalink.nodeManager.leastUsedNodes()[0];
     if (!node)
       return res.status(500).json({ error: 'No NodeLink nodes available' });
@@ -216,6 +255,8 @@ app.get('/api/search', requireFirebaseAuth, privateRateLimit, async (req, res) =
     // Handle Spotify Playlist URLs/URIs specially to bypass the 100 tracks limit
     const spotifyPlaylistRegex = /(?:open\.spotify\.com\/playlist\/|spotify:playlist:)([a-zA-Z0-9]{22})/;
     const match = trimmedQuery.match(spotifyPlaylistRegex);
+
+    let finalResult: any;
 
     if (match) {
       const playlistId = match[1];
@@ -245,26 +286,33 @@ app.get('/api/search', requireFirebaseAuth, privateRateLimit, async (req, res) =
             }
           }));
 
-        return res.json({
+        finalResult = {
           loadType: 'playlist',
           playlistInfo: {
             name: fullData.name,
             selectedTrack: 0
           },
           tracks
-        });
+        };
       } catch (err) {
         console.error('[SpotifyImport] Failed to fetch full playlist metadata:', err);
         // Fallback to normal node search if manual fetch fails
       }
     }
 
-    const result = await node.search(
-      { query: trimmedQuery },
-      { id: req.user?.uid || 'MelofyInternal' },
-    );
+    if (!finalResult) {
+      finalResult = await node.search(
+        { query: trimmedQuery },
+        { id: req.user?.uid || 'MelofyInternal' },
+      );
+    }
 
-    res.json(result);
+    // Cache the result for 24 hours
+    if (finalResult && finalResult.loadType !== 'error' && finalResult.loadType !== 'empty') {
+      await redis.set(cacheKey, finalResult, { ex: 86400 });
+    }
+
+    res.json(finalResult);
   } catch (error) {
     console.error('Search error:', error);
     res.status(500).json({ error: 'Search failed' });
@@ -299,7 +347,15 @@ app.get(
         ? `ytrec:${effectiveVideoId}`
         : `ytrec:${effectiveQuery}`;
 
+    const recCacheKey = `recs:${identifier}`;
+
     try {
+      // Check cache first
+      const cached = await redis.get(recCacheKey);
+      if (cached) {
+        return res.json(cached);
+      }
+
       const node = lavalink.nodeManager.leastUsedNodes()[0];
       if (!node)
         return res.status(500).json({ error: 'No NodeLink nodes available' });
@@ -334,10 +390,17 @@ app.get(
           t.title.toLowerCase() !== effectiveQuery?.toLowerCase(),
       );
 
-      res.json({ tracks: filtered.length > 0 ? filtered : tracks });
+      const response = { tracks: filtered.length > 0 ? filtered : tracks };
+
+      // Cache recommendations for 6 hours
+      if (response.tracks.length > 0) {
+        await redis.set(recCacheKey, response, { ex: 21600 });
+      }
+
+      res.json(response);
     } catch (error: any) {
       console.error('Recommendations error:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: 'Failed to fetch recommendations' });
     }
   },
 );
@@ -462,3 +525,42 @@ const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`Audio Backend running on port ${PORT}`);
 });
+
+// Graceful shutdown
+function gracefulShutdown(signal: string) {
+  console.log(`\n[API] ${signal} received. Shutting down gracefully...`);
+
+  // Stop accepting new connections
+  io.close(() => {
+    console.log('[API] Socket.IO closed.');
+  });
+
+  server.close(() => {
+    console.log('[API] HTTP server closed.');
+
+    // Clean up Lavalink connections
+    try {
+      lavalink.nodeManager.nodes.forEach((node) => {
+        try { node.destroy(); } catch {}
+      });
+    } catch {}
+
+    // Clear reconnect intervals
+    nodeReconnectState.forEach((state) => {
+      if (state.interval) clearInterval(state.interval);
+    });
+    nodeReconnectState.clear();
+
+    console.log('[API] Cleanup complete. Exiting.');
+    process.exit(0);
+  });
+
+  // Force exit after 10 seconds if graceful shutdown stalls
+  setTimeout(() => {
+    console.error('[API] Forced shutdown after timeout.');
+    process.exit(1);
+  }, 10_000).unref();
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

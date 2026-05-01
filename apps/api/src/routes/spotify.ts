@@ -213,6 +213,10 @@ router.get('/mixes', async (req, res) => {
   ];
 
   try {
+    const cacheKey = 'spotify:mixes';
+    const cached = await redis.get(cacheKey);
+    if (cached) return res.json(cached);
+
     const results = await Promise.allSettled(
       mixQueries.map((m) =>
         spotifyGet(
@@ -235,6 +239,9 @@ router.get('/mixes', async (req, res) => {
     }
 
     res.json(playlists);
+    if (playlists.length > 0) {
+      await redis.set(cacheKey, playlists, { ex: 21600 }); // 6 hours
+    }
   } catch (error: any) {
     console.error(
       '[Spotify] Mixes error:',
@@ -347,9 +354,21 @@ router.get('/search', async (req, res) => {
   if (!q) return res.status(400).json({ error: 'Missing query parameter q' });
 
   try {
+    const cacheKey = `spotify:search:${type}:${q.toLowerCase().trim()}`;
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      console.log(`[SpotifyCache] Hit for: ${q}`);
+      return res.json(cached);
+    }
+
     const data = await spotifyGet(
       `/search?q=${encodeURIComponent(q)}&type=${type}&limit=10&market=US`,
     );
+    
+    if (data) {
+      await redis.set(cacheKey, data, { ex: 43200 }); // 12 hours
+    }
+    
     res.json(data);
   } catch (error: any) {
     console.error(

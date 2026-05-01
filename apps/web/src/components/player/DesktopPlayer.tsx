@@ -188,7 +188,13 @@ export function DesktopPlayer({
                 <p className='text-sm font-semibold text-foreground truncate group-hover/info:underline decoration-1 underline-offset-4'>
                   {currentTrack.title}
                 </p>
-                <p className='text-xs text-muted-foreground truncate group-hover/info:text-foreground transition-colors'>
+                <p 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/search?q=${encodeURIComponent(currentTrack.artist)}`);
+                  }}
+                  className='text-xs text-muted-foreground truncate hover:text-primary hover:underline underline-offset-2 cursor-pointer transition-all'
+                >
                   {currentTrack.artist}
                 </p>
               </div>
@@ -375,6 +381,15 @@ export function DesktopPlayer({
         >
           <Mic2 className='h-5 w-5' />
         </Button>
+
+        <div className="no-nav" onClick={(e) => e.stopPropagation()}>
+          <VolumeControl
+            volume={volume}
+            setVolume={setVolume}
+            onWheel={handleVolumeWheel}
+          />
+
+        </div>
         {pipAvailable && (
           <Button
             variant='ghost'
@@ -391,13 +406,6 @@ export function DesktopPlayer({
             <PictureInPicture2 className='h-5 w-5' />
           </Button>
         )}
-        <div className="no-nav" onClick={(e) => e.stopPropagation()}>
-          <VolumeControl
-            volume={volume}
-            setVolume={setVolume}
-            onWheel={handleVolumeWheel}
-          />
-        </div>
       </div>
     </motion.div>
   );

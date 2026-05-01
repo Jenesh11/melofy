@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LandingPageHeader } from '@/components/landing/LandingPageHeader';
+import { LandingFooter } from '@/components/landing/LandingFooter';
 
 export const metadata: Metadata = {
   title: 'Terms of Service | Melofy',
@@ -8,9 +9,10 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <div className='min-h-screen bg-[radial-gradient(circle_at_10%_0%,rgba(6,182,212,0.10),transparent_40%),var(--background)] text-foreground'>
+    <>
       <LandingPageHeader />
-      <main className='max-w-4xl mx-auto px-6 py-16 md:py-24'>
+      <div className='min-h-screen bg-[radial-gradient(circle_at_10%_0%,rgba(6,182,212,0.10),transparent_40%),var(--background)] text-foreground'>
+        <main className='max-w-4xl mx-auto px-6 py-16 md:py-24'>
         <div className='mb-12'>
           <p className='text-xs font-bold uppercase tracking-widest text-primary mb-3'>Legal</p>
           <h1 className='text-4xl md:text-6xl font-black tracking-tighter text-foreground mb-4'>Terms of Service</h1>
@@ -119,12 +121,9 @@ export default function TermsPage() {
         </div>
       </main>
 
-      <footer className='border-t border-border/50 py-8 px-6 text-center'>
-        <p className='text-xs text-muted-foreground/60'>
-          © 2026 Melofy Inc. All rights reserved.
-        </p>
-      </footer>
+      <LandingFooter />
     </div>
+    </>
   );
 }
 

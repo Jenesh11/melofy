@@ -17,7 +17,13 @@ import {
   Sparkles,
   Share2,
   Smartphone,
+  Github,
+  HelpCircle,
+  Shield,
+  FileText,
+  Globe,
 } from 'lucide-react';
+import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useSettingsStore } from '@/store/useSettingsStore';
@@ -267,6 +273,45 @@ export default function SettingsPage() {
               <PreMidGuide />
             </div>
           </div>
+        </section>
+
+        <div className='h-px w-full bg-border/50' />
+
+        {/* Legal & Resources Section */}
+        <section className='space-y-6'>
+          <header className='flex items-center gap-2 px-2'>
+            <Globe className='h-4 w-4 text-primary' />
+            <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Legal & Resources</h2>
+          </header>
+
+          <Card className='p-4 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] overflow-hidden'>
+            <div className='grid grid-cols-2 md:grid-cols-4 gap-2'>
+              <Link href='/github' target='_blank' className='flex items-center gap-3 p-4 rounded-xl hover:bg-foreground/5 transition-all group'>
+                <div className='h-10 w-10 rounded-full bg-foreground/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors'>
+                  <Github className='h-5 w-5 text-muted-foreground group-hover:text-primary' />
+                </div>
+                <span className='text-sm font-bold text-foreground'>GitHub</span>
+              </Link>
+              <Link href='/help' target='_blank' className='flex items-center gap-3 p-4 rounded-xl hover:bg-foreground/5 transition-all group'>
+                <div className='h-10 w-10 rounded-full bg-foreground/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors'>
+                  <HelpCircle className='h-5 w-5 text-muted-foreground group-hover:text-primary' />
+                </div>
+                <span className='text-sm font-bold text-foreground'>Help</span>
+              </Link>
+              <Link href='/privacy' target='_blank' className='flex items-center gap-3 p-4 rounded-xl hover:bg-foreground/5 transition-all group'>
+                <div className='h-10 w-10 rounded-full bg-foreground/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors'>
+                  <Shield className='h-5 w-5 text-muted-foreground group-hover:text-primary' />
+                </div>
+                <span className='text-sm font-bold text-foreground'>Privacy</span>
+              </Link>
+              <Link href='/terms' target='_blank' className='flex items-center gap-3 p-4 rounded-xl hover:bg-foreground/5 transition-all group'>
+                <div className='h-10 w-10 rounded-full bg-foreground/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors'>
+                  <FileText className='h-5 w-5 text-muted-foreground group-hover:text-primary' />
+                </div>
+                <span className='text-sm font-bold text-foreground'>Terms</span>
+              </Link>
+            </div>
+          </Card>
         </section>
       </div>
     </main>

@@ -32,13 +32,17 @@ function AppContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const isPublicRoute =
-    pathname === '/' ||
-    pathname === '/login' ||
+  // Routes that should NEVER show the app shell (sidebar/player), even when authenticated
+  const isStandaloneRoute =
     pathname === '/terms' ||
     pathname === '/privacy' ||
     pathname === '/help' ||
     pathname === '/github';
+
+  const isPublicRoute =
+    pathname === '/' ||
+    pathname === '/login' ||
+    isStandaloneRoute;
 
   useEffect(() => {
     if (!loading && !user && !isPublicRoute) {
@@ -84,6 +88,15 @@ function AppContent({ children }: { children: React.ReactNode }) {
           <Loader2 className='h-4 w-4 animate-spin' />
           <span>Setting the stage for you...</span>
         </div>
+      </div>
+    );
+  }
+
+  // Standalone doc pages render without app shell for ALL users (auth or not)
+  if (isStandaloneRoute) {
+    return (
+      <div className='h-screen overflow-y-auto overflow-x-hidden bg-background text-foreground custom-scrollbar relative'>
+        {children}
       </div>
     );
   }

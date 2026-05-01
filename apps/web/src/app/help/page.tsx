@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LandingPageHeader } from '@/components/landing/LandingPageHeader';
+import { LandingFooter } from '@/components/landing/LandingFooter';
 import { Music2, Headphones, Wifi, ListMusic, Github, Shield } from 'lucide-react';
 
 export const metadata: Metadata = {
@@ -69,9 +70,10 @@ const features = [
 
 export default function HelpPage() {
   return (
-    <div className='min-h-screen bg-[radial-gradient(circle_at_50%_0%,rgba(6,182,212,0.12),transparent_50%),var(--background)] text-foreground'>
+    <>
       <LandingPageHeader />
-      <main className='max-w-5xl mx-auto px-6 py-16 md:py-24'>
+      <div className='min-h-screen bg-[radial-gradient(circle_at_50%_0%,rgba(6,182,212,0.12),transparent_50%),var(--background)] text-foreground'>
+        <main className='max-w-5xl mx-auto px-6 py-16 md:py-24'>
         {/* Hero */}
         <div className='mb-16 text-center'>
           <p className='text-xs font-bold uppercase tracking-widest text-primary mb-3'>Help Center</p>
@@ -149,9 +151,8 @@ export default function HelpPage() {
         </div>
       </main>
 
-      <footer className='border-t border-border/50 py-8 px-6 text-center'>
-        <p className='text-xs text-muted-foreground/60'>© 2026 Melofy Inc. All rights reserved.</p>
-      </footer>
+      <LandingFooter />
     </div>
+    </>
   );
 }

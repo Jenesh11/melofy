@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LandingPageHeader } from '@/components/landing/LandingPageHeader';
+import { LandingFooter } from '@/components/landing/LandingFooter';
 import { Github, Star, GitFork, Bug, Lightbulb, Code2 } from 'lucide-react';
 
 export const metadata: Metadata = {
@@ -35,9 +36,10 @@ const contributions = [
 
 export default function GithubPage() {
   return (
-    <div className='min-h-screen bg-[radial-gradient(circle_at_30%_0%,rgba(168,85,247,0.10),transparent_40%),var(--background)] text-foreground'>
+    <>
       <LandingPageHeader />
-      <main className='max-w-4xl mx-auto px-6 py-16 md:py-24 flex flex-col items-center text-center'>
+      <div className='min-h-screen bg-[radial-gradient(circle_at_30%_0%,rgba(168,85,247,0.10),transparent_40%),var(--background)] text-foreground'>
+        <main className='max-w-4xl mx-auto px-6 py-16 md:py-24 flex flex-col items-center text-center'>
         {/* Hero */}
         <div className='mb-12 space-y-4'>
           <div className='w-16 h-16 rounded-2xl bg-muted/30 border border-border/50 flex items-center justify-center mx-auto mb-6'>
@@ -122,9 +124,8 @@ export default function GithubPage() {
         </div>
       </main>
 
-      <footer className='border-t border-border/50 py-8 px-6 text-center'>
-        <p className='text-xs text-muted-foreground/60'>© 2026 Melofy Inc. All rights reserved.</p>
-      </footer>
+      <LandingFooter />
     </div>
+    </>
   );
 }

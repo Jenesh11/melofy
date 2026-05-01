@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Search as SearchIcon, Loader2, X, Clock } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Input } from '@/components/ui/input';
@@ -51,7 +52,8 @@ interface SearchHistoryItem {
 }
 
 export default function SearchPage() {
-  const [query, setQuery] = useState('');
+  const searchParams = useSearchParams();
+  const [query, setQuery] = useState(searchParams.get('q') || '');
   const debouncedQuery = useDebounce(query, 500);
   const [results, setResults] = useState<TrackItem[]>([]);
   const [spotifyTracks, setSpotifyTracks] = useState<SpotifyTrackLike[]>([]);

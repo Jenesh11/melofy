@@ -226,10 +226,13 @@ export default function PlayingPage() {
                   ].join(' ')}>
                     {currentTrack.title}
                   </h1>
-                  <p className={[
-                    'text-foreground/50 font-medium tracking-tight truncate transition-all duration-500',
-                    isPanelOpen ? 'text-base md:text-xl xl:text-2xl' : 'text-xl md:text-3xl lg:text-4xl',
-                  ].join(' ')}>
+                  <p 
+                    onClick={() => router.push(`/search?q=${encodeURIComponent(currentTrack.artist)}`)}
+                    className={[
+                      'text-foreground/50 font-medium tracking-tight truncate transition-all duration-500 cursor-pointer hover:text-foreground/80 hover:underline decoration-primary/30 underline-offset-8',
+                      isPanelOpen ? 'text-base md:text-xl xl:text-2xl' : 'text-xl md:text-3xl lg:text-4xl',
+                    ].join(' ')}
+                  >
                     {currentTrack.artist}
                   </p>
                 </div>

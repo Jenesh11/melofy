@@ -95,6 +95,10 @@ const nextConfig: NextConfig = {
         source: '/api/jam/:path*',
         destination: `${backendBaseUrl}/api/jam/:path*`,
       },
+      {
+        source: '/api/health',
+        destination: `${backendBaseUrl}/health`,
+      },
     ];
   },
 };
