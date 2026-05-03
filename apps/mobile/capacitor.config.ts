@@ -7,13 +7,12 @@ const config: CapacitorConfig = {
   // Since we load the live URL, this folder just needs to exist as a fallback.
   webDir: 'www',
   server: {
-    // ── Local Development ──────────────────────────────────────────────────────
-    // Point this at your running Next.js dev server (same LAN IP).
-    // For production, replace with your deployed URL, e.g. https://melofy.jene.in
-    url: 'https://melofy.jene.in',
+    // ── Local Development & Production Redirect ────────────────────────────────
+    // We handle the redirect in apps/mobile/www/index.html to provide a 
+    // premium offline experience instead of a browser error page.
+    // url: 'https://melofy.jene.in',
     allowNavigation: ['melofy.jene.in'],
-    cleartext: false, // required for http:// (local dev only)
-    // ─────────────────────────────────────────────────────────────────────────
+    cleartext: false,
     androidScheme: 'https',
   },
   plugins: {

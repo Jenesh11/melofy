@@ -249,7 +249,7 @@ export default function SettingsPage() {
                 <p className='text-sm text-muted-foreground'>
                   Take Melofy on the go with our dedicated Android app.
                 </p>
-                <a href='https://github.com/ShreyJaiswal1/melofy/releases/download/1.0.0/Melofy.apk' target='_blank' rel='noopener noreferrer'>
+                <a href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy.apk' target='_blank' rel='noopener noreferrer'>
                   <Button className='w-full rounded-full font-bold shadow-xl shadow-primary/20'>
                     Download for Android
                   </Button>

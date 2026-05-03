@@ -106,11 +106,16 @@ export default function Home() {
         setIsFetching(true);
         const authHeaders = await getFirebaseAuthHeaders(user);
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const fetchOptions = { headers: authHeaders, signal: controller.signal };
+
         const [trendRes, newRes, mixRes, popularRes] = await Promise.all([
-          fetch('/api/spotify/trending', { headers: authHeaders }),
-          fetch('/api/spotify/new-releases', { headers: authHeaders }),
-          fetch('/api/spotify/mixes', { headers: authHeaders }),
-          fetch('/api/spotify/popular-playlists', { headers: authHeaders }),
+          fetch('/api/spotify/trending', fetchOptions),
+          fetch('/api/spotify/new-releases', fetchOptions),
+          fetch('/api/spotify/mixes', fetchOptions),
+          fetch('/api/spotify/popular-playlists', fetchOptions),
         ]);
 
         if (trendRes.ok) setTrending(await trendRes.json());
@@ -125,6 +130,7 @@ export default function Home() {
             method: 'POST',
             headers: { ...authHeaders, 'Content-Type': 'application/json' },
             body: JSON.stringify({ artists }),
+            signal: controller.signal,
           });
           if (discRes.ok) setDiscoveryMixes(await discRes.json());
         }
@@ -133,11 +139,12 @@ export default function Home() {
         const randomGenre = genres[Math.floor(Math.random() * genres.length)];
         const recRes = await fetch(
           `/api/spotify/recommendations?genre=${randomGenre}`,
-          { headers: authHeaders },
+          fetchOptions,
         );
 
         if (recRes.ok) setRecommendations(await recRes.json());
         
+        clearTimeout(timeoutId);
         setHasFetched(true);
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);

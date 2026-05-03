@@ -46,9 +46,12 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !user && !isPublicRoute) {
-      router.push('/login');
+      const searchParams = new URLSearchParams(window.location.search);
+      const queryString = searchParams.toString();
+      const currentUrl = pathname + (queryString ? `?${queryString}` : '');
+      router.push(`/login?callbackUrl=${encodeURIComponent(currentUrl)}`);
     }
-  }, [user, loading, isPublicRoute, router]);
+  }, [user, loading, isPublicRoute, router, pathname]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
