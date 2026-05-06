@@ -129,18 +129,43 @@ function PhoneFrame({ children, isPlaying }: { children: React.ReactNode; isPlay
               )}
 
               {/* Camera / Sensors hole (fixed position to prevent dislocation) */}
-              <div className='absolute left-[calc(50%+18px)] top-1/2 -translate-y-1/2 flex items-center justify-center'>
+              <div className='absolute left-[calc(50%+18px)] top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none'>
                 <div className='w-2 h-2 rounded-full bg-zinc-900 shadow-inner' />
                 <div className='w-1 h-1 rounded-full bg-blue-500/20 absolute blur-[1px]' />
               </div>
+
+              {isPlaying && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.1 }}
+                >
+                  <DynamicIslandEQ />
+                </motion.div>
+              )}
             </motion.div>
 
             {/* Status bar */}
-            <div className='absolute top-4 w-full flex justify-between px-8 text-[11px] font-bold text-white/80 z-40 tabular-nums'>
+            <div className='absolute top-4 w-full flex justify-between px-8 text-[11px] font-bold text-white/90 z-40 tabular-nums'>
               <span>9:41</span>
               <div className='flex items-center gap-1.5'>
-                <div className='w-5 h-2.5 border border-white/30 rounded-[3px] p-[1px] flex items-center'>
-                  <div className='h-full bg-white/80 rounded-[1px]' style={{ width: '80%' }} />
+                {/* Signal */}
+                <div className='flex items-end gap-[1.5px] h-2.5 mb-[0.5px]'>
+                  <div className='w-[2.5px] h-[35%] bg-white rounded-[0.5px]' />
+                  <div className='w-[2.5px] h-[55%] bg-white rounded-[0.5px]' />
+                  <div className='w-[2.5px] h-[75%] bg-white rounded-[0.5px]' />
+                  <div className='w-[2.5px] h-[100%] bg-white/30 rounded-[0.5px]' />
+                </div>
+                {/* WiFi */}
+                <svg width='14' height='10' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='3' strokeLinecap='round' strokeLinejoin='round' className='mb-[0.5px]'>
+                  <path d='M5 12.5a10 10 0 0 1 14 0' />
+                  <path d='M8.5 16a5 5 0 0 1 7 0' />
+                  <circle cx='12' cy='19.5' r='1' fill='currentColor' stroke='none' />
+                </svg>
+                {/* Battery */}
+                <div className='relative w-[23px] h-[11.5px] border border-white/35 rounded-[3.5px] p-[1px] flex items-center ml-0.5'>
+                  <div className='h-full bg-white rounded-[1.5px]' style={{ width: '65%' }} />
+                  <div className='absolute -right-[2.5px] top-1/2 -translate-y-1/2 w-[1.5px] h-[4px] bg-white/35 rounded-r-[1px]' />
                 </div>
               </div>
             </div>
@@ -153,6 +178,40 @@ function PhoneFrame({ children, isPlaying }: { children: React.ReactNode; isPlay
           </div>
         </div>
       </motion.div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/*  High Quality Dynamic Island EQ                                             */
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+function DynamicIslandEQ() {
+  // 5 bars with iOS Apple Music-style smooth random heights
+  const bars = [
+    { heights: [3, 5, 3, 4, 3, 6, 3], duration: 1.2 },
+    { heights: [4, 8, 5, 10, 6, 9, 4], duration: 1.5 },
+    { heights: [6, 12, 8, 14, 10, 12, 6], duration: 1.3 },
+    { heights: [5, 10, 6, 9, 5, 11, 5], duration: 1.4 },
+    { heights: [3, 4, 3, 5, 3, 4, 3], duration: 1.2 },
+  ];
+
+  return (
+    <div className='flex items-center justify-center gap-[2.5px] h-4 px-1 shrink-0'>
+      {bars.map((bar, i) => (
+        <motion.div
+          key={i}
+          animate={{ height: bar.heights }}
+          transition={{
+            duration: bar.duration,
+            repeat: Infinity,
+            repeatType: 'mirror',
+            ease: 'easeInOut',
+          }}
+          className='w-[2.5px] bg-[#ff3b30] rounded-full opacity-90'
+          style={{ minHeight: '3px' }}
+        />
+      ))}
     </div>
   );
 }

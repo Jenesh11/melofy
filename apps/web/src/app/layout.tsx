@@ -21,11 +21,19 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
+  themeColor: '#000000',
 };
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://melofy.jene.in'),
   title: 'Melofy | Elevate Your Sound',
+  applicationName: 'Melofy',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Melofy',
+  },
   description:
     'The ultimate destination for music lovers. Port your Spotify playlists, discover new sounds, and experience high-fidelity streaming in a stunning, minimalist interface.',
   keywords: [
