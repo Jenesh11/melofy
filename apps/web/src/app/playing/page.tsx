@@ -25,6 +25,7 @@ import { useLikedSongs } from '@/hooks/useLikedSongs';
 import { openPip, isPipSupported } from '@/hooks/usePip';
 import { useLyricsPanelStore } from '@/store/useLyricsPanelStore';
 import { Drawer } from 'vaul';
+import { ListenAlongPopover } from '@/components/player/ListenAlongPopover';
 
 export default function PlayingPage() {
   const currentTrack = usePlayerStore((state) => state.currentTrack);
@@ -290,6 +291,10 @@ export default function PlayingPage() {
                       className={`h-6 w-6 transition-all ${isLiked(currentTrack?.id || '') ? 'fill-foreground' : ''}`}
                     />
                   </Button>
+
+                  <div className="h-14 w-14 flex items-center justify-center rounded-full border border-foreground/20 hover:bg-foreground/10 bg-foreground/5 backdrop-blur-xl transition-all">
+                    <ListenAlongPopover />
+                  </div>
 
                   {pipAvailable && (
                     <Button

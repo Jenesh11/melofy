@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { usePlayerStore, Track } from '@/store/usePlayerStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuth } from '@/lib/firebase/auth-context';
+import { Capacitor } from '@capacitor/core';
 
 interface PersistedPlayerState {
   currentTrack?: Track | null;
@@ -108,7 +109,7 @@ export function usePlayerSync(
           history: state.history || [],
           isShuffle: state.isShuffle || false,
           isRepeat: state.isRepeat || false,
-          volume: state.volume ?? 0.8,
+          volume: state.volume ?? (Capacitor.isNativePlatform() ? 1 : 0.8),
         });
 
         if (audioRef.current && state.currentTime) {

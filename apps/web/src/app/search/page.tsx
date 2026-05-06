@@ -332,7 +332,8 @@ export default function SearchPage() {
           placeholder='Search songs, artists, playlists…'
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          autoFocus
+          // autoFocus intentionally omitted: SearchPage is always-mounted on mobile,
+          // so autoFocus would open the keyboard even when this tab is hidden.
         />
         {query && (
           <button

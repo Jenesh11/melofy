@@ -76,10 +76,12 @@ interface PlayerState {
   setPartyListeners: (listeners: PartyListener[]) => void;
 }
 
+import { Capacitor } from '@capacitor/core';
+
 const initialState = {
   currentTrack: null,
   isPlaying: false,
-  volume: 0.8,
+  volume: Capacitor.isNativePlatform() ? 1 : 0.8,
   progress: 0,
   queue: [],
   history: [],

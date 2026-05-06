@@ -9,6 +9,7 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useSocket } from '@/lib/socket-context';
 import { useAuth } from '@/lib/firebase/auth-context';
+import { Capacitor } from '@capacitor/core';
 
 // Sub-hooks for modular logic
 import { useMediaSession } from './useMediaSession';
@@ -142,7 +143,9 @@ export function useAudioPlayback() {
 
   // Volume sync
   useEffect(() => {
-    if (audioRef.current) audioRef.current.volume = volume;
+    if (audioRef.current) {
+      audioRef.current.volume = Capacitor.isNativePlatform() ? 1 : volume;
+    }
   }, [volume]);
 
   // Global Hotkeys
