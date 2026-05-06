@@ -80,6 +80,7 @@ export function MobilePlayer({
   
   const queue = usePlayerStore((state) => state.queue);
   const playFromQueue = usePlayerStore((state) => state.playFromQueue);
+  const setQueue = usePlayerStore((state) => state.setQueue);
 
   if (!isExpanded) return null;
 

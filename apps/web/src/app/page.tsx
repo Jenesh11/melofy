@@ -69,7 +69,7 @@ export default function Home() {
   );
 
   const newReleasesAsTracks = useMemo(() => {
-    return newReleases.map(track => ({
+    return newReleases.map((track: any) => ({
       id: track.id,
       name: track.name,
       artists: track.artists || [{ name: 'Unknown' }],
