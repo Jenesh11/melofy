@@ -149,11 +149,13 @@ function AppContent({ children }: { children: React.ReactNode }) {
         */}
         <main
           className={cn(
-            'flex-1 relative scroll-smooth flex flex-col',
+            'flex-1 relative scroll-smooth flex flex-col custom-scrollbar',
             pathname === '/playing' ? 'bg-background' : 'bg-linear-to-b from-card/30 via-background to-background',
+            // On mobile tab routes: main is overflow-hidden (each tab panel scrolls itself).
+            // On desktop and non-tab routes: main scrolls normally.
             isMobileTabRoute
-              ? 'overflow-hidden md:overflow-y-auto md:custom-scrollbar'
-              : 'overflow-y-auto custom-scrollbar',
+              ? 'overflow-hidden md:overflow-y-auto'
+              : 'overflow-y-auto',
           )}
         >
           {/* Topbar — sticky on desktop (main scrolls). On mobile tab routes, main
@@ -174,18 +176,20 @@ function AppContent({ children }: { children: React.ReactNode }) {
           <div
             aria-hidden={pathname !== '/'}
             className={cn(
-              'md:hidden flex-col flex-1 overflow-y-auto custom-scrollbar pb-32',
+              'md:hidden flex-col flex-1 overflow-y-auto pb-32 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
               pathname === '/' ? 'flex' : 'hidden',
             )}
           >
             <HomePageComponent />
           </div>
 
-          {/* Search tab — wrapped in Suspense because SearchPage uses useSearchParams() */}
+          {/* Search tab — wrapped in Suspense because SearchPage uses useSearchParams().
+              No pb-32 here: Search page has its own inner overflow-y-auto scroll
+              container and handles bottom padding internally. */}
           <div
             aria-hidden={pathname !== '/search'}
             className={cn(
-              'md:hidden flex-col flex-1 overflow-y-auto custom-scrollbar pb-32',
+              'md:hidden flex-col flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
               pathname === '/search' ? 'flex' : 'hidden',
             )}
           >
@@ -198,7 +202,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
           <div
             aria-hidden={pathname !== '/library'}
             className={cn(
-              'md:hidden flex-col flex-1 overflow-y-auto custom-scrollbar pb-32',
+              'md:hidden flex-col flex-1 overflow-y-auto pb-32 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
               pathname === '/library' ? 'flex' : 'hidden',
             )}
           >
