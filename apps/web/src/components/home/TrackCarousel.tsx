@@ -5,8 +5,10 @@ import { motion } from 'framer-motion';
 import { Play, Music2 } from 'lucide-react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { resolvePlayableTrack, TrackItem } from '@/components/ui/TrackList';
+import { TrackOptionsMenu } from '@/components/ui/TrackOptionsMenu';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { ListPlus } from 'lucide-react';
 import {
   mapSpotifyTrackToTrackItem,
   mapTrackItemToPlayerTrack,
@@ -68,6 +70,43 @@ export function TrackCarousel({
     [contextTracks, currentTrack?.title, isPlaying, pause, playInContext, resume, trackItems],
   );
 
+  const addToQueue = usePlayerStore((state) => state.addToQueue);
+
+  const handleAddToQueue = useCallback(
+    async (index: number) => {
+      const item = trackItems[index];
+      if (!item) return;
+
+      let trackToAdd = contextTracks[index];
+      if (!trackToAdd.url) {
+        const resolved = await resolvePlayableTrack(item);
+        if (!resolved) {
+          toast.error('Could not find a playable version of this track');
+          return;
+        }
+        trackToAdd = resolved;
+      }
+      addToQueue(trackToAdd);
+      
+      toast('Added to Queue', {
+        className: 'bg-primary text-primary-foreground border-none shadow-2xl',
+        description: (
+          <div className="flex items-center gap-2 mt-1">
+            {trackToAdd.artworkUrl && (
+              <img src={trackToAdd.artworkUrl} alt="" className="h-8 w-8 rounded-md object-cover shadow-md brightness-90" />
+            )}
+            <div className="flex flex-col min-w-0">
+              <span className="font-bold text-xs truncate opacity-90">{trackToAdd.title}</span>
+            </div>
+          </div>
+        ),
+        icon: <ListPlus className="h-4 w-4" />,
+        duration: 2500,
+      });
+    },
+    [contextTracks, trackItems, addToQueue]
+  );
+
   if (!tracks || tracks.length === 0) return null;
 
   return (
@@ -90,7 +129,7 @@ export function TrackCarousel({
           </Button>
         )}
       </div>
-      <div className='flex overflow-x-auto gap-6 pb-6 custom-scrollbar scroll-smooth snap-x snap-mandatory'>
+      <div className='flex overflow-x-auto gap-6 pb-6 custom-scrollbar carousel-scrollbar scroll-smooth snap-x snap-mandatory'>
         {tracks.map((track, index) => {
           const trackItem = trackItems[index];
           const titleText = trackItem?.title || 'Unknown Title';
@@ -111,16 +150,19 @@ export function TrackCarousel({
                 <div className={cn('absolute bottom-3 right-3 z-20 transition-opacity duration-300', !isActive && 'opacity-0 group-hover:opacity-100')}>
                   <div className='w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-xl group-hover:scale-105 transition-transform'>
                     {isActive ? (
-                      <div className='h-5 w-5 flex items-end justify-center gap-[2px]'>
-                        <span className='w-1 h-full bg-black animate-bounce'></span>
-                        <span
-                          className='w-1 h-3/4 bg-black animate-bounce'
-                          style={{ animationDelay: '0.2s' }}
-                        ></span>
-                        <span
-                          className='w-1 h-1/2 bg-black animate-bounce'
-                          style={{ animationDelay: '0.4s' }}
-                        ></span>
+                      <div className='flex items-center justify-center gap-0.5 h-4'>
+                        <div
+                          className='w-0.5 h-2 bg-black animate-bounce'
+                          style={{ animationDelay: '0ms' }}
+                        />
+                        <div
+                          className='w-0.5 h-3 bg-black animate-bounce'
+                          style={{ animationDelay: '100ms' }}
+                        />
+                        <div
+                          className='w-0.5 h-2 bg-black animate-bounce'
+                          style={{ animationDelay: '200ms' }}
+                        />
                       </div>
                     ) : (
                       <Play className='h-5 w-5 fill-black translate-x-0.5' />
@@ -140,13 +182,21 @@ export function TrackCarousel({
                   )}
                 </div>
               </div>
-              <div className='flex flex-col px-2'>
-                <p className='text-foreground font-bold truncate text-base group-hover:text-primary transition-colors'>
-                  {titleText}
-                </p>
-                <p className='text-muted-foreground text-xs truncate uppercase tracking-tighter mt-1 font-medium'>
-                  {artistText}
-                </p>
+              <div className='flex items-start justify-between px-2 gap-2'>
+                <div className='flex flex-col min-w-0'>
+                  <p className='text-foreground font-bold truncate text-base group-hover:text-primary transition-colors'>
+                    {titleText}
+                  </p>
+                  <p className='text-muted-foreground text-xs truncate uppercase tracking-tighter mt-1 font-medium'>
+                    {artistText}
+                  </p>
+                </div>
+                <div className='opacity-0 group-hover:opacity-100 transition-opacity shrink-0' onClick={(e) => e.stopPropagation()}>
+                  <TrackOptionsMenu 
+                    track={contextTracks[index]} 
+                    onAddToQueue={() => handleAddToQueue(index)} 
+                  />
+                </div>
               </div>
             </motion.div>
           );

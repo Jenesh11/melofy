@@ -235,4 +235,25 @@
   .sidebar-scrollbar:hover {
     scrollbar-color: color-mix(in oklch, var(--foreground) 10%, transparent) transparent;
   }
+
+  /* Carousel Specific Scrollbar (Visible on Hover) */
+  .carousel-scrollbar::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  .carousel-scrollbar:hover::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--foreground) 12%, transparent);
+  }
+
+  .carousel-scrollbar:hover::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklch, var(--foreground) 22%, transparent);
+  }
+
+  .carousel-scrollbar {
+    scrollbar-color: transparent transparent;
+  }
+
+  .carousel-scrollbar:hover {
+    scrollbar-color: color-mix(in oklch, var(--foreground) 12%, transparent) transparent;
+  }
 }

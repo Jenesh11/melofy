@@ -60,6 +60,7 @@ interface PlayerState {
     collectionType?: 'spotify' | 'custom' | 'youtube',
     force?: boolean
   ) => void;
+  playFromQueue: (index: number, force?: boolean) => void;
   playNext: (force?: boolean) => void;
   playPrevious: (force?: boolean) => void;
   toggleShuffle: () => void;
@@ -174,6 +175,22 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       isPlaying: true,
       progress: 0,
     }));
+  },
+  playFromQueue: (index, force = false) => {
+    if (!force && !get().canControlPlayback()) return;
+    const { queue, currentTrack, history } = get();
+    if (index < 0 || index >= queue.length) return;
+
+    const nextTrack = queue[index];
+    const skippedTracks = queue.slice(0, index);
+
+    set({
+      history: currentTrack ? [...history, currentTrack, ...skippedTracks] : [...history, ...skippedTracks],
+      currentTrack: nextTrack,
+      queue: queue.slice(index + 1),
+      isPlaying: true,
+      progress: 0,
+    });
   },
   playNext: (force = false) => {
     if (!force && !get().canControlPlayback()) return;

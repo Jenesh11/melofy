@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { ProgressBar } from './ProgressBar';
 import { VolumeControl } from './VolumeControl';
 import { ListenAlongPopover } from './ListenAlongPopover';
+import { QueuePopover } from './QueuePopover';
 import { cn } from '@/lib/utils';
 import { Track } from '@/store/usePlayerStore';
 import Image from 'next/image';
@@ -366,6 +367,7 @@ export function DesktopPlayer({
           <Heart className={cn('h-5 w-5', isLiked(currentTrack.id) && 'fill-current')} />
         </Button>
         <ListenAlongPopover />
+        <QueuePopover />
         <Button
           variant='ghost'
           size='icon'

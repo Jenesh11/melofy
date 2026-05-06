@@ -69,11 +69,11 @@ export default function Home() {
   );
 
   const newReleasesAsTracks = useMemo(() => {
-    return newReleases.map(album => ({
-      id: album.id,
-      name: album.name,
-      artists: album.owner ? [{ name: album.owner.display_name }] : [{ name: 'Unknown' }],
-      album: album,
+    return newReleases.map(track => ({
+      id: track.id,
+      name: track.name,
+      artists: track.artists || [{ name: 'Unknown' }],
+      album: track.album,
     } as SpotifyTrackLike));
   }, [newReleases]);
 
@@ -173,7 +173,7 @@ export default function Home() {
   const greeting = getGreeting();
 
   return (
-    <div className='p-4 md:p-8 flex flex-col gap-10 overflow-x-hidden min-h-screen'>
+    <div className='p-4 md:p-8 flex flex-col gap-10 overflow-x-hidden'>
       <header className='flex flex-col gap-2'>
         <motion.p
           initial={{ opacity: 0, x: -20 }}
@@ -246,7 +246,7 @@ export default function Home() {
           </p>
         </div>
       ) : (
-        <div className='flex flex-col gap-10 pb-24'>
+        <div className='flex flex-col gap-10'>
           <HistoryCarousel
             history={history}
             currentTrack={currentTrack}

@@ -13,7 +13,6 @@ import {
   ListMusic,
   X,
   Heart,
-  PictureInPicture2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -22,10 +21,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { SyncedLyrics } from '@/components/ui/SyncedLyrics';
 import { useLikedSongs } from '@/hooks/useLikedSongs';
-import { openPip, isPipSupported } from '@/hooks/usePip';
 import { useLyricsPanelStore } from '@/store/useLyricsPanelStore';
 import { Drawer } from 'vaul';
-import { ListenAlongPopover } from '@/components/player/ListenAlongPopover';
 
 export default function PlayingPage() {
   const currentTrack = usePlayerStore((state) => state.currentTrack);
@@ -36,7 +33,6 @@ export default function PlayingPage() {
   const [showLyrics, setShowLyrics] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const { toggleLike, isLiked } = useLikedSongs();
-  const [pipAvailable, setPipAvailable] = useState(false);
   const isPanelOpen = useLyricsPanelStore((s) => s.isOpen);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -47,14 +43,6 @@ export default function PlayingPage() {
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  useEffect(() => {
-    const supported = isPipSupported();
-    if (supported) {
-      const timeout = setTimeout(() => setPipAvailable(true), 0);
-      return () => clearTimeout(timeout);
-    }
   }, []);
 
   const handleTogglePlay = () => {
@@ -158,157 +146,191 @@ export default function PlayingPage() {
               exit={{ opacity: 0, y: -30, scale: 1.05 }}
               transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
               className={[
-                'flex items-center w-full mx-auto transition-all duration-500',
-                // When lyrics panel is open, shrink row-layout breakpoint (xl) and tighten gap
-                isPanelOpen
-                  ? 'flex-col xl:flex-row gap-8 xl:gap-12 max-w-3xl'
-                  : 'flex-col lg:flex-row gap-12 lg:gap-20 max-w-5xl',
-                showLyrics ? 'scale-90 opacity-0 pointer-events-none' : 'scale-100 opacity-100',
+                'flex w-full mx-auto transition-all duration-700',
+                showLyrics && !isMobile
+                  ? 'flex-row gap-12 max-w-7xl items-center h-[75vh]'
+                  : 'justify-center',
+                isMobile && showLyrics
+                  ? 'scale-90 opacity-0 pointer-events-none'
+                  : 'scale-100 opacity-100',
               ].join(' ')}
             >
-              {/* Artwork Card */}
-              <div className={[
-                'relative group shrink-0 w-full transition-all duration-500',
-                isPanelOpen
-                  ? 'max-w-[220px] md:max-w-[260px] xl:max-w-[300px]'
-                  : 'max-w-[280px] sm:max-w-[320px] md:max-w-[400px]',
-              ].join(' ')}>
-                <div className='relative aspect-square rounded-[2rem] lg:rounded-[3rem] overflow-hidden shadow-2xl border border-foreground/10 bg-secondary/30 backdrop-blur-2xl'>
-                  {currentTrack.artworkUrl ? (
-                    <Image
-                      src={currentTrack.artworkUrl}
-                      alt={currentTrack.title}
-                      width={400}
-                      height={400}
-                      className='w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105'
-                    />
-                  ) : (
-                    <div className='w-full h-full flex items-center justify-center'>
-                      <Music2 className='h-32 w-32 text-foreground/10' />
-                    </div>
-                  )}
+              {/* Left Column / Main Player */}
+              <div
+                className={[
+                  'flex w-full transition-all duration-700',
+                  showLyrics && !isMobile
+                    ? 'flex-col items-center justify-center w-1/3 min-w-[250px] max-w-sm lg:max-w-md shrink-0 gap-6 h-full'
+                    : isPanelOpen
+                      ? 'flex-col xl:flex-row items-center gap-8 xl:gap-12 max-w-3xl mx-auto'
+                      : 'flex-col lg:flex-row items-center gap-12 lg:gap-20 max-w-5xl mx-auto',
+                ].join(' ')}
+              >
+                {/* Artwork Card */}
+                <div
+                  className={[
+                    'relative group shrink-0 w-full transition-all duration-700',
+                    showLyrics && !isMobile
+                      ? 'max-w-[200px] lg:max-w-[300px]'
+                      : isPanelOpen
+                        ? 'max-w-[220px] md:max-w-[260px] xl:max-w-[300px]'
+                        : 'max-w-[280px] sm:max-w-[320px] md:max-w-[400px]',
+                  ].join(' ')}
+                >
+                  <div className='relative aspect-square rounded-[2rem] lg:rounded-[3rem] overflow-hidden shadow-2xl border border-foreground/10 bg-secondary/30 backdrop-blur-2xl'>
+                    {currentTrack.artworkUrl ? (
+                      <Image
+                        src={currentTrack.artworkUrl}
+                        alt={currentTrack.title}
+                        width={400}
+                        height={400}
+                        className='w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105'
+                      />
+                    ) : (
+                      <div className='w-full h-full flex items-center justify-center'>
+                        <Music2 className='h-32 w-32 text-foreground/10' />
+                      </div>
+                    )}
 
-                  <div className='absolute inset-0 bg-background/20 dark:bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm'>
+                    <div className='absolute inset-0 bg-background/20 dark:bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm'>
+                      <Button
+                        size='icon'
+                        className='h-24 w-24 rounded-full bg-primary text-primary-foreground hover:scale-110 transition-transform shadow-2xl border-none'
+                        onClick={handleTogglePlay}
+                      >
+                        {isPlaying ? (
+                          <Pause className='h-10 w-10 fill-current' />
+                        ) : (
+                          <Play className='h-10 w-10 ml-2 fill-current' />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Text Info & Controls */}
+                <div
+                  className={[
+                    'flex flex-col w-full min-w-0 transition-all duration-700',
+                    showLyrics && !isMobile
+                      ? 'items-center text-center gap-4 lg:gap-6'
+                      : isPanelOpen
+                        ? 'items-center xl:items-start text-center xl:text-left gap-4 xl:gap-6'
+                        : 'items-center lg:items-start text-center lg:text-left gap-6 lg:gap-8',
+                  ].join(' ')}
+                >
+                  <div className='space-y-4 w-full'>
+                    <motion.p
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 0.8, y: 0 }}
+                      className='text-primary font-black tracking-[0.4em] text-xs uppercase'
+                    >
+                      Now Playing
+                    </motion.p>
+                    <h1
+                      className={[
+                        'font-black text-foreground tracking-tighter leading-[1.1] drop-shadow-2xl line-clamp-2 transition-all duration-500',
+                        showLyrics && !isMobile
+                          ? 'text-2xl lg:text-3xl xl:text-4xl'
+                          : isPanelOpen
+                            ? 'text-2xl md:text-3xl xl:text-4xl xxl:text-5xl'
+                            : 'text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl',
+                      ].join(' ')}
+                    >
+                      {currentTrack.title}
+                    </h1>
+                    <p
+                      onClick={() =>
+                        router.push(
+                          `/search?q=${encodeURIComponent(currentTrack.artist)}`,
+                        )
+                      }
+                      className={[
+                        'text-foreground/50 font-medium tracking-tight truncate transition-all duration-500 cursor-pointer hover:text-foreground/80 hover:underline decoration-primary/30 underline-offset-8',
+                        showLyrics && !isMobile
+                          ? 'text-base lg:text-xl'
+                          : isPanelOpen
+                            ? 'text-base md:text-xl xl:text-2xl'
+                            : 'text-xl md:text-3xl lg:text-4xl',
+                      ].join(' ')}
+                    >
+                      {currentTrack.artist}
+                    </p>
+                  </div>
+
+                  <div
+                    className={[
+                      'flex items-center justify-center mt-2 gap-3 flex-wrap transition-all duration-500',
+                      showLyrics && !isMobile
+                        ? 'justify-center mt-2'
+                        : isPanelOpen
+                          ? 'xl:justify-start xl:mt-4'
+                          : 'lg:justify-start lg:mt-6',
+                    ].join(' ')}
+                  >
                     <Button
-                      size='icon'
-                      className='h-24 w-24 rounded-full bg-primary text-primary-foreground hover:scale-110 transition-transform shadow-2xl border-none'
+                      size='lg'
+                      className='bg-foreground text-background font-black h-16 w-16 md:w-auto md:px-12 rounded-full hover:scale-105 transition-all active:scale-95 shadow-xl border-none text-base'
                       onClick={handleTogglePlay}
                     >
                       {isPlaying ? (
-                        <Pause className='h-10 w-10 fill-current' />
+                        <>
+                          <Pause className='h-8 w-8 md:mr-3 fill-current' />{' '}
+                          <span className='hidden md:inline'>PAUSE</span>
+                        </>
                       ) : (
-                        <Play className='h-10 w-10 ml-2 fill-current' />
+                        <>
+                          <Play className='h-8 w-8 ml-1 md:ml-0 md:mr-3 fill-current' />{' '}
+                          <span className='hidden md:inline'>PLAY</span>
+                        </>
                       )}
                     </Button>
-                  </div>
-                </div>
-              </div>
 
-              {/* Text Info & Controls */}
-              <div className={[
-                'flex flex-col w-full min-w-0 transition-all duration-500',
-                isPanelOpen
-                  ? 'items-center xl:items-start text-center xl:text-left gap-4 xl:gap-6'
-                  : 'items-center lg:items-start text-center lg:text-left gap-6 lg:gap-8',
-              ].join(' ')}>
-                <div className='space-y-4 w-full'>
-                  <motion.p
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 0.8, y: 0 }}
-                    className='text-primary font-black tracking-[0.4em] text-xs uppercase'
-                  >
-                    Now Playing
-                  </motion.p>
-                  <h1 className={[
-                    'font-black text-foreground tracking-tighter leading-[1.1] drop-shadow-2xl line-clamp-2 transition-all duration-500',
-                    isPanelOpen
-                      ? 'text-2xl md:text-3xl xl:text-4xl xxl:text-5xl'
-                      : 'text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl',
-                  ].join(' ')}>
-                    {currentTrack.title}
-                  </h1>
-                  <p 
-                    onClick={() => router.push(`/search?q=${encodeURIComponent(currentTrack.artist)}`)}
-                    className={[
-                      'text-foreground/50 font-medium tracking-tight truncate transition-all duration-500 cursor-pointer hover:text-foreground/80 hover:underline decoration-primary/30 underline-offset-8',
-                      isPanelOpen ? 'text-base md:text-xl xl:text-2xl' : 'text-xl md:text-3xl lg:text-4xl',
-                    ].join(' ')}
-                  >
-                    {currentTrack.artist}
-                  </p>
-                </div>
+                    <Button
+                      size='icon'
+                      variant='outline'
+                      className={`h-14 w-14 rounded-full border-foreground/20 transition-all backdrop-blur-xl ${
+                        showLyrics
+                          ? 'bg-foreground/20 text-foreground border-foreground/40'
+                          : 'bg-foreground/5 text-foreground hover:bg-foreground/10'
+                      }`}
+                      onClick={() => setShowLyrics(!showLyrics)}
+                      title='Toggle Lyrics'
+                    >
+                      <ListMusic className='h-6 w-6' strokeWidth={showLyrics ? 2.5 : 2} />
+                    </Button>
 
-                <div className={[
-                    'flex items-center justify-center mt-2 gap-3 flex-wrap transition-all duration-500',
-                    isPanelOpen ? 'xl:justify-start xl:mt-4' : 'lg:justify-start lg:mt-6',
-                  ].join(' ')}>
-                  <Button
-                    size='lg'
-                    className='bg-foreground text-background font-black h-16 w-16 md:w-auto md:px-12 rounded-full hover:scale-105 transition-all active:scale-95 shadow-xl border-none text-base'
-                    onClick={handleTogglePlay}
-                  >
-                    {isPlaying ? (
-                      <>
-                        <Pause className='h-8 w-8 md:mr-3 fill-current' />{' '}
-                        <span className='hidden md:inline'>PAUSE</span>
-                      </>
-                    ) : (
-                      <>
-                        <Play className='h-8 w-8 ml-1 md:ml-0 md:mr-3 fill-current' />{' '}
-                        <span className='hidden md:inline'>PLAY</span>
-                      </>
-                    )}
-                  </Button>
-
-                  <Button
-                    size='icon'
-                    variant='outline'
-                    className={`h-14 w-14 rounded-full border-foreground/20 transition-all backdrop-blur-xl ${showLyrics ? 'bg-foreground text-background' : 'bg-foreground/5 text-foreground hover:bg-foreground/10'}`}
-                    onClick={() => setShowLyrics(!showLyrics)}
-                    title='Toggle Lyrics'
-                  >
-                    <ListMusic className='h-6 w-6' />
-                  </Button>
-
-                  <Button
-                    size='icon'
-                    variant='outline'
-                    className='h-14 w-14 rounded-full border-foreground/20 hover:bg-foreground/10 bg-foreground/5 backdrop-blur-xl transition-all'
-                    onClick={handleShare}
-                    title='Share'
-                  >
-                    <Share2 className='h-6 w-6 text-foreground/80' />
-                  </Button>
-
-                  <Button
-                    size='icon'
-                    variant='outline'
-                    className='h-14 w-14 rounded-full border-foreground/20 hover:bg-foreground/10 bg-foreground/5 backdrop-blur-xl transition-all'
-                    onClick={() => currentTrack && toggleLike(currentTrack)}
-                    title='Like Song'
-                  >
-                    <Heart
-                      className={`h-6 w-6 transition-all ${isLiked(currentTrack?.id || '') ? 'fill-foreground' : ''}`}
-                    />
-                  </Button>
-
-                  <div className="h-14 w-14 flex items-center justify-center rounded-full border border-foreground/20 hover:bg-foreground/10 bg-foreground/5 backdrop-blur-xl transition-all">
-                    <ListenAlongPopover />
-                  </div>
-
-                  {pipAvailable && (
                     <Button
                       size='icon'
                       variant='outline'
                       className='h-14 w-14 rounded-full border-foreground/20 hover:bg-foreground/10 bg-foreground/5 backdrop-blur-xl transition-all'
-                      onClick={() => openPip()}
-                      title='Picture-in-Picture'
+                      onClick={handleShare}
+                      title='Share'
                     >
-                      <PictureInPicture2 className='h-6 w-6 text-foreground/80' />
+                      <Share2 className='h-6 w-6 text-foreground/80' />
                     </Button>
-                  )}
+
+                    <Button
+                      size='icon'
+                      variant='outline'
+                      className='h-14 w-14 rounded-full border-foreground/20 hover:bg-foreground/10 bg-foreground/5 backdrop-blur-xl transition-all'
+                      onClick={() => currentTrack && toggleLike(currentTrack)}
+                      title='Like Song'
+                    >
+                      <Heart
+                        className={`h-6 w-6 transition-all ${isLiked(currentTrack?.id || '') ? 'fill-foreground' : ''}`}
+                      />
+                    </Button>
+                  </div>
                 </div>
               </div>
+
+              {/* Right Column / Lyrics */}
+              {!isMobile && showLyrics && (
+                <div className='flex-1 min-w-0 h-full flex flex-col border-l border-foreground/10 pl-8 lg:pl-12 animate-in fade-in slide-in-from-right-8 duration-700'>
+                  <SyncedLyrics />
+                </div>
+              )}
             </motion.div>
           ) : (
             <motion.div
@@ -340,40 +362,49 @@ export default function PlayingPage() {
           )}
         </AnimatePresence>
 
-        {/* Lyrics Drawer / Modal */}
-        <Drawer.Root 
-          open={showLyrics} 
+        {/* Lyrics Drawer / Modal (Mobile Only) */}
+        <Drawer.Root
+          open={isMobile ? showLyrics : false}
           onOpenChange={setShowLyrics}
           shouldScaleBackground={true}
         >
           <Drawer.Portal>
-            <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" />
-            <Drawer.Content className="bg-background flex flex-col rounded-t-[32px] h-[92vh] fixed bottom-0 left-0 right-0 z-[101] border-t border-foreground/10 outline-none">
-              <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-foreground/20 mt-4 mb-2" />
-              
-              <div className="flex items-center justify-between px-6 py-2 shrink-0">
-                <div className="flex flex-col">
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-0.5">Now Reading</p>
-                  <h2 className="text-xl font-bold tracking-tight text-foreground line-clamp-1">
-                    {currentTrack?.title}
-                  </h2>
+            <Drawer.Overlay className='fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]' />
+            <Drawer.Content className='bg-background flex flex-col rounded-t-[32px] h-[92vh] fixed bottom-0 left-0 right-0 z-[101] border-t border-foreground/10 outline-none'>
+              <div className='mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-foreground/20 mt-4 mb-2' />
+
+              <div className='flex items-center justify-between px-6 py-2 shrink-0'>
+                <div className='flex flex-col'>
+                  <Drawer.Description className='sr-only'>
+                    Lyrics for {currentTrack?.title}
+                  </Drawer.Description>
+                  <p className='text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-0.5'>
+                    Now Reading
+                  </p>
+                  <Drawer.Title asChild>
+                    <h2 className='text-xl font-bold tracking-tight text-foreground line-clamp-1'>
+                      {currentTrack?.title}
+                    </h2>
+                  </Drawer.Title>
                 </div>
                 <Drawer.Close asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full hover:bg-foreground/5 h-10 w-10">
-                    <X className="h-6 w-6" />
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    className='rounded-full hover:bg-foreground/5 h-10 w-10'
+                  >
+                    <X className='h-6 w-6' />
                   </Button>
                 </Drawer.Close>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-hidden relative px-2 md:px-8">
+              <div className='flex-1 min-h-0 overflow-hidden relative px-2 md:px-8'>
                 <SyncedLyrics />
               </div>
             </Drawer.Content>
           </Drawer.Portal>
         </Drawer.Root>
       </div>
-
-
     </motion.div>
   );
 }

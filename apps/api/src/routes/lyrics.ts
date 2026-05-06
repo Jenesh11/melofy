@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { Redis } from '@upstash/redis';
+import { Client as GeniusClient } from 'genius-lyrics';
 
 const router = Router();
+const genius = new GeniusClient(process.env.GENIUS_LYRICS_API);
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL || '',
@@ -63,7 +65,24 @@ router.get('/', async (req: Request, res: Response) => {
 
     if (!response.ok) {
       if (response.status === 404) {
-        // Cache 404s for 10 minutes to avoid hammering lrclib
+        // Fallback to Genius API if lrclib fails
+        try {
+          const searches = await genius.songs.search(`${track_name} ${artist_name}`);
+          if (searches.length > 0) {
+            const firstSong = searches[0];
+            const lyricsText = await firstSong.lyrics();
+            
+            if (lyricsText) {
+              const fallbackData = { plainLyrics: lyricsText };
+              await redis.set(cacheKey, fallbackData, { ex: 3600 });
+              return res.json(fallbackData);
+            }
+          }
+        } catch (geniusError) {
+          console.error('Genius API fallback error:', geniusError);
+        }
+
+        // Cache 404s for 10 minutes to avoid hammering lrclib and Genius
         await redis.set(cacheKey, { error: 'not_found' }, { ex: 600 });
         return res.status(404).json({ error: 'Lyrics not found' });
       }

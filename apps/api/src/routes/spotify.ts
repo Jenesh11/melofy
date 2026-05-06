@@ -6,6 +6,7 @@ import {
   spotifyGet, 
   fetchFullSpotifyPlaylist 
 } from '../lib/spotify';
+import { lavalink } from '../index';
 
 const router = Router();
 
@@ -53,19 +54,43 @@ router.get('/trending', async (req, res) => {
 
 /**
  * GET /api/spotify/new-releases
- * 2026 Update: /browse/new-releases is removed for Dev mode apps.
- * Replacement: Use the search API for recently released albums.
+ * Pulls new releases/hits from YouTube Music via NodeLink
+ * mapped to the Spotify track schema expected by the frontend.
  */
 router.get('/new-releases', async (req, res) => {
   try {
-    // Search for albums released in the current year
-    const year = new Date().getFullYear();
-    const data = await spotifyGet(`/search?q=year:${year}&type=album&limit=10&market=US`);
-    res.json(data.albums.items);
+    const node = lavalink.nodeManager.leastUsedNodes()[0];
+    if (!node) {
+      return res.status(500).json({ error: 'No NodeLink nodes available' });
+    }
+
+    const result = await node.search(
+      { query: 'ytmsearch:latest music releases' },
+      { id: req.user?.uid || 'MelofyInternal' }
+    );
+
+    if (result.loadType === 'empty' || result.loadType === 'error') {
+      return res.json([]);
+    }
+
+    const rawTracks = (result as any).tracks || (result as any).data || [];
+    
+    const formatted = rawTracks.slice(0, 10).map((track: any) => ({
+      id: track.info.identifier,
+      name: track.info.title,
+      artists: [{ name: track.info.author }],
+      album: {
+        id: track.info.identifier,
+        name: track.info.title,
+        images: [{ url: track.info.artworkUrl }]
+      }
+    }));
+
+    res.json(formatted);
   } catch (error: any) {
     console.error(
-      '[Spotify] New releases error (search fallback):',
-      error?.response?.data || error.message,
+      '[Spotify] New releases error (NodeLink fallback):',
+      error?.message,
     );
     res.status(500).json({ error: 'Failed to fetch new releases' });
   }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { Music2, Heart } from 'lucide-react';
+import { Music2, Heart, ListPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePlayerStore, Track as PlayerTrack } from '@/store/usePlayerStore';
 import { toast } from 'sonner';
@@ -75,6 +75,7 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
   const playInContext = usePlayerStore((state) => state.playInContext);
   const pause = usePlayerStore((state) => state.pause);
   const resume = usePlayerStore((state) => state.resume);
+  const addToQueue = usePlayerStore((state) => state.addToQueue);
   const { toggleLike, isLiked } = useLikedSongs();
 
   const contextTracks = useMemo(
@@ -113,10 +114,41 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
     [contextTracks, currentTrack?.title, isPlaying, pause, playInContext, resume],
   );
 
+  const handleAddToQueue = useCallback(
+    async (item: TrackItem, index: number) => {
+      let trackToAdd = contextTracks[index];
+      if (!trackToAdd.url) {
+        const resolved = await resolvePlayableTrack(item);
+        if (!resolved) {
+          toast.error('Could not find a playable version of this track');
+          return;
+        }
+        trackToAdd = resolved;
+      }
+      addToQueue(trackToAdd);
+      toast('Added to Queue', {
+        className: 'bg-primary text-primary-foreground border-none shadow-2xl',
+        description: (
+          <div className="flex items-center gap-2 mt-1">
+            {trackToAdd.artworkUrl && (
+              <img src={trackToAdd.artworkUrl} alt="" className="h-8 w-8 rounded-md object-cover shadow-md brightness-90" />
+            )}
+            <div className="flex flex-col min-w-0">
+              <span className="font-bold text-xs truncate opacity-90">{trackToAdd.title}</span>
+            </div>
+          </div>
+        ),
+        icon: <ListPlus className="h-4 w-4" />,
+        duration: 2500,
+      });
+    },
+    [contextTracks, addToQueue]
+  );
+
   return (
     <div className='flex flex-col gap-1'>
       {showHeader && (
-        <div className='grid grid-cols-[2rem_1fr_auto_2rem] md:grid-cols-[2rem_1fr_minmax(0,200px)_auto_2rem] gap-4 px-4 py-2 border-b border-border text-muted-foreground text-[10px] font-bold tracking-wider uppercase mb-2'>
+        <div className='grid grid-cols-[2rem_1fr_auto_5rem] md:grid-cols-[2rem_1fr_minmax(0,200px)_auto_5rem] gap-4 px-4 py-2 border-b border-border text-muted-foreground text-[10px] font-bold tracking-wider uppercase mb-2'>
           <span className='text-center'>#</span>
           <span>Title</span>
           <span className='hidden md:block'>Album</span>
@@ -146,7 +178,7 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
           <div
             key={item.id + index}
             className={cn(
-              'grid grid-cols-[2rem_1fr_auto_2rem] md:grid-cols-[2rem_1fr_minmax(0,200px)_auto_2rem] gap-4 px-4 py-3 rounded-xl transition-all group items-center',
+              'grid grid-cols-[2rem_1fr_auto_5rem] md:grid-cols-[2rem_1fr_minmax(0,200px)_auto_5rem] gap-4 px-4 py-3 rounded-xl transition-all group items-center',
               isActive ? 'bg-foreground/10 shadow-sm' : 'hover:bg-foreground/5',
             )}
           >
@@ -222,27 +254,34 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
               {formatDuration(item.duration)}
             </span>
 
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleLike(contextTracks[index]);
-              }}
-              className='flex items-center justify-center h-8 w-8 rounded-full hover:bg-foreground/10 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100'
-              style={{
-                opacity: isLiked(contextTracks[index]?.id || '')
-                  ? 1
-                  : undefined,
-              }}
-            >
-              <Heart
-                className={cn(
-                  'h-4 w-4 transition-all',
-                  isLiked(contextTracks[index]?.id || '')
-                    ? 'fill-primary text-primary'
-                    : 'text-muted-foreground hover:text-foreground',
-                )}
-              />
-            </button>
+            <div className='flex items-center justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100' style={{ opacity: isLiked(contextTracks[index]?.id || '') ? 1 : undefined }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddToQueue(item, index);
+                }}
+                className='flex items-center justify-center h-8 w-8 rounded-full hover:bg-foreground/10 transition-colors'
+                title='Add to queue'
+              >
+                <ListPlus className='h-4 w-4 text-muted-foreground hover:text-foreground transition-all' />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleLike(contextTracks[index]);
+                }}
+                className='flex items-center justify-center h-8 w-8 rounded-full hover:bg-foreground/10 transition-colors'
+              >
+                <Heart
+                  className={cn(
+                    'h-4 w-4 transition-all',
+                    isLiked(contextTracks[index]?.id || '')
+                      ? 'fill-primary text-primary'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                />
+              </button>
+            </div>
           </div>
         );
       })}

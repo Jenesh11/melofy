@@ -135,7 +135,7 @@ export function PlaylistGrid({
       <div
         className={
           isCarousel
-            ? 'flex overflow-x-auto gap-6 pb-4 custom-scrollbar snap-x snap-mandatory scroll-smooth'
+            ? 'flex overflow-x-auto gap-6 pb-4 custom-scrollbar carousel-scrollbar snap-x snap-mandatory scroll-smooth'
             : 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6'
         }
       >

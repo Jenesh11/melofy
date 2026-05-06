@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 interface LyricLine {
   text: string;
@@ -44,6 +45,7 @@ export const SyncedLyrics = ({ compact = false }: { compact?: boolean }) => {
   const progress = usePlayerStore((state) => state.progress);
   const lyricsCache = usePlayerStore((state) => state.lyricsCache);
   const setLyricsCache = usePlayerStore((state) => state.setLyrics);
+  const { user } = useAuth();
 
   const [lyricsLines, setLyricsLines] = useState<LyricLine[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -88,7 +90,15 @@ export const SyncedLyrics = ({ compact = false }: { compact?: boolean }) => {
           duration: Math.floor(currentTrack.duration / 1000).toString(),
         });
 
-        const res = await fetch(`/api/lyrics?${queryParams.toString()}`);
+        const headers: Record<string, string> = {};
+        if (user) {
+          const token = await user.getIdToken();
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const res = await fetch(`/api/lyrics?${queryParams.toString()}`, {
+          headers,
+        });
         if (!res.ok) {
           setError(true);
           setLoading(false);
@@ -127,7 +137,7 @@ export const SyncedLyrics = ({ compact = false }: { compact?: boolean }) => {
     return () => {
       active = false;
     };
-  }, [currentTrack, lyricsCache, setLyricsCache]);
+  }, [currentTrack, lyricsCache, setLyricsCache, user]);
 
   // Find the currently active line index based on playback progress
   const activeIndex = React.useMemo(() => {
