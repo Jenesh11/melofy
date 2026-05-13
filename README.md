@@ -110,10 +110,10 @@ graph TD
     Metadata -->|Fetch Track Info| SpotifyAPI
     
     %% Audio Flow
-    SocketServer -->|Commands (Play/Pause)| NodeLinkServer
+    SocketServer -->|Commands Play/Pause| NodeLinkServer
     NodeLinkServer -->|Fetch Audio Source| SpotifyAPI
     NodeLinkServer --> AudioStreamer
-    AudioStreamer -.->|Direct Audio Stream (HLS/HTTP)| AudioPlayer
+    AudioStreamer -.->|Direct Audio Stream HLS/HTTP| AudioPlayer
 ```
 
 ---
