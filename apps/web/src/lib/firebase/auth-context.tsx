@@ -5,7 +5,6 @@ import {
   User,
   onAuthStateChanged,
   signInWithPopup,
-  signInWithRedirect,
   GoogleAuthProvider,
   signInWithCredential,
   signOut as firebaseSignOut,
@@ -21,10 +20,30 @@ const googleProvider = new GoogleAuthProvider();
 /**
  * Detects if the code is running inside a Capacitor native WebView.
  * Safe to call in SSR — returns false on the server.
+ *
+ * Uses multiple detection strategies since the Capacitor bridge may not
+ * always be fully injected when loading a remote URL in production:
+ *  1. Standard Capacitor.isNativePlatform() API
+ *  2. Capacitor global object presence with platform check
+ *  3. User-agent sniffing for Capacitor-injected WebViews
  */
 function isCapacitorNative(): boolean {
   if (typeof window === 'undefined') return false;
-  return !!(window as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
+
+  const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean; getPlatform?: () => string } }).Capacitor;
+
+  // Strategy 1: Standard API
+  if (cap?.isNativePlatform?.()) return true;
+
+  // Strategy 2: Platform string check (covers cases where isNativePlatform is not yet bound)
+  const platform = cap?.getPlatform?.();
+  if (platform === 'android' || platform === 'ios') return true;
+
+  // Strategy 3: User-agent detection for Capacitor-injected WebViews
+  // Capacitor injects its bridge and the WebView UA typically contains 'Capacitor'
+  if (typeof navigator !== 'undefined' && /Capacitor/i.test(navigator.userAgent)) return true;
+
+  return false;
 }
 
 export interface AuthContextType {
@@ -75,7 +94,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    // ── Tauri Deep Link Listener ──────────────────────────────────────────
+    let unlistenTauriDeepLink: (() => void) | undefined;
+    if (typeof window !== 'undefined' && '__TAURI__' in window) {
+      // Helper to process a melofy:// auth deep link URL
+      const handleDeepLinkUrl = async (url: string) => {
+        if (url.startsWith('melofy://auth')) {
+          const urlObj = new URL(url);
+          const customToken = urlObj.searchParams.get('token');
+          if (customToken) {
+            console.log('[Auth] Deep link received. Signing in with Custom Token...');
+            const { signInWithCustomToken } = await import('firebase/auth');
+            signInWithCustomToken(auth, customToken).catch(console.error);
+          }
+        }
+      };
+
+      // Check for pending deep link that arrived before JS was ready
+      // (set by the Rust setup hook via window.eval)
+      const pendingUrl = (window as { __MELOFY_PENDING_DEEP_LINK?: string }).__MELOFY_PENDING_DEEP_LINK;
+      if (pendingUrl) {
+        console.log('[Auth] Processing pending deep link from startup:', pendingUrl);
+        delete (window as { __MELOFY_PENDING_DEEP_LINK?: string }).__MELOFY_PENDING_DEEP_LINK;
+        handleDeepLinkUrl(pendingUrl);
+      }
+
+      // Listen for deep links that arrive while the app is running
+      import('@tauri-apps/plugin-deep-link').then((deepLinkPlugin) => {
+        const onOpenUrl = deepLinkPlugin.onOpenUrl || deepLinkPlugin.default?.onOpenUrl;
+        if (!onOpenUrl) {
+          console.error('Tauri deep link plugin not found');
+          return;
+        }
+        
+        onOpenUrl(async (urls: string[]) => {
+          for (const url of urls) {
+            await handleDeepLinkUrl(url);
+          }
+        }).then((unlisten) => {
+          unlistenTauriDeepLink = unlisten;
+        }).catch(console.error);
+      }).catch(console.error);
+    }
+
+    return () => {
+      unsubscribe();
+      if (unlistenTauriDeepLink) unlistenTauriDeepLink();
+    };
   }, []);
 
   const signInWithGoogle = async () => {
@@ -87,46 +152,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // ── Native path: use @capgo/capacitor-social-login ───────────────────
         // Dynamic import so the web bundle is never broken — this package is
         // only installed in apps/mobile, not apps/web.
-        const { SocialLogin } = await import(
-          '@capgo/capacitor-social-login'
-        );
+        try {
+          const { SocialLogin } = await import(
+            '@capgo/capacitor-social-login'
+          );
 
-        console.log('[Auth] SocialLogin.initialize …');
-        await SocialLogin.initialize({
-          google: {
-            webClientId: '499485015638-sc946ao8esct09jf6klaa967fbs5bmce.apps.googleusercontent.com',
-          },
-        });
+          console.log('[Auth] SocialLogin.initialize …');
+          await SocialLogin.initialize({
+            google: {
+              webClientId: '499485015638-sc946ao8esct09jf6klaa967fbs5bmce.apps.googleusercontent.com',
+            },
+          });
 
-        console.log('[Auth] SocialLogin.login …');
-        const result = await SocialLogin.login({ provider: 'google', options: { scopes: ['profile', 'email'] } });
-        console.log('[Auth] SocialLogin.login result:', JSON.stringify(result));
+          console.log('[Auth] SocialLogin.login …');
+          const result = await SocialLogin.login({ provider: 'google', options: { scopes: ['profile', 'email'] } });
+          console.log('[Auth] SocialLogin.login result:', JSON.stringify(result));
 
-        // Use explicit types instead of 'any' to satisfy strict linting
-        interface GoogleOnlineResponse {
-          responseType: 'online';
-          idToken: string | null;
+          // Use explicit types instead of 'any' to satisfy strict linting
+          interface GoogleOnlineResponse {
+            responseType: 'online';
+            idToken: string | null;
+          }
+
+          const googleResult = result.result as GoogleOnlineResponse | { responseType: 'offline' };
+          const idToken = googleResult?.responseType === 'online' ? googleResult.idToken : null;
+
+          if (!idToken) throw new Error('Google Sign-In: no idToken returned from native provider. Ensure you are not in offline mode.');
+          const credential = GoogleAuthProvider.credential(idToken);
+          await signInWithCredential(auth, credential);
+          return; // Success — exit early
+        } catch (nativeError) {
+          console.error('[Auth] Native SocialLogin failed, attempting popup fallback:', nativeError);
+          // Fall through to popup attempt below
+        }
+      }
+
+      // ── Browser / Fallback path ────────────────────────────────────────────
+      const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+
+      if (isTauri) {
+        console.log('[Auth] Tauri detected — opening system browser for login');
+        const openerPlugin = await import('@tauri-apps/plugin-opener');
+        const openBrowserUrl = openerPlugin.openUrl || openerPlugin.default?.openUrl;
+
+        if (!openBrowserUrl) {
+          throw new Error('Tauri opener plugin not found');
         }
 
-        const googleResult = result.result as GoogleOnlineResponse | { responseType: 'offline' };
-        const idToken = googleResult?.responseType === 'online' ? googleResult.idToken : null;
+        // Determine the URL depending on dev/prod
+        const isDev = window.location.hostname === 'localhost';
+        const baseUrl = isDev ? 'http://localhost:3000' : 'https://melofy.jene.in';
 
-        if (!idToken) throw new Error('Google Sign-In: no idToken returned from native provider. Ensure you are not in offline mode.');
-        const credential = GoogleAuthProvider.credential(idToken);
-        await signInWithCredential(auth, credential);
+        await openBrowserUrl(`${baseUrl}/desktop-login`);
       } else {
-        // ── Browser path ──────────────────────────────────────────────────────
-        // signInWithPopup doesn't work inside Android/iOS WebViews.
-        // If we detect a WebView-like user agent, use redirect instead.
-        const isWebView = typeof navigator !== 'undefined' &&
-          /wv|WebView/i.test(navigator.userAgent);
-
-        if (isWebView) {
-          console.log('[Auth] WebView detected — using signInWithRedirect');
-          await signInWithRedirect(auth, googleProvider);
-        } else {
-          await signInWithPopup(auth, googleProvider);
-        }
+        // Always try popup first — it works in regular browsers and modern WebViews.
+        // signInWithRedirect is fundamentally broken in Android WebView.
+        console.log('[Auth] Attempting signInWithPopup…');
+        await signInWithPopup(auth, googleProvider);
       }
     } catch (error) {
       console.error('Error signing in with Google', error);

@@ -47,6 +47,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
     pathname === '/terms' ||
     pathname === '/privacy' ||
     pathname === '/help' ||
+    pathname === '/desktop-login' ||
     pathname === '/github';
 
   const isPublicRoute =
