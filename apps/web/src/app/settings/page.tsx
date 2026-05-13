@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@/lib/firebase/auth-context';
+import { useState, useEffect } from 'react';import { useAuth } from '@/lib/firebase/auth-context';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -39,6 +39,14 @@ export default function SettingsPage() {
   const { essence, setEssence, mode, setMode } = useTheme();
   const { autoPip, toggleAutoPip } = useSettingsStore();
   const router = useRouter();
+  const [isNative, setIsNative] = useState(false);
+
+  useEffect(() => {
+    const isCapacitorNative = typeof window !== 'undefined' && (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
+    if (isCapacitorNative) {
+      setTimeout(() => setIsNative(true), 0);
+    }
+  }, []);
 
   const handleSignOut = async () => {
     try {
@@ -241,20 +249,22 @@ export default function SettingsPage() {
           <div className='grid grid-cols-1 md:grid-cols-2 gap-6 items-start'>
             <div className='flex flex-col gap-6'>
               {/* Mobile App */}
-              <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] flex flex-col gap-4'>
-                <div className='flex items-center gap-2 mb-2'>
-                  <Smartphone className='h-5 w-5 text-primary' />
-                  <h3 className='font-bold text-foreground text-lg'>Mobile App</h3>
-                </div>
-                <p className='text-sm text-muted-foreground'>
-                  Take Melofy on the go with our dedicated Android app.
-                </p>
-                <a href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy.apk' target='_blank' rel='noopener noreferrer'>
-                  <Button className='w-full rounded-full font-bold shadow-xl shadow-primary/20'>
-                    Download for Android
-                  </Button>
-                </a>
-              </Card>
+              {!isNative && (
+                <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] flex flex-col gap-4'>
+                  <div className='flex items-center gap-2 mb-2'>
+                    <Smartphone className='h-5 w-5 text-primary' />
+                    <h3 className='font-bold text-foreground text-lg'>Mobile App</h3>
+                  </div>
+                  <p className='text-sm text-muted-foreground'>
+                    Take Melofy on the go with our dedicated Android app.
+                  </p>
+                  <a href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy.apk' target='_blank' rel='noopener noreferrer'>
+                    <Button className='w-full rounded-full font-bold shadow-xl shadow-primary/20'>
+                      Download for Android
+                    </Button>
+                  </a>
+                </Card>
+              )}
 
               {/* Support */}
               <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] flex flex-col gap-4'>

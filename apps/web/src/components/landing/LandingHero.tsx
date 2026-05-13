@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 
 /* ── Constants ── */
 const ARTWORK =
@@ -350,7 +350,14 @@ function PlayerScreen({ isPlaying, setIsPlaying }: { isPlaying: boolean; setIsPl
 
 export function LandingHero() {
   const [isPlaying, setIsPlaying] = useState(true);
+  const [isNative, setIsNative] = useState(false);
 
+  useEffect(() => {
+    const isCapacitorNative = typeof window !== 'undefined' && (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
+    if (isCapacitorNative) {
+      setTimeout(() => setIsNative(true), 0);
+    }
+  }, []);
   return (
     <section className='relative min-h-screen flex items-center justify-center py-40 px-6 overflow-hidden'>
       {/* Background — dot grid only */}
@@ -399,19 +406,21 @@ export function LandingHero() {
                 <ChevronRight className='ml-2 w-5 h-5' />
               </Button>
             </Link>
-            <a
-              href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy.apk'
-              target='_blank'
-              rel='noopener noreferrer'
-            >
-              <Button
-                variant='outline'
-                size='lg'
-                className='h-14 px-10 rounded-full font-bold text-lg hover:scale-105 transition-transform shadow-xl shadow-foreground/5'
+            {!isNative && (
+              <a
+                href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy.apk'
+                target='_blank'
+                rel='noopener noreferrer'
               >
-                Download for Android
-              </Button>
-            </a>
+                <Button
+                  variant='outline'
+                  size='lg'
+                  className='h-14 px-10 rounded-full font-bold text-lg hover:scale-105 transition-transform shadow-xl shadow-foreground/5'
+                >
+                  Download for Android
+                </Button>
+              </a>
+            )}
           </div>
         </div>
 
