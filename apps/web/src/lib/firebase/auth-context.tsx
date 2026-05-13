@@ -5,6 +5,7 @@ import {
   User,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
   GoogleAuthProvider,
   signInWithCredential,
   signOut as firebaseSignOut,
@@ -79,20 +80,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
-      if (isCapacitorNative()) {
+      const isNative = isCapacitorNative();
+      console.log('[Auth] signInWithGoogle — isCapacitorNative:', isNative);
+
+      if (isNative) {
         // ── Native path: use @capgo/capacitor-social-login ───────────────────
         // Dynamic import so the web bundle is never broken — this package is
         // only installed in apps/mobile, not apps/web.
         const { SocialLogin } = await import(
           '@capgo/capacitor-social-login'
         );
+
+        console.log('[Auth] SocialLogin.initialize …');
         await SocialLogin.initialize({
           google: {
             webClientId: '499485015638-sc946ao8esct09jf6klaa967fbs5bmce.apps.googleusercontent.com',
           },
         });
+
+        console.log('[Auth] SocialLogin.login …');
         const result = await SocialLogin.login({ provider: 'google', options: { scopes: ['profile', 'email'] } });
-        
+        console.log('[Auth] SocialLogin.login result:', JSON.stringify(result));
+
         // Use explicit types instead of 'any' to satisfy strict linting
         interface GoogleOnlineResponse {
           responseType: 'online';
@@ -101,13 +110,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const googleResult = result.result as GoogleOnlineResponse | { responseType: 'offline' };
         const idToken = googleResult?.responseType === 'online' ? googleResult.idToken : null;
-        
+
         if (!idToken) throw new Error('Google Sign-In: no idToken returned from native provider. Ensure you are not in offline mode.');
         const credential = GoogleAuthProvider.credential(idToken);
         await signInWithCredential(auth, credential);
       } else {
-        // ── Browser path: existing popup flow (unchanged) ─────────────────
-        await signInWithPopup(auth, googleProvider);
+        // ── Browser path ──────────────────────────────────────────────────────
+        // signInWithPopup doesn't work inside Android/iOS WebViews.
+        // If we detect a WebView-like user agent, use redirect instead.
+        const isWebView = typeof navigator !== 'undefined' &&
+          /wv|WebView/i.test(navigator.userAgent);
+
+        if (isWebView) {
+          console.log('[Auth] WebView detected — using signInWithRedirect');
+          await signInWithRedirect(auth, googleProvider);
+        } else {
+          await signInWithPopup(auth, googleProvider);
+        }
       }
     } catch (error) {
       console.error('Error signing in with Google', error);

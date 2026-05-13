@@ -61,7 +61,7 @@ function PhoneFrame({ children, isPlaying }: { children: React.ReactNode; isPlay
 
   return (
     <div 
-      className='relative mx-auto group perspective-[1200px]' 
+      className='relative mx-auto group perspective-distant' 
       style={{ width: 300, height: 610, perspective: 1200 }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
@@ -122,7 +122,9 @@ function PhoneFrame({ children, isPlaying }: { children: React.ReactNode; isPlay
                   animate={{ opacity: 1, x: 0 }}
                   className='flex items-center gap-2'
                 >
+                  
                   <div className='w-5 h-5 rounded-[4px] overflow-hidden'>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={ARTWORK} alt='' className='w-full h-full object-cover' />
                   </div>
                 </motion.div>
@@ -154,7 +156,7 @@ function PhoneFrame({ children, isPlaying }: { children: React.ReactNode; isPlay
                   <div className='w-[2.5px] h-[35%] bg-white rounded-[0.5px]' />
                   <div className='w-[2.5px] h-[55%] bg-white rounded-[0.5px]' />
                   <div className='w-[2.5px] h-[75%] bg-white rounded-[0.5px]' />
-                  <div className='w-[2.5px] h-[100%] bg-white/30 rounded-[0.5px]' />
+                  <div className='w-[2.5px] h-full bg-white/30 rounded-[0.5px]' />
                 </div>
                 {/* WiFi */}
                 <svg width='14' height='10' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='3' strokeLinecap='round' strokeLinejoin='round' className='mb-[0.5px]'>
@@ -163,7 +165,7 @@ function PhoneFrame({ children, isPlaying }: { children: React.ReactNode; isPlay
                   <circle cx='12' cy='19.5' r='1' fill='currentColor' stroke='none' />
                 </svg>
                 {/* Battery */}
-                <div className='relative w-[23px] h-[11.5px] border border-white/35 rounded-[3.5px] p-[1px] flex items-center ml-0.5'>
+                <div className='relative w-[23px] h-[11.5px] border border-white/35 rounded-[3.5px] p-px flex items-center ml-0.5'>
                   <div className='h-full bg-white rounded-[1.5px]' style={{ width: '65%' }} />
                   <div className='absolute -right-[2.5px] top-1/2 -translate-y-1/2 w-[1.5px] h-[4px] bg-white/35 rounded-r-[1px]' />
                 </div>
@@ -270,12 +272,13 @@ function PlayerScreen({ isPlaying, setIsPlaying }: { isPlaying: boolean; setIsPl
         {/* Album artwork (Removed flex-1 to allow track info to sit right below it) */}
         <div className='px-5 pb-10 pt-4 flex items-start justify-center'>
           <div className='w-full aspect-square rounded-[20px] overflow-hidden shadow-2xl relative border border-white/10'>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={ARTWORK}
               alt='Blinding Lights — The Weeknd'
               className='w-full h-full object-cover'
             />
-            <div className='absolute inset-0 bg-gradient-to-t from-black/25 to-transparent' />
+            <div className='absolute inset-0 bg-linear-to-t from-black/25 to-transparent' />
           </div>
         </div>
 
@@ -367,6 +370,7 @@ export function LandingHero() {
           <div className='flex flex-col gap-6'>
             <div className='flex items-center justify-center lg:justify-start gap-4 mb-2'>
               <div className='w-12 h-12 flex items-center justify-center overflow-hidden'>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src='/logo.png' alt='Melofy Logo' className='w-full h-full object-contain' />
               </div>
               <span className='text-4xl font-black text-foreground tracking-tighter'>Melofy</span>

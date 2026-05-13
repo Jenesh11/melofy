@@ -91,10 +91,10 @@ export function MobilePlayer({
       shouldScaleBackground={true}
     >
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" />
-        <Drawer.Content className='md:hidden fixed inset-0 z-[101] bg-black text-white flex flex-col overflow-hidden outline-none'>
+        <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-100" />
+        <Drawer.Content className='md:hidden fixed inset-0 z-101 bg-black text-white flex flex-col overflow-hidden outline-none'>
           <Drawer.Title className="sr-only">Now Playing</Drawer.Title>
-          <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-white/20 mt-4 mb-2 z-[110]" />
+          <div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-white/20 mt-4 mb-2 z-110" />
       {/* Background Essence */}
       <AnimatePresence mode='wait'>
         {currentTrack && (
@@ -150,7 +150,7 @@ export function MobilePlayer({
         </div>
 
         {/* Main Content wrapper for centering */}
-        <div className='flex-1 flex flex-col justify-center min-h-[min-content] py-4'>
+        <div className='flex-1 flex flex-col justify-center min-h-min py-4'>
 
         {/* Large Artwork */}
         <div className='relative w-full aspect-square mb-8 shrink-0'>
@@ -341,9 +341,9 @@ export function MobilePlayer({
         onOpenChange={setShowLyrics}
       >
         <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110]" />
-          <Drawer.Content className='fixed inset-0 z-[120] bg-black/80 backdrop-blur-3xl flex flex-col outline-none'>
-            <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-white/20 mt-4 mb-2" />
+          <Drawer.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-md z-110" />
+          <Drawer.Content className='fixed inset-0 z-120 bg-black/80 backdrop-blur-3xl flex flex-col outline-none'>
+            <div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-white/20 mt-4 mb-2" />
             <div className='flex items-center justify-between p-6 shrink-0 border-b border-white/10'>
               <Drawer.Title className='text-xl font-bold text-white tracking-widest uppercase m-0'>
                 Lyrics
@@ -382,9 +382,9 @@ export function MobilePlayer({
         onOpenChange={setShowQueue}
       >
         <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110]" />
-          <Drawer.Content className='fixed inset-0 z-[120] bg-black/80 backdrop-blur-3xl flex flex-col outline-none'>
-            <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-white/20 mt-4 mb-2" />
+          <Drawer.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-md z-110" />
+          <Drawer.Content className='fixed inset-0 z-120 bg-black/80 backdrop-blur-3xl flex flex-col outline-none'>
+            <div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-white/20 mt-4 mb-2" />
             <div className='flex items-center justify-between p-6 shrink-0 border-b border-white/10'>
               <Drawer.Title className='text-xl font-bold text-white tracking-widest uppercase flex items-center gap-2 m-0'>
                 <ListMusic className='h-5 w-5' /> Queue ({queue.length})
