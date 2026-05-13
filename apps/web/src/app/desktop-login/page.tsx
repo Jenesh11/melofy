@@ -13,8 +13,6 @@ import {
   ArrowRight,
   CheckCircle2,
   ExternalLink,
-  Copy,
-  Check,
   RotateCcw,
 } from 'lucide-react';
 import { getAuth, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
@@ -28,7 +26,6 @@ export default function DesktopLogin() {
   const [done, setDone] = useState(false);
   const [customToken, setCustomToken] = useState('');
   const [deepLinkFailed, setDeepLinkFailed] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   const attemptDeepLink = useCallback((token: string) => {
     const deepLinkUrl = `melofy://auth?token=${token}`;
@@ -46,24 +43,6 @@ export default function DesktopLogin() {
       }
     }, 3000);
   }, []);
-
-  const handleCopyToken = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(customToken);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback: select from a hidden input
-      const input = document.createElement('input');
-      input.value = customToken;
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand('copy');
-      document.body.removeChild(input);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }, [customToken]);
 
   const handleRetryDeepLink = useCallback(() => {
     if (!customToken) return;
@@ -199,34 +178,6 @@ export default function DesktopLogin() {
                   <RotateCcw className="mr-2 w-4 h-4" />
                   Retry Opening App
                 </button>
-
-                {/* Option 2: Copy Token */}
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground/60 font-medium">
-                    Or copy the auth token and paste it in the desktop app:
-                  </p>
-                  <div className="flex gap-2">
-                    <div className="flex-1 bg-background/50 border border-border rounded-xl px-3 py-2.5 text-xs font-mono text-muted-foreground truncate text-left">
-                      {customToken.slice(0, 32)}…
-                    </div>
-                    <button
-                      onClick={handleCopyToken}
-                      className="shrink-0 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95"
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="w-3.5 h-3.5" />
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          Copy
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
 
                 {/* Dev mode hint */}
                 <div className="flex items-start gap-2.5 text-amber-500/80 bg-amber-500/5 border border-amber-500/10 px-4 py-3 rounded-2xl text-xs font-medium text-left">
