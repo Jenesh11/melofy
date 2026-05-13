@@ -54,6 +54,70 @@
 
 ---
 
+## 🏗️ System Architecture
+
+Melofy employs a distributed service architecture separating the frontend interface, the main API gateway, and the dedicated audio streaming engine.
+
+```mermaid
+graph TD
+    %% Core Styling
+    classDef client fill:#0ea5e9,stroke:#0284c7,stroke-width:2px,color:#fff,rx:8px,ry:8px
+    classDef frontend fill:#10b981,stroke:#059669,stroke-width:2px,color:#fff,rx:8px,ry:8px
+    classDef backend fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff,rx:8px,ry:8px
+    classDef audio fill:#f59e0b,stroke:#d97706,stroke-width:2px,color:#fff,rx:8px,ry:8px
+    classDef database fill:#ef4444,stroke:#dc2626,stroke-width:2px,color:#fff,rx:8px,ry:8px
+    classDef external fill:#374151,stroke:#1f2937,stroke-width:2px,color:#fff,rx:8px,ry:8px
+
+    subgraph Clients ["📱 Client Layer"]
+        Web["Web Application"]:::client
+        Mobile["Android App (Capacitor)"]:::client
+    end
+
+    subgraph Frontend ["🎨 Frontend (Next.js)"]
+        UI["User Interface"]:::frontend
+        State["Zustand State"]:::frontend
+        AudioPlayer["Web Audio API Player"]:::frontend
+    end
+
+    subgraph Backend ["⚙️ API Gateway (Express)"]
+        Router["API Router"]:::backend
+        SocketServer["Socket.io (Realtime)"]:::backend
+        Metadata["Metadata & Search"]:::backend
+    end
+
+    subgraph Streaming ["🎵 Audio Engine (NodeLink)"]
+        NodeLinkServer["NodeLink Server"]:::audio
+        AudioStreamer["Audio Streamer"]:::audio
+    end
+
+    subgraph Cloud ["☁️ Cloud & External Services"]
+        Firebase["Firebase Auth"]:::database
+        Upstash["Upstash Redis"]:::database
+        SpotifyAPI["Spotify APIs"]:::external
+    end
+
+    %% Client Interactions
+    Web -->|Renders| UI
+    Mobile -->|WebView| UI
+    UI <--> State
+    State -->|HTTP Requests| Router
+    UI -->|WebSocket| SocketServer
+
+    %% Backend Integrations
+    Router -->|Verify Token| Firebase
+    Router --> Metadata
+    Metadata <-->|Cache Responses| Upstash
+    Metadata -->|Fetch Track Info| SpotifyAPI
+    
+    %% Audio Flow
+    SocketServer -->|Commands (Play/Pause)| NodeLinkServer
+    NodeLinkServer -->|Fetch Audio Source| SpotifyAPI
+    NodeLinkServer --> AudioStreamer
+    AudioStreamer -.->|Direct Audio Stream (HLS/HTTP)| AudioPlayer
+```
+
+---
+
 ## 🛠️ Performance-Driven Tech Stack
 
 <div align="center">
