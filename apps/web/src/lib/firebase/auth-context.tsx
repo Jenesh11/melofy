@@ -104,6 +104,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       };
+      // Expose to global window so the single-instance Rust hook can call it directly
+      (window as { __MELOFY_HANDLE_DEEP_LINK?: (url: string) => void }).__MELOFY_HANDLE_DEEP_LINK = handleDeepLinkUrl;
 
       // Check for pending deep link that arrived before JS was ready
       // (set by the Rust setup hook via window.eval)
