@@ -4,22 +4,30 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+use std::sync::Mutex;
+
+struct PendingDeepLink(Mutex<Option<String>>);
+
+#[tauri::command]
+fn get_pending_deep_link(state: tauri::State<PendingDeepLink>) -> Option<String> {
+    state.0.lock().unwrap().take()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(PendingDeepLink(Mutex::new(None)))
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             use tauri::Manager;
+            use tauri::Emitter;
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_focus();
                 let _ = window.unminimize();
                 
-                // Pass deep link to the already-running webview
+                // Pass deep link to the already-running webview via safe Tauri event
                 for arg in args {
                     if arg.starts_with("melofy://") {
-                        let _ = window.eval(&format!(
-                            r#"if (window.__MELOFY_HANDLE_DEEP_LINK) {{ window.__MELOFY_HANDLE_DEEP_LINK("{}"); }}"#,
-                            arg.replace('"', r#"\""#)
-                        ));
+                        let _ = window.emit("melofy-deep-link", arg);
                     }
                 }
             }
@@ -35,20 +43,15 @@ pub fn run() {
                 if let Ok(Some(urls)) = app.deep_link().get_current() {
                     for url in urls {
                         println!("[Melofy] Deep link received on startup: {}", url);
-                        // Inject the pending URL into the WebView's JS context
-                        // so the auth-context listener can pick it up.
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.eval(&format!(
-                                r#"window.__MELOFY_PENDING_DEEP_LINK = "{}";"#,
-                                url.as_str().replace('"', r#"\""#)
-                            ));
-                        }
+                        // Save the URL in state so the frontend can retrieve it once fully loaded
+                        let state = app.state::<PendingDeepLink>();
+                        *state.0.lock().unwrap() = Some(url.to_string());
                     }
                 }
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![greet, get_pending_deep_link])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

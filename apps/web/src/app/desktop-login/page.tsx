@@ -179,15 +179,6 @@ export default function DesktopLogin() {
                   Retry Opening App
                 </button>
 
-                {/* Dev mode hint */}
-                <div className="flex items-start gap-2.5 text-amber-500/80 bg-amber-500/5 border border-amber-500/10 px-4 py-3 rounded-2xl text-xs font-medium text-left">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>
-                    <strong>Dev mode?</strong> The <code className="bg-amber-500/10 px-1 rounded">melofy://</code> deep link only works
-                    after the desktop app has been installed. During development,
-                    auth tokens are logged to the Tauri console.
-                  </span>
-                </div>
               </motion.div>
             ) : done ? (
               <motion.div
