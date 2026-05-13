@@ -165,8 +165,8 @@ export default function DesktopLogin() {
                     Couldn&apos;t Open App
                   </h2>
                   <p className="text-muted-foreground text-sm leading-relaxed">
-                    Authentication was successful, but we couldn&apos;t redirect to Melofy Desktop.
-                    This is normal during development or on first install.
+                    Authentication was successful, but we couldn&apos;t automatically redirect you back to Melofy Desktop.
+                    Please retry opening the app manually.
                   </p>
                 </div>
 

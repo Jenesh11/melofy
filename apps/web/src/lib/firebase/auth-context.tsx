@@ -104,31 +104,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       };
-      
-      // Listen for deep links from Tauri events
-      import('@tauri-apps/api/core').then(async ({ invoke }) => {
-        try {
-          // 1. Check for a pending deep link from a cold start
-          const pendingUrl = await invoke<string | null>('get_pending_deep_link');
-          if (pendingUrl) {
-            console.log('[Auth] Processing pending deep link from startup:', pendingUrl);
-            await handleDeepLinkUrl(pendingUrl);
-          }
-        } catch (e) {
-          console.error('[Auth] Error checking pending deep link', e);
-        }
-      });
 
-      import('@tauri-apps/api/event').then(async ({ listen }) => {
-        // 2. Listen for deep links while the app is already running
-        unlistenTauriDeepLink = await listen<string>('melofy-deep-link', (event) => {
-          console.log('[Auth] Received deep link event:', event.payload);
-          handleDeepLinkUrl(event.payload);
-        });
-      }).catch(console.error);
+      // Export it globally so the Rust single-instance hook can call it directly
+      (window as { __handleDeepLinkUrl?: (url: string) => void }).__handleDeepLinkUrl = handleDeepLinkUrl;
 
-      // We still keep the original deep link listener just in case
-      // standard tauri-plugin-deep-link fires on some platforms
+      // Check for pending deep link that arrived before JS was ready
+      // (set by the Rust setup hook via window.eval)
+      const pendingUrl = (window as { __MELOFY_PENDING_DEEP_LINK?: string }).__MELOFY_PENDING_DEEP_LINK;
+      if (pendingUrl) {
+        console.log('[Auth] Processing pending deep link from startup:', pendingUrl);
+        delete (window as { __MELOFY_PENDING_DEEP_LINK?: string }).__MELOFY_PENDING_DEEP_LINK;
+        handleDeepLinkUrl(pendingUrl);
+      }
+
+      // Listen for deep links that arrive while the app is running
       import('@tauri-apps/plugin-deep-link').then((m) => {
         const deepLinkPlugin = m as { 
           onOpenUrl?: typeof m.onOpenUrl; 
@@ -136,13 +125,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
         const onOpenUrl = deepLinkPlugin.onOpenUrl || deepLinkPlugin.default?.onOpenUrl;
         
-        if (onOpenUrl) {
-          onOpenUrl(async (urls: string[]) => {
-            for (const url of urls) {
-              await handleDeepLinkUrl(url);
-            }
-          }).catch(console.error);
+        if (!onOpenUrl) {
+          console.error('Tauri deep link plugin not found');
+          return;
         }
+        
+        onOpenUrl(async (urls: string[]) => {
+          for (const url of urls) {
+            await handleDeepLinkUrl(url);
+          }
+        }).then((unlisten) => {
+          unlistenTauriDeepLink = unlisten;
+        }).catch(console.error);
       }).catch(console.error);
     }
 
