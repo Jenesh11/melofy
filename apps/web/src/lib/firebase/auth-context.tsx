@@ -120,8 +120,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Listen for deep links that arrive while the app is running
-      import('@tauri-apps/plugin-deep-link').then((deepLinkPlugin) => {
+      import('@tauri-apps/plugin-deep-link').then((m) => {
+        const deepLinkPlugin = m as { 
+          onOpenUrl?: typeof m.onOpenUrl; 
+          default?: { onOpenUrl?: typeof m.onOpenUrl } 
+        };
         const onOpenUrl = deepLinkPlugin.onOpenUrl || deepLinkPlugin.default?.onOpenUrl;
+        
         if (!onOpenUrl) {
           console.error('Tauri deep link plugin not found');
           return;
@@ -192,7 +197,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (isTauri) {
         console.log('[Auth] Tauri detected — opening system browser for login');
-        const openerPlugin = await import('@tauri-apps/plugin-opener');
+        const m = await import('@tauri-apps/plugin-opener');
+        const openerPlugin = m as {
+          openUrl?: typeof m.openUrl;
+          default?: { openUrl?: typeof m.openUrl };
+        };
         const openBrowserUrl = openerPlugin.openUrl || openerPlugin.default?.openUrl;
 
         if (!openBrowserUrl) {
