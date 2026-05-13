@@ -31,19 +31,14 @@ function isCapacitorNative(): boolean {
   if (typeof window === 'undefined') return false;
 
   const cap = (window as { Capacitor?: { isNativePlatform?: () => boolean; getPlatform?: () => string } }).Capacitor;
-
-  // Strategy 1: Standard API
-  if (cap?.isNativePlatform?.()) return true;
-
-  // Strategy 2: Platform string check (covers cases where isNativePlatform is not yet bound)
   const platform = cap?.getPlatform?.();
-  if (platform === 'android' || platform === 'ios') return true;
 
-  // Strategy 3: User-agent detection for Capacitor-injected WebViews
-  // Capacitor injects its bridge and the WebView UA typically contains 'Capacitor'
-  if (typeof navigator !== 'undefined' && /Capacitor/i.test(navigator.userAgent)) return true;
-
-  return false;
+  return !!(
+    cap?.isNativePlatform?.() ||
+    platform === 'android' ||
+    platform === 'ios' ||
+    (typeof navigator !== 'undefined' && /Capacitor/i.test(navigator.userAgent))
+  );
 }
 
 export interface AuthContextType {
@@ -155,40 +150,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (isNative) {
         // ── Native path: use @capgo/capacitor-social-login ───────────────────
-        // Dynamic import so the web bundle is never broken — this package is
-        // only installed in apps/mobile, not apps/web.
         try {
-          const { SocialLogin } = await import(
-            '@capgo/capacitor-social-login'
-          );
+          const { SocialLogin } = await import('@capgo/capacitor-social-login');
 
-          console.log('[Auth] SocialLogin.initialize …');
           await SocialLogin.initialize({
             google: {
               webClientId: '499485015638-sc946ao8esct09jf6klaa967fbs5bmce.apps.googleusercontent.com',
             },
           });
 
-          console.log('[Auth] SocialLogin.login …');
           const result = await SocialLogin.login({ provider: 'google', options: { scopes: ['profile', 'email'] } });
-          console.log('[Auth] SocialLogin.login result:', JSON.stringify(result));
+          
+          // The capgo Google plugin returns the tokens directly inside the result object
+          const idToken = (result.result as { idToken?: string })?.idToken;
 
-          // Use explicit types instead of 'any' to satisfy strict linting
-          interface GoogleOnlineResponse {
-            responseType: 'online';
-            idToken: string | null;
-          }
-
-          const googleResult = result.result as GoogleOnlineResponse | { responseType: 'offline' };
-          const idToken = googleResult?.responseType === 'online' ? googleResult.idToken : null;
-
-          if (!idToken) throw new Error('Google Sign-In: no idToken returned from native provider. Ensure you are not in offline mode.');
-          const credential = GoogleAuthProvider.credential(idToken);
-          await signInWithCredential(auth, credential);
+          if (!idToken) throw new Error('Google Sign-In: no idToken returned from native provider.');
+          
+          await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
           return; // Success — exit early
         } catch (nativeError) {
           console.error('[Auth] Native SocialLogin failed, attempting popup fallback:', nativeError);
-          // Fall through to popup attempt below
         }
       }
 
