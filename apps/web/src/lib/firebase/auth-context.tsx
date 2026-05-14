@@ -171,8 +171,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
           return; // Success — exit early
-        } catch (nativeError) {
-          console.error('[Auth] Native SocialLogin failed, attempting popup fallback:', nativeError);
+        } catch (nativeError: any) {
+          console.error('[Auth] Native SocialLogin failed:', nativeError);
+          // Instead, show an alert with the error so the developer/user knows why it failed.
+          const msg = nativeError?.message || String(nativeError);
+          alert(`Google Sign-In failed: ${msg}\n\nMake sure your SHA-1 (Debug or Release) is added to Firebase Console!`);
+          throw nativeError;
         }
       }
 
@@ -199,7 +203,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await openBrowserUrl(`${baseUrl}/desktop-login`);
       } else {
         // Always try popup first — it works in regular browsers and modern WebViews.
-        // signInWithRedirect is fundamentally broken in Android WebView.
         console.log('[Auth] Attempting signInWithPopup…');
         await signInWithPopup(auth, googleProvider);
       }
