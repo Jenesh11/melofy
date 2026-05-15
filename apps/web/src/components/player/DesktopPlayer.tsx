@@ -158,7 +158,7 @@ export function DesktopPlayer({
               backgroundImage: `url(${currentTrack.artworkUrl})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
-              filter: 'blur(40px) saturate(2)',
+              filter: 'blur(20px) saturate(2)',
               maskImage: 'linear-gradient(to right, black, transparent)',
               WebkitMaskImage: 'linear-gradient(to right, black, transparent)',
             }}

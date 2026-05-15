@@ -120,13 +120,27 @@ router.get('/recommendations', async (req, res) => {
     ? genre
     : genres[Math.floor(Math.random() * genres.length)];
 
-  const query = mood ? `genre:${chosenGenre} ${mood}` : `genre:${chosenGenre}`;
+  const cacheKey = `spotify:recommendations:${chosenGenre}:${mood}`;
 
   try {
+    // Check cache first
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    const query = mood ? `genre:${chosenGenre} ${mood}` : `genre:${chosenGenre}`;
+
     const data = await spotifyGet(
       `/search?q=${encodeURIComponent(query)}&type=track&limit=10&market=US`,
     );
-    res.json(data.tracks.items);
+
+    const tracks = data.tracks.items;
+
+    // Cache for 24 hours
+    await redis.setex(cacheKey, 60 * 60 * 24, tracks);
+
+    res.json(tracks);
   } catch (error: any) {
     console.error(
       '[Spotify] Recommendations error:',

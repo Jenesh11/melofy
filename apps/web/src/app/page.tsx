@@ -173,7 +173,7 @@ export default function Home() {
   const greeting = getGreeting();
 
   return (
-    <div className='p-4 md:p-8 flex flex-col gap-10 overflow-x-hidden'>
+    <div className='p-4 md:p-6 flex flex-col gap-10 overflow-x-hidden'>
       <header className='flex flex-col gap-2'>
         <motion.p
           initial={{ opacity: 0, x: -20 }}
