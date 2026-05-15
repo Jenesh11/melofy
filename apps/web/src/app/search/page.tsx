@@ -380,7 +380,7 @@ export default function SearchPage() {
                   transition={{ delay: index * 0.04 }}
                   key={`history-${item.term}-${index}`}
                   onClick={() => setQuery(item.term)}
-                  className='group relative flex-shrink-0 w-52 h-32 rounded-2xl overflow-hidden cursor-pointer snap-start border border-white/5 hover:border-primary/40 transition-all duration-300 hover:shadow-xl hover:shadow-primary/10 hover:scale-[1.02]'
+                  className='group relative shrink-0 w-52 h-32 rounded-2xl overflow-hidden cursor-pointer snap-start border border-white/5 hover:border-primary/40 transition-all duration-300 hover:shadow-xl hover:shadow-primary/10 hover:scale-[1.02]'
                 >
                   {/* Background image */}
                   {item.image ? (
@@ -391,11 +391,11 @@ export default function SearchPage() {
                       className='object-cover brightness-50 group-hover:brightness-65 group-hover:scale-110 transition-all duration-700'
                     />
                   ) : (
-                    <div className='absolute inset-0 bg-gradient-to-br from-zinc-800 to-zinc-900' />
+                    <div className='absolute inset-0 bg-linear-to-br from-zinc-800 to-zinc-900' />
                   )}
 
                   {/* Bottom gradient */}
-                  <div className='absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent' />
+                  <div className='absolute inset-0 bg-linear-to-t from-black/90 via-black/30 to-transparent' />
 
                   {/* Delete button top-right */}
                   <button

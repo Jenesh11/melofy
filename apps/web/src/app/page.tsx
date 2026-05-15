@@ -69,7 +69,7 @@ export default function Home() {
   );
 
   const newReleasesAsTracks = useMemo(() => {
-    return newReleases.map((track: any) => ({
+    return newReleases.map((track: SpotifyTrackLike) => ({
       id: track.id,
       name: track.name,
       artists: track.artists || [{ name: 'Unknown' }],

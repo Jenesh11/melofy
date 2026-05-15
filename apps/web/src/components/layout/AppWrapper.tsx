@@ -92,7 +92,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
     return () => {
       backButtonHandler.then((h) => h.remove());
     };
-  }, []);
+  }, [pathname, router]);
 
   if (loading) {
     return (

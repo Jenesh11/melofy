@@ -161,7 +161,7 @@ export function DesktopPlayer({
               filter: 'blur(20px) saturate(2)',
               maskImage: 'linear-gradient(to right, black, transparent)',
               WebkitMaskImage: 'linear-gradient(to right, black, transparent)',
-            }}
+            } as any}
           />
         </AnimatePresence>
 

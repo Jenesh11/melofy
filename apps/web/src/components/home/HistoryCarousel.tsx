@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Track, usePlayerStore } from '@/store/usePlayerStore';
 import { TrackOptionsMenu } from '@/components/ui/TrackOptionsMenu';
 import { toast } from 'sonner';
+import Image from 'next/image';
 
 interface HistoryCarouselProps {
   history: Track[];
@@ -21,9 +22,9 @@ export function HistoryCarousel({
   onPause,
   onResume,
 }: HistoryCarouselProps) {
-  if (history.length === 0) return null;
-
   const addToQueue = usePlayerStore((state) => state.addToQueue);
+
+  if (history.length === 0) return null;
 
   const handleAddToQueue = (track: Track) => {
     addToQueue(track);
@@ -32,7 +33,13 @@ export function HistoryCarousel({
       description: (
         <div className="flex items-center gap-2 mt-1">
           {track.artworkUrl && (
-            <img src={track.artworkUrl} alt="" className="h-8 w-8 rounded-md object-cover shadow-md brightness-90" />
+            <Image 
+              src={track.artworkUrl} 
+              alt="" 
+              width={32}
+              height={32}
+              className="h-8 w-8 rounded-md object-cover shadow-md brightness-90" 
+            />
           )}
           <div className="flex flex-col min-w-0">
             <span className="font-bold text-xs truncate opacity-90">{track.title}</span>
@@ -94,9 +101,11 @@ export function HistoryCarousel({
                 <div className='absolute inset-0 bg-background/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10 pointer-events-none' />
                 <div className='h-full w-full bg-linear-to-br from-muted to-background group-hover:scale-110 transition-transform duration-700 flex items-center justify-center'>
                   {track.artworkUrl ? (
-                    <img
+                    <Image
                       src={track.artworkUrl}
                       alt={track.title}
+                      width={200}
+                      height={200}
                       className='w-full h-full object-cover'
                     />
                   ) : (

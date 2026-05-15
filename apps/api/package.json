@@ -8,7 +8,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts"
   },
   "dependencies": {
-    "@upstash/redis": "^1.36.4",
+    "@upstash/redis": "^1.38.0",
     "axios": "^1.13.6",
     "cors": "^2.8.5",
     "dotenv": "^17.3.1",

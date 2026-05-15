@@ -12,6 +12,19 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
 import { toast } from 'sonner';
 
+interface LavalinkTrack {
+  encoded: string;
+  info: {
+    identifier: string;
+    title: string;
+    author: string;
+    artworkUrl?: string;
+    duration: number;
+    length?: number;
+    sourceName?: string;
+  };
+}
+
 export function Topbar() {
   const router = useRouter();
   const pathname = usePathname();
@@ -23,7 +36,7 @@ export function Topbar() {
 
   const [query, setQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<LavalinkTrack[]>([]);
   const [loading, setLoading] = useState(false);
   
   const debouncedQuery = useDebounce(query, 500);
@@ -72,7 +85,7 @@ export function Topbar() {
     fetchResults();
   }, [debouncedQuery, user, authLoading]);
 
-  const mapTrack = (track: any) => ({
+  const mapTrack = (track: LavalinkTrack) => ({
     id: track.info?.identifier || 'unknown',
     title: track.info?.title || 'Unknown Title',
     artist: track.info?.author || 'Unknown Artist',
@@ -82,7 +95,7 @@ export function Topbar() {
     encoded: track.encoded,
   });
 
-  const handleTrackClick = (track: any) => {
+  const handleTrackClick = (track: LavalinkTrack) => {
     const mappedTrack = mapTrack(track);
     setQueue([mappedTrack]);
     playTrack(mappedTrack, true);
@@ -91,7 +104,7 @@ export function Topbar() {
     if (inputRef.current) inputRef.current.blur();
   };
 
-  const handleAddToQueue = (e: React.MouseEvent, track: any) => {
+  const handleAddToQueue = (e: React.MouseEvent, track: LavalinkTrack) => {
     e.stopPropagation();
     const mappedTrack = mapTrack(track);
     if (!currentTrack) {
@@ -188,7 +201,7 @@ export function Topbar() {
 
             {/* Dropdown */}
             {isFocused && (query.trim() || loading) && (
-              <div className='absolute top-full left-0 right-0 mt-2 bg-card/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl overflow-hidden z-[100] max-h-[60vh] overflow-y-auto custom-scrollbar'>
+              <div className='absolute top-full left-0 right-0 mt-2 bg-card/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl overflow-hidden z-100 max-h-[60vh] overflow-y-auto custom-scrollbar'>
                 {loading && results.length === 0 ? (
                   <div className='flex items-center justify-center p-8'>
                     <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />
