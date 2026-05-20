@@ -4,9 +4,9 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { Track } from '@/store/usePlayerStore';
 import { useSettingsStore } from '@/store/useSettingsStore';
 
-// Document PiP window dimensions — compact Spotify-style horizontal card
-const PIP_W = 460;
-const PIP_H = 148;
+// Document PiP window dimensions — premium vertical ambient player matching safety height minimums
+const PIP_W = 380;
+const PIP_H = 240;
 
 // Module-level so openDocPip() can be called from button clicks
 let _requestOpen: (() => Promise<void>) | null = null;
@@ -36,10 +36,11 @@ export function useDocPip(
     }
 
     try {
-      // @ts-expect-error — Document PiP API is not in core TS types yet
+      // @ts-expect-error - Document PiP API is not in core TS types yet
       const win: Window = await window.documentPictureInPicture.requestWindow({
         width: PIP_W,
         height: PIP_H,
+        preferInitialWindowPlacement: true,
         disallowReturnToOpener: false,
       });
 
@@ -78,9 +79,6 @@ export function useDocPip(
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
       `;
       win.document.head.appendChild(baseStyle);
-
-      win.document.body.style.width = `${PIP_W}px`;
-      win.document.body.style.height = `${PIP_H}px`;
 
       pipWindowRef.current = win;
       setPipWindow(win);
