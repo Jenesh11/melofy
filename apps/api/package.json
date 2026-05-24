@@ -15,7 +15,6 @@
     "express": "^4.19.0",
     "express-rate-limit": "^8.3.1",
     "firebase-admin": "^13.10.0",
-    "genius-lyrics": "^4.4.7",
     "helmet": "^8.1.0",
     "lavalink-client": "^2.9.7",
     "socket.io": "^4.7.5"
