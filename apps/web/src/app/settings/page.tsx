@@ -17,6 +17,7 @@ import {
   Sparkles,
   Share2,
   Smartphone,
+  Laptop,
   Github,
   HelpCircle,
   Shield,
@@ -40,11 +41,16 @@ export default function SettingsPage() {
   const { autoPip, toggleAutoPip } = useSettingsStore();
   const router = useRouter();
   const [isNative, setIsNative] = useState(false);
+  const [isTauri, setIsTauri] = useState(false);
 
   useEffect(() => {
     const isCapacitorNative = typeof window !== 'undefined' && (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
     if (isCapacitorNative) {
       setTimeout(() => setIsNative(true), 0);
+    }
+    const isTauriEnv = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+    if (isTauriEnv) {
+      setIsTauri(true);
     }
   }, []);
 
@@ -248,8 +254,26 @@ export default function SettingsPage() {
 
           <div className='grid grid-cols-1 md:grid-cols-2 gap-6 items-start'>
             <div className='flex flex-col gap-6'>
+              {/* Desktop App */}
+              {!isTauri && (
+                <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] flex flex-col gap-4'>
+                  <div className='flex items-center gap-2 mb-2'>
+                    <Laptop className='h-5 w-5 text-primary' />
+                    <h3 className='font-bold text-foreground text-lg'>Desktop App</h3>
+                  </div>
+                  <p className='text-sm text-muted-foreground'>
+                    Enjoy a seamless frameless player with custom keybindings and desktop sync.
+                  </p>
+                  <a href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy_x64.msi' target='_blank' rel='noopener noreferrer'>
+                    <Button className='w-full rounded-full font-bold shadow-xl shadow-primary/20'>
+                      Download for Windows
+                    </Button>
+                  </a>
+                </Card>
+              )}
+
               {/* Mobile App */}
-              {!isNative && (
+              {!isNative && !isTauri && (
                 <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] flex flex-col gap-4'>
                   <div className='flex items-center gap-2 mb-2'>
                     <Smartphone className='h-5 w-5 text-primary' />

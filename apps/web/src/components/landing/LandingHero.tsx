@@ -351,11 +351,16 @@ function PlayerScreen({ isPlaying, setIsPlaying }: { isPlaying: boolean; setIsPl
 export function LandingHero() {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isNative, setIsNative] = useState(false);
+  const [isTauri, setIsTauri] = useState(false);
 
   useEffect(() => {
     const isCapacitorNative = typeof window !== 'undefined' && (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
     if (isCapacitorNative) {
       setTimeout(() => setIsNative(true), 0);
+    }
+    const isTauriEnv = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+    if (isTauriEnv) {
+      setIsTauri(true);
     }
   }, []);
   return (
@@ -396,30 +401,57 @@ export function LandingHero() {
             curated playlists to your ears, everywhere you go.
           </p>
 
-          <div className='flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start'>
+          <div className='flex flex-col gap-6 items-center lg:items-start'>
             <Link href='/login'>
               <Button
                 size='lg'
-                className='h-14 px-10 rounded-full bg-primary text-primary-foreground font-bold text-lg hover:scale-105 transition-transform shadow-xl shadow-primary/20'
+                className='h-14 px-10 rounded-full bg-primary text-primary-foreground font-bold text-lg hover:scale-105 transition-transform shadow-xl shadow-primary/20 w-full sm:w-auto'
               >
                 Get Started Free
                 <ChevronRight className='ml-2 w-5 h-5' />
               </Button>
             </Link>
-            {!isNative && (
-              <a
-                href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy.apk'
-                target='_blank'
-                rel='noopener noreferrer'
-              >
-                <Button
-                  variant='outline'
-                  size='lg'
-                  className='h-14 px-10 rounded-full font-bold text-lg hover:scale-105 transition-transform shadow-xl shadow-foreground/5'
+            
+            {!isNative && !isTauri && (
+              <div className='flex items-center justify-center lg:justify-start gap-4 mt-2 w-full select-none'>
+                <span className="text-xs font-bold uppercase tracking-[0.25em] text-muted-foreground/80 shrink-0">
+                  Downloads:
+                </span>
+                
+                <a
+                  href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy_x64.msi'
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='group'
+                  title='Download for Windows'
                 >
-                  Download for Android
-                </Button>
-              </a>
+                  <Button
+                    variant='outline'
+                    className='w-12 h-12 rounded-full bg-card/20 hover:bg-white/5 transition-all flex items-center justify-center border-border/60 hover:border-foreground/40 shadow-md shadow-black/5 hover:scale-110 active:scale-95 p-0 shrink-0'
+                  >
+                    <svg className="w-5 h-5 text-sky-400 fill-current" viewBox="0 0 24 24">
+                      <path d="M0 3.449L9.75 2.1v9.451H0V3.449zM0 12.45h9.75v9.451L0 20.551v-8.101zM10.8 1.95L24 0v11.55H10.8V1.95zM10.8 12.45H24v11.55l-13.2-1.95v-9.6z"/>
+                    </svg>
+                  </Button>
+                </a>
+                
+                <a
+                  href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy.apk'
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='group'
+                  title='Download for Android'
+                >
+                  <Button
+                    variant='outline'
+                    className='w-12 h-12 rounded-full bg-card/20 hover:bg-white/5 transition-all flex items-center justify-center border-border/60 hover:border-foreground/40 shadow-md shadow-black/5 hover:scale-110 active:scale-95 p-0 shrink-0'
+                  >
+                    <svg className="w-5 h-5 fill-current text-[#3DDC84]" viewBox="0 0 24 24">
+                      <path d="M17.523 15.3414C17.0396 15.3414 16.6477 14.9495 16.6477 14.4661C16.6477 13.9828 17.0396 13.5909 17.523 13.5909C18.0064 13.5909 18.3983 13.9828 18.3983 14.4661C18.3983 14.9495 18.0064 15.3414 17.523 15.3414ZM6.4773 15.3414C5.9939 15.3414 5.602 14.9495 5.602 14.4661C5.602 13.9828 5.9939 13.5909 6.4773 13.5909C6.9607 13.5909 7.3526 13.9828 7.3526 14.4661C7.3526 14.9495 6.9607 15.3414 6.4773 15.3414ZM17.9152 10.6023L19.7891 7.354C19.9573 7.0622 19.8584 6.6917 19.5667 6.5234C19.2749 6.3551 18.9044 6.454 18.7361 6.7458L16.8341 10.0416C15.4208 9.3977 13.8242 9.0416 12 9.0416C10.1758 9.0416 8.5792 9.3977 7.1659 10.0416L5.2639 6.7458C5.0956 6.454 4.7251 6.3551 4.4333 6.5234C4.1416 6.6917 4.0427 7.0622 4.2109 7.354L6.0848 10.6023C2.5059 12.5295 0.0886 16.2798 0 20.6932H24C23.9114 16.2798 21.4941 12.5295 17.9152 10.6023Z"/>
+                    </svg>
+                  </Button>
+                </a>
+              </div>
             )}
           </div>
         </div>

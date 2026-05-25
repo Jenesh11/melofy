@@ -42,7 +42,7 @@ export function LandingFooter() {
 
   return (
     <footer className='py-20 px-6 border-t border-border bg-background'>
-      <div className='max-w-7xl mx-auto w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-12'>
+      <div className='max-w-7xl mx-auto w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-12'>
         {/* Brand */}
         <div className='flex flex-col gap-6 col-span-1 md:col-span-1'>
           <div className='flex items-center gap-2'>
@@ -98,6 +98,31 @@ export function LandingFooter() {
               variant='default'
               className='w-fit transform hover:-rotate-1 transition-transform'
             />
+          </div>
+        </div>
+
+        {/* Downloads */}
+        <div className='flex flex-col gap-6'>
+          <h4 className='text-foreground font-bold tracking-tight uppercase text-xs'>
+            Downloads
+          </h4>
+          <div className='flex flex-col gap-3 text-sm text-muted-foreground/60'>
+            <a
+              href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy_x64.msi'
+              target='_blank'
+              rel='noopener noreferrer'
+              className='hover:text-primary transition-colors'
+            >
+              Windows App (.msi)
+            </a>
+            <a
+              href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy.apk'
+              target='_blank'
+              rel='noopener noreferrer'
+              className='hover:text-primary transition-colors'
+            >
+              Android App (.apk)
+            </a>
           </div>
         </div>
 
