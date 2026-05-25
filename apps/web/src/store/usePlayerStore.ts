@@ -65,7 +65,6 @@ interface PlayerState {
   playPrevious: (force?: boolean) => void;
   toggleShuffle: () => void;
   toggleRepeat: () => void;
-  toggleAutoplay: () => void;
   setLyrics: (id: string, lyrics: LyricsData) => void;
   updateTrackUrl: (id: string, url: string, identifier?: string) => void;
   hydrateState: (state: Partial<PlayerState>) => void;
@@ -88,7 +87,7 @@ const initialState = {
   history: [],
   isShuffle: false,
   isRepeat: false,
-  isAutoplay: false,
+  isAutoplay: true,
   activePlaylistContext: null,
   activeCollectionId: null,
   activeCollectionType: null,
@@ -279,7 +278,6 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
   toggleShuffle: () => set((state) => ({ isShuffle: !state.isShuffle })),
   toggleRepeat: () => set((state) => ({ isRepeat: !state.isRepeat })),
-  toggleAutoplay: () => set((state) => ({ isAutoplay: !state.isAutoplay })),
   setLyrics: (id, lyrics) =>
     set((state) => ({
       lyricsCache: { ...state.lyricsCache, [id]: lyrics },

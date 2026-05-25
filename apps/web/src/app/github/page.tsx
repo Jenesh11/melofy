@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { LandingPageHeader } from '@/components/landing/LandingPageHeader';
 import { LandingFooter } from '@/components/landing/LandingFooter';
 import { Github, Star, GitFork, Bug, Lightbulb, Code2 } from 'lucide-react';
+import { GithubGuidelines } from '@/components/landing/GithubGuidelines';
 
 export const metadata: Metadata = {
   title: 'GitHub | Melofy',
@@ -110,6 +111,11 @@ export default function GithubPage() {
             ))}
           </div>
         </div>
+
+        {/* Contribution Guidelines Portal */}
+        <GithubGuidelines />
+
+        <div className="mb-16" />
 
         {/* Tech Stack */}
         <div className='w-full p-8 rounded-3xl border border-border/50 bg-card/20 backdrop-blur-sm text-left'>

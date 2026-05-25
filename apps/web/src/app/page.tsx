@@ -101,21 +101,42 @@ export default function Home() {
       return;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      try {
+        controller.abort();
+      } catch {}
+    }, 10000);
+
+    const safeFetch = async (url: string, options?: RequestInit) => {
+      try {
+        return await fetch(url, options);
+      } catch (err: unknown) {
+        const error = err as Error;
+        if (error.name === 'AbortError' || error.message?.includes('abort') || error.message?.includes('cancel')) {
+          // Return a dummy non-ok Response to avoid throwing unhandled promise rejections
+          return new Response(JSON.stringify({ aborted: true }), {
+            status: 499,
+            statusText: 'Client Aborted',
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        throw err;
+      }
+    };
+
     const fetchDashboardData = async () => {
       try {
         setIsFetching(true);
         const authHeaders = await getFirebaseAuthHeaders(user);
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-
         const fetchOptions = { headers: authHeaders, signal: controller.signal };
 
         const [trendRes, newRes, mixRes, popularRes] = await Promise.all([
-          fetch('/api/spotify/trending', fetchOptions),
-          fetch('/api/spotify/new-releases', fetchOptions),
-          fetch('/api/spotify/mixes', fetchOptions),
-          fetch('/api/spotify/popular-playlists', fetchOptions),
+          safeFetch('/api/spotify/trending', fetchOptions),
+          safeFetch('/api/spotify/new-releases', fetchOptions),
+          safeFetch('/api/spotify/mixes', fetchOptions),
+          safeFetch('/api/spotify/popular-playlists', fetchOptions),
         ]);
 
         if (trendRes.ok) setTrending(await trendRes.json());
@@ -126,7 +147,7 @@ export default function Home() {
         // Fetch Discovery Mixes based on history
         if (history.length > 0) {
           const artists = history.map(t => t.artist).filter(Boolean);
-          const discRes = await fetch('/api/spotify/discovery', {
+          const discRes = await safeFetch('/api/spotify/discovery', {
             method: 'POST',
             headers: { ...authHeaders, 'Content-Type': 'application/json' },
             body: JSON.stringify({ artists }),
@@ -137,7 +158,7 @@ export default function Home() {
 
         const genres = ['pop', 'hip-hop', 'r&b', 'indie', 'electronic', 'soul'];
         const randomGenre = genres[Math.floor(Math.random() * genres.length)];
-        const recRes = await fetch(
+        const recRes = await safeFetch(
           `/api/spotify/recommendations?genre=${randomGenre}`,
           fetchOptions,
         );
@@ -146,14 +167,26 @@ export default function Home() {
         
         clearTimeout(timeoutId);
         setHasFetched(true);
-      } catch (error) {
-        console.error('Failed to fetch dashboard data:', error);
+      } catch (error: unknown) {
+        const err = error as Error;
+        if (err.name === 'AbortError') {
+          console.warn('Dashboard data fetch was aborted.');
+        } else {
+          console.error('Failed to fetch dashboard data:', err);
+        }
       } finally {
         setIsFetching(false);
       }
     };
 
     void fetchDashboardData();
+
+    return () => {
+      clearTimeout(timeoutId);
+      try {
+        controller.abort();
+      } catch {}
+    };
   }, [user, hasFetched, history, setTrending, setNewReleases, setMixes, setPopularPlaylists, setDiscoveryMixes, setRecommendations, setHasFetched]);
 
   if (loading) return <div className='min-h-screen bg-background' />;

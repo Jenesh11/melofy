@@ -168,6 +168,7 @@ export default function SearchPage() {
           if (ytData.loadType === 'playlist' && ytData.tracks) {
             const mapped: TrackItem[] = ytData.tracks.map((track) => ({
               id: track.info?.identifier || 'unknown',
+              identifier: track.info?.identifier || 'unknown',
               title: track.info?.title || 'Unknown Title',
               artist: track.info?.author || 'Unknown Artist',
               artworkUrl: track.info?.artworkUrl || '',
@@ -194,6 +195,7 @@ export default function SearchPage() {
                 const identifier = track.info?.identifier;
                 return {
                   id: identifier || 'unknown',
+                  identifier: identifier || 'unknown',
                   title: track.info?.title || 'Unknown Title',
                   artist: track.info?.author || 'Unknown Artist',
                   artworkUrl: track.info?.artworkUrl || '',

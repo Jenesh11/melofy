@@ -30,6 +30,7 @@ export function Topbar() {
   const pathname = usePathname();
   const { user, loading: authLoading } = useAuth();
   const playTrack = usePlayerStore((state) => state.play);
+  const playInContext = usePlayerStore((state) => state.playInContext);
   const setQueue = usePlayerStore((state) => state.setQueue);
   const queue = usePlayerStore((state) => state.queue);
   const currentTrack = usePlayerStore((state) => state.currentTrack);
@@ -87,6 +88,7 @@ export function Topbar() {
 
   const mapTrack = (track: LavalinkTrack) => ({
     id: track.info?.identifier || 'unknown',
+    identifier: track.info?.identifier || 'unknown',
     title: track.info?.title || 'Unknown Title',
     artist: track.info?.author || 'Unknown Artist',
     artworkUrl: track.info?.artworkUrl || '',
@@ -97,8 +99,8 @@ export function Topbar() {
 
   const handleTrackClick = (track: LavalinkTrack) => {
     const mappedTrack = mapTrack(track);
-    setQueue([mappedTrack]);
-    playTrack(mappedTrack, true);
+    const allMappedTracks = results.map((t) => mapTrack(t));
+    playInContext(mappedTrack, allMappedTracks, true);
     setIsFocused(false);
     setQuery('');
     if (inputRef.current) inputRef.current.blur();
@@ -122,7 +124,12 @@ export function Topbar() {
       description: (
         <div className="flex items-center gap-2 mt-1">
           {mappedTrack.artworkUrl && (
-            <img src={mappedTrack.artworkUrl} alt="" className="h-8 w-8 rounded-md object-cover shadow-md brightness-90" />
+            <img
+              // eslint-disable-next-line @next/next/no-img-element
+              src={mappedTrack.artworkUrl}
+              alt=""
+              className="h-8 w-8 rounded-md object-cover shadow-md brightness-90"
+            />
           )}
           <div className="flex flex-col min-w-0">
             <span className="font-bold text-xs truncate opacity-90">{mappedTrack.title}</span>
@@ -209,10 +216,10 @@ export function Topbar() {
                 ) : results.length > 0 ? (
                   <div className='flex flex-col py-2'>
                     {results.map((track, i) => (
-                      <button
+                      <div
                         key={`${track.info?.identifier}-${i}`}
                         onClick={() => handleTrackClick(track)}
-                        className='flex items-center gap-3 w-full p-2 hover:bg-muted/50 transition-colors text-left group/item'
+                        className='flex items-center gap-3 w-full p-2 hover:bg-muted/50 transition-colors text-left group/item cursor-pointer'
                       >
                         <div className='h-10 w-10 shrink-0 rounded-md overflow-hidden relative bg-muted flex items-center justify-center'>
                           {track.info?.artworkUrl ? (
@@ -244,12 +251,12 @@ export function Topbar() {
                         >
                           <PlusCircle className='h-5 w-5' />
                         </button>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 ) : query.trim() && !loading ? (
                   <div className='p-6 text-center text-sm text-muted-foreground'>
-                    No results found for "{query}"
+                    No results found for &quot;{query}&quot;
                   </div>
                 ) : null}
               </div>

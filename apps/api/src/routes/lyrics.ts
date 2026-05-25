@@ -179,7 +179,10 @@ function extractSearchHitPath(body: string): string | null {
 function extractLyricsHtml(html: string): string | null {
   const match = html.match(PRELOADED_STATE_REGEX);
   const arg   = match?.[1];
-  if (!arg) return null;
+  if (!arg) {
+    console.log('[Lyrics] Genius Parser: __PRELOADED_STATE__ script tag pattern not matched in HTML.');
+    return null;
+  }
 
   try {
     const parse = new Function(`return JSON.parse(${arg})`) as () => JsonValue;
@@ -187,12 +190,53 @@ function extractLyricsHtml(html: string): string | null {
 
     const root         = getRecordFromValue(payload);
     const songPage     = getRecordFromValue(getRecordValue(root, 'songPage'));
+    if (!songPage) {
+      console.warn('[Lyrics] Genius Parser: "songPage" property missing in preloaded state payload.');
+      return null;
+    }
     const lyricsData   = getRecordFromValue(getRecordValue(songPage, 'lyricsData'));
+    if (!lyricsData) {
+      console.warn('[Lyrics] Genius Parser: "lyricsData" property missing in preloaded state songPage.');
+      return null;
+    }
     const body         = getRecordFromValue(getRecordValue(lyricsData, 'body'));
-    return getString(getRecordValue(body, 'html'));
-  } catch {
+    if (!body) {
+      console.warn('[Lyrics] Genius Parser: "body" property missing in preloaded state lyricsData.');
+      return null;
+    }
+    const htmlVal      = getString(getRecordValue(body, 'html'));
+    if (!htmlVal) {
+      console.warn('[Lyrics] Genius Parser: "html" body string missing in preloaded state body.');
+      return null;
+    }
+    return htmlVal;
+  } catch (err: any) {
+    console.error('[Lyrics] Genius Parser: Failed to parse __PRELOADED_STATE__ JSON payload:', err?.message || err);
     return null;
   }
+}
+
+/**
+ * Extracts lyrics from the Genius song page HTML by looking for data-lyrics-container divs.
+ * This is a robust fallback when the embedded __PRELOADED_STATE__ script is missing or fails to parse.
+ */
+function extractLyricsHtmlFallback(html: string): string | null {
+  const containerRegex = /<div[^>]+data-lyrics-container="true"[^>]*>([\s\S]*?)<\/div>/gi;
+  const matches = [...html.matchAll(containerRegex)];
+  
+  if (matches.length === 0) {
+    // Fallback to older container class name
+    const oldRegex = /<div[^>]+class="lyrics"[^>]*>([\s\S]*?)<\/div>/gi;
+    const oldMatches = [...html.matchAll(oldRegex)];
+    if (oldMatches.length > 0) {
+      console.log('[Lyrics] Genius Parser Fallback: Found lyrics in legacy "lyrics" class container.');
+      return oldMatches.map(m => m[1]).join('\n');
+    }
+    return null;
+  }
+  
+  console.log(`[Lyrics] Genius Parser Fallback: Found ${matches.length} "data-lyrics-container" containers.`);
+  return matches.map(m => m[1]).join('\n');
 }
 
 /**
@@ -326,88 +370,147 @@ async function fetchFromGenius(
   trackName: string,
   artistName: string,
 ): Promise<{ plainLyrics: string; syncedLyrics: null; trackName: string; artistName: string; albumName: null; duration: null; instrumental: boolean; lang: null; isrc: null; spotifyId: null; releaseDate: null; source: string } | null> {
-  const { query, title, author } = buildSearchQuery(trackName, artistName);
-  console.log(`[Lyrics] Genius: searching for "${query}"`);
+  const queriesToTry: { query: string; title: string; author: string }[] = [];
 
-  try {
-    // Step 1: Search Genius multi-search API
-    const searchUrl = `https://genius.com/api/search/multi?q=${encodeURIComponent(query)}`;
-    const searchRes = await fetchWithTimeout(searchUrl, { method: 'GET', headers: { ...GENIUS_HEADERS } }, GENIUS_TIMEOUT_MS);
+  // 1. Try standard query first
+  queriesToTry.push(buildSearchQuery(trackName, artistName));
 
-    if (!searchRes.ok) {
-      console.warn(`[Lyrics] Genius search returned ${searchRes.status}`);
-      return null;
+  // 2. Fallback: If track name has a hyphen (e.g. "Artist - Song (Lyrics)"), add the split query
+  if (trackName.includes('-')) {
+    const parts = trackName.split('-');
+    if (parts.length >= 2) {
+      const leftPart = parts[0].trim();
+      const rightPart = parts.slice(1).join('-').trim();
+
+      const fallbackTitle = cleanMetadata(rightPart);
+      const fallbackAuthor = cleanMetadata(primaryArtist(leftPart));
+
+      if (fallbackTitle && fallbackAuthor) {
+        const fallbackQuery = `${fallbackTitle} ${fallbackAuthor}`;
+        const standardQueryObj = queriesToTry[0];
+        if (fallbackQuery.toLowerCase() !== standardQueryObj.query.toLowerCase()) {
+          queriesToTry.push({
+            query: fallbackQuery,
+            title: fallbackTitle,
+            author: fallbackAuthor
+          });
+        }
+      }
     }
-
-    const searchBody = await searchRes.text();
-    const songPath   = extractSearchHitPath(searchBody);
-
-    if (!songPath) {
-      console.log('[Lyrics] Genius: no song hit found in search results');
-      return null;
-    }
-
-    // Step 2: Validate similarity BEFORE fetching the page to avoid useless scrape
-    // The path is like "/artist-name-song-name-lyrics" — extract the name slug
-    const pathSlug = songPath.replace(/^\//, '').replace(/-lyrics$/, '').replace(/-/g, ' ');
-    const titleScore  = stringSimilarity(title,  pathSlug);
-    const authorScore = stringSimilarity(author, pathSlug);
-    const matchScore  = Math.max(titleScore, (titleScore * 0.65) + (authorScore * 0.35));
-
-    console.log(`[Lyrics] Genius candidate: "${songPath}" (slug similarity=${matchScore.toFixed(2)})`);
-
-    if (matchScore < MIN_GENIUS_SIMILARITY) {
-      console.log(`[Lyrics] Genius: rejected match — score ${matchScore.toFixed(2)} < threshold ${MIN_GENIUS_SIMILARITY}`);
-      return null;
-    }
-
-    // Step 3: Fetch the song page
-    const pageRes = await fetchWithTimeout(
-      `https://genius.com${songPath}`,
-      { method: 'GET', headers: { ...GENIUS_HEADERS } },
-      GENIUS_TIMEOUT_MS,
-    );
-
-    if (!pageRes.ok) {
-      console.warn(`[Lyrics] Genius page fetch returned ${pageRes.status}`);
-      return null;
-    }
-
-    const pageHtml  = await pageRes.text();
-    const lyricsHtml = extractLyricsHtml(pageHtml);
-
-    if (!lyricsHtml) {
-      console.log('[Lyrics] Genius: __PRELOADED_STATE__ lyrics HTML not found in page');
-      return null;
-    }
-
-    const plainLyrics = parseLyricsHtml(lyricsHtml);
-
-    if (!plainLyrics) {
-      console.log('[Lyrics] Genius: parsed lyrics are empty');
-      return null;
-    }
-
-    console.log(`[Lyrics] Genius: successfully scraped lyrics for "${songPath}"`);
-
-    return {
-      plainLyrics,
-      syncedLyrics: null,
-      trackName,
-      artistName,
-      albumName: null,
-      duration: null,
-      instrumental: false,
-      lang: null,
-      isrc: null,
-      spotifyId: null,
-      releaseDate: null,
-      source: 'genius',
-    };
-  } catch (err) {
-    console.error('[Lyrics] Genius error:', err);
-    return null;
   }
+
+  console.log(`[Lyrics] Genius: Search queries queue: ${JSON.stringify(queriesToTry.map(q => q.query))}`);
+
+  for (let attempt = 0; attempt < queriesToTry.length; attempt++) {
+    const { query, title, author } = queriesToTry[attempt];
+    console.log(`[Lyrics] Genius: searching for "${query}" (attempt ${attempt + 1}/${queriesToTry.length})`);
+
+    try {
+      // Step 1: Search Genius multi-search API
+      const searchUrl = `https://genius.com/api/search/multi?q=${encodeURIComponent(query)}`;
+      console.log(`[Lyrics] Genius: Fetching search API from ${searchUrl}`);
+      const searchRes = await fetchWithTimeout(searchUrl, { method: 'GET', headers: { ...GENIUS_HEADERS } }, GENIUS_TIMEOUT_MS);
+
+      if (!searchRes.ok) {
+        const errorText = await searchRes.text().catch(() => '');
+        console.warn(
+          `[Lyrics] Genius search API returned status ${searchRes.status}. ` +
+          `Headers: ${JSON.stringify(Object.fromEntries(searchRes.headers.entries()))}. ` +
+          `Body snippet: ${errorText.substring(0, 500)}`
+        );
+        continue;
+      }
+
+      const searchBody = await searchRes.text();
+      const songPath   = extractSearchHitPath(searchBody);
+
+      if (!songPath) {
+        console.log(`[Lyrics] Genius: no song hit found in search results payload for query "${query}".`);
+        continue;
+      }
+
+      // Step 2: Validate similarity BEFORE fetching the page to avoid useless scrape
+      // The path is like "/artist-name-song-name-lyrics" — extract the name slug
+      const pathSlug = songPath.replace(/^\//, '').replace(/-lyrics$/, '').replace(/-/g, ' ');
+      const titleScore  = stringSimilarity(title,  pathSlug);
+      const authorScore = stringSimilarity(author, pathSlug);
+      const matchScore  = Math.max(titleScore, (titleScore * 0.65) + (authorScore * 0.35));
+
+      console.log(`[Lyrics] Genius candidate found: "${songPath}" (slug similarity=${matchScore.toFixed(2)})`);
+
+      if (matchScore < MIN_GENIUS_SIMILARITY) {
+        console.log(`[Lyrics] Genius: rejected match — score ${matchScore.toFixed(2)} < threshold ${MIN_GENIUS_SIMILARITY} for query "${query}"`);
+        continue;
+      }
+
+      // Step 3: Fetch the song page
+      const pageUrl = `https://genius.com${songPath}`;
+      console.log(`[Lyrics] Genius: Fetching song page from ${pageUrl}`);
+      const pageRes = await fetchWithTimeout(
+        pageUrl,
+        { method: 'GET', headers: { ...GENIUS_HEADERS } },
+        GENIUS_TIMEOUT_MS,
+      );
+
+      if (!pageRes.ok) {
+        const pageErrorText = await pageRes.text().catch(() => '');
+        console.warn(
+          `[Lyrics] Genius page fetch returned status ${pageRes.status}. ` +
+          `Headers: ${JSON.stringify(Object.fromEntries(pageRes.headers.entries()))}. ` +
+          `Body snippet: ${pageErrorText.substring(0, 500)}`
+        );
+        continue;
+      }
+
+      const pageHtml  = await pageRes.text();
+      
+      // Attempt standard preloaded state extraction first
+      let lyricsHtml = extractLyricsHtml(pageHtml);
+      let extractedVia = 'preloaded_state';
+
+      // Fallback to direct HTML container scraping
+      if (!lyricsHtml) {
+        console.log('[Lyrics] Genius: __PRELOADED_STATE__ lyrics extraction failed. Attempting HTML containers fallback...');
+        lyricsHtml = extractLyricsHtmlFallback(pageHtml);
+        extractedVia = 'html_containers';
+      }
+
+      if (!lyricsHtml) {
+        console.warn('[Lyrics] Genius: Failed to extract lyrics HTML using both __PRELOADED_STATE__ and HTML containers fallback.');
+        continue;
+      }
+
+      const plainLyrics = parseLyricsHtml(lyricsHtml);
+
+      if (!plainLyrics) {
+        console.log(`[Lyrics] Genius: Parsed lyrics are empty (extracted via: ${extractedVia})`);
+        continue;
+      }
+
+      console.log(`[Lyrics] Genius: successfully scraped lyrics for "${songPath}" (extracted via: ${extractedVia}, length: ${plainLyrics.length} chars)`);
+
+      return {
+        plainLyrics,
+        syncedLyrics: null,
+        trackName,
+        artistName,
+        albumName: null,
+        duration: null,
+        instrumental: false,
+        lang: null,
+        isrc: null,
+        spotifyId: null,
+        releaseDate: null,
+        source: 'genius',
+      };
+    } catch (err: any) {
+      console.error(`[Lyrics] Genius handler caught an error for query "${query}":`, err?.message || err);
+      // continue to next query candidate
+    }
+  }
+
+  console.log('[Lyrics] Genius: All query candidates failed to retrieve lyrics.');
+  return null;
 }
 
 // ---------------------------------------------------------------------------

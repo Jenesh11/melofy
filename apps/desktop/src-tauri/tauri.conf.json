@@ -14,14 +14,29 @@
     "windows": [
       {
         "title": "Melofy",
+        "label": "main",
         "width": 1200,
         "height": 800,
         "minWidth": 800,
         "minHeight": 600,
         "fullscreen": false,
         "resizable": true,
-        "transparent": false,
-        "decorations": true
+        "transparent": true,
+        "decorations": false
+      },
+      {
+        "title": "Melofy Mini Player",
+        "label": "pip",
+        "url": "/pip",
+        "width": 450,
+        "height": 150,
+        "resizable": false,
+        "fullscreen": false,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "visible": false,
+        "skipTaskbar": true
       }
     ],
     "security": {

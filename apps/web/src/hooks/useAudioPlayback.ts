@@ -33,7 +33,6 @@ export function useAudioPlayback() {
     setVolume,
     toggleShuffle,
     toggleRepeat,
-    toggleAutoplay,
     canControlPlayback,
   } = usePlayerStore(useShallow((state) => ({
     currentTrack: state.currentTrack,
@@ -49,7 +48,6 @@ export function useAudioPlayback() {
     setVolume: state.setVolume,
     toggleShuffle: state.toggleShuffle,
     toggleRepeat: state.toggleRepeat,
-    toggleAutoplay: state.toggleAutoplay,
     canControlPlayback: state.canControlPlayback,
   })));
 
@@ -208,7 +206,6 @@ export function useAudioPlayback() {
     isShuffle,
     toggleShuffle,
     isAutoplay,
-    toggleAutoplay,
     playPrevious,
     handleTogglePlay,
     handleSkipNext,

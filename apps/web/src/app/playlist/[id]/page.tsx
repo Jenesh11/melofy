@@ -202,6 +202,7 @@ export default function PlaylistPage() {
     const customTracks = playlist.tracks as CustomPlaylistTrack[];
     return customTracks.map((track) => ({
       id: track.info.identifier,
+      identifier: track.info.identifier,
       title: track.info.title,
       artist: track.info.author,
       artworkUrl: track.info.artworkUrl || '',

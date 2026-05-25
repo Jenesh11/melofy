@@ -90,18 +90,18 @@ export function ImportPlaylistCard({
         </CardDescription>
       </CardHeader>
       <CardContent className='p-8 pt-0 space-y-6'>
-        <div className='space-y-4'>
+        <div className='flex flex-col sm:flex-row gap-4 items-center w-full'>
           <Input
             placeholder='https://open.spotify.com/playlist/...'
             value={importUrl}
             onChange={(e) => setImportUrl(e.target.value)}
-            className='bg-muted/50 border-border h-12 rounded-2xl focus-visible:ring-primary/50 text-foreground placeholder:text-muted-foreground font-light'
+            className='bg-muted/50 border-border h-14 rounded-2xl focus-visible:ring-primary/50 text-foreground placeholder:text-muted-foreground font-light w-full'
             disabled={isImporting || !user}
           />
           <Button
             onClick={handleImport}
             disabled={isImporting || !importUrl.trim() || !user}
-            className='w-full h-14 rounded-2xl bg-primary text-primary-foreground font-bold hover:scale-[1.02] transition-all active:scale-[0.98] group border-none'
+            className='h-14 sm:w-56 w-full rounded-2xl bg-primary text-primary-foreground font-bold hover:scale-[1.02] transition-all active:scale-[0.98] group border-none shrink-0'
           >
             {isImporting ? (
               <>

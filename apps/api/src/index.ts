@@ -331,9 +331,20 @@ app.get(
       trackId?: string;
     };
 
-    // Determine seed criteria. Prioritize Spotify for recommendations if available.
-    const effectiveSpotifyId = spotifyId || (trackId?.length === 22 ? trackId : undefined);
-    const effectiveVideoId = videoId || (trackId?.length === 11 ? trackId : undefined);
+    // Determine seed criteria. Prioritize Spotify for recommendations if available and valid (length 22).
+    const isSpotifyId = (id?: string) => typeof id === 'string' && id.length === 22;
+    const isVideoId = (id?: string) => typeof id === 'string' && id.length === 11;
+
+    const effectiveSpotifyId = isSpotifyId(spotifyId)
+      ? spotifyId
+      : (isSpotifyId(trackId) ? trackId : undefined);
+
+    const effectiveVideoId = isVideoId(videoId)
+      ? videoId
+      : (isVideoId(spotifyId)
+        ? spotifyId
+        : (isVideoId(trackId) ? trackId : undefined));
+
     const effectiveQuery = query || trackId;
 
     if (!effectiveSpotifyId && !effectiveVideoId && !effectiveQuery) {

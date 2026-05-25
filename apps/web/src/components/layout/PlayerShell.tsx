@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { createPortal } from 'react-dom';
 import { MobilePlayer } from '@/components/player/MobilePlayer';
@@ -24,6 +24,103 @@ export function PlayerShell() {
   const { isLiked, toggleLike } = useLikedSongs();
 
   const pip = useDocPip(playback.currentTrack, playback.isPlaying);
+
+  // Synchronize state and commands with the Tauri PiP window
+  const channelRef = useRef<BroadcastChannel | null>(null);
+  const latestStateRef = useRef<any>(null);
+
+  latestStateRef.current = {
+    currentTrack: playback.currentTrack,
+    isPlaying: playback.isPlaying,
+    isBuffering: playback.isBuffering,
+    progressPercent: playback.progressPercent,
+    currentDisplayTime: playback.currentDisplayTime,
+    durationTime: playback.durationTime,
+    isLiked: playback.currentTrack ? isLiked(playback.currentTrack.id) : false,
+    isShuffle: playback.isShuffle,
+    isRepeat: playback.isRepeat,
+    volume: playback.volume,
+  };
+
+  useEffect(() => {
+    const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+    if (!isTauri) return;
+
+    const channel = new BroadcastChannel('melofy-pip');
+    channelRef.current = channel;
+
+    const handleMessage = (e: MessageEvent) => {
+      const data = e.data;
+      if (!data || data.type !== 'command') return;
+
+      switch (data.action) {
+        case 'request-state':
+          if (latestStateRef.current) {
+            channel.postMessage({ type: 'state-update', state: latestStateRef.current });
+          }
+          break;
+        case 'togglePlay':
+          playback.handleTogglePlay();
+          break;
+        case 'skipNext':
+          playback.handleSkipNext();
+          break;
+        case 'playPrevious':
+          playback.playPrevious();
+          break;
+        case 'seek':
+          if (typeof data.value === 'number') {
+            playback.handleSeek([data.value]);
+          }
+          break;
+        case 'volume':
+          if (typeof data.value === 'number') {
+            playback.setVolume(data.value);
+          }
+          break;
+        case 'toggleLike':
+          if (playback.currentTrack) {
+            toggleLike(playback.currentTrack);
+          }
+          break;
+        case 'toggleShuffle':
+          playback.toggleShuffle();
+          break;
+        case 'toggleRepeat':
+          playback.toggleRepeat();
+          break;
+        case 'close':
+          pip.closePip();
+          break;
+        default:
+          break;
+      }
+    };
+
+    channel.addEventListener('message', handleMessage);
+
+    return () => {
+      channel.removeEventListener('message', handleMessage);
+      channel.close();
+      channelRef.current = null;
+    };
+  }, [playback, toggleLike, pip]);
+
+  useEffect(() => {
+    if (!channelRef.current) return;
+    channelRef.current.postMessage({ type: 'state-update', state: latestStateRef.current });
+  }, [
+    playback.currentTrack,
+    playback.isPlaying,
+    playback.isBuffering,
+    playback.progressPercent,
+    playback.currentDisplayTime,
+    playback.durationTime,
+    playback.isShuffle,
+    playback.isRepeat,
+    playback.volume,
+    isLiked,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,7 +175,6 @@ export function PlayerShell() {
     isShuffle: playback.isShuffle,
     toggleShuffle: playback.toggleShuffle,
     isAutoplay: playback.isAutoplay,
-    toggleAutoplay: playback.toggleAutoplay,
     playPrevious: playback.playPrevious,
     handleTogglePlay: playback.handleTogglePlay,
     handleSkipNext: playback.handleSkipNext,

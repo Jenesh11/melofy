@@ -16,9 +16,11 @@ export async function openPip() {
   if (_requestOpen) await _requestOpen();
 }
 
-/** True if Document Picture-in-Picture is available in this browser (Chrome 116+) */
+/** True if Document Picture-in-Picture or native Tauri window is available */
 export function isPipSupported() {
-  return typeof window !== 'undefined' && 'documentPictureInPicture' in window;
+  if (typeof window === 'undefined') return false;
+  const isTauri = '__TAURI_INTERNALS__' in window;
+  return isTauri || 'documentPictureInPicture' in window;
 }
 
 export function useDocPip(
@@ -27,8 +29,39 @@ export function useDocPip(
 ) {
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const pipWindowRef = useRef<Window | null>(null);
+  const [isTauriPipOpen, setIsTauriPipOpen] = useState(false);
+
+  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+  const openTauriWindow = useCallback(async () => {
+    try {
+      const { Window } = await import('@tauri-apps/api/window');
+      const pipWin = new Window('pip');
+      await pipWin.show();
+      await pipWin.setFocus();
+      setIsTauriPipOpen(true);
+    } catch (err) {
+      console.error('[TauriPiP] failed to open:', err);
+    }
+  }, []);
+
+  const closeTauriWindow = useCallback(async () => {
+    try {
+      const { Window } = await import('@tauri-apps/api/window');
+      const pipWin = new Window('pip');
+      await pipWin.hide();
+      setIsTauriPipOpen(false);
+    } catch (err) {
+      console.error('[TauriPiP] failed to close:', err);
+    }
+  }, []);
 
   const openWindow = useCallback(async () => {
+    if (isTauri) {
+      await openTauriWindow();
+      return;
+    }
+
     if (!('documentPictureInPicture' in window)) return;
     // If already open, just focus it
     if (pipWindowRef.current && !pipWindowRef.current.closed) {
@@ -90,15 +123,20 @@ export function useDocPip(
     } catch (err) {
       console.error('[DocPiP] failed to open:', err);
     }
-  }, []);
+  }, [isTauri, openTauriWindow]);
 
   const closeWindow = useCallback(() => {
+    if (isTauri) {
+      void closeTauriWindow();
+      return;
+    }
+
     if (pipWindowRef.current && !pipWindowRef.current.closed) {
       pipWindowRef.current.close();
     }
     pipWindowRef.current = null;
     setPipWindow(null);
-  }, []);
+  }, [isTauri, closeTauriWindow]);
 
   // Expose openWindow for the module-level helper
   useEffect(() => {
@@ -119,10 +157,27 @@ export function useDocPip(
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [isPlaying, currentTrack, openWindow, autoPip]);
 
+  // Handle external synchronization of closed state for Tauri PiP
+  useEffect(() => {
+    if (!isTauri) return;
+
+    const channel = new BroadcastChannel('melofy-pip');
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data && e.data.type === 'command' && e.data.action === 'close') {
+        void closeTauriWindow();
+      }
+    };
+    channel.addEventListener('message', handleMessage);
+    return () => {
+      channel.removeEventListener('message', handleMessage);
+      channel.close();
+    };
+  }, [isTauri, closeTauriWindow]);
+
   return {
     pipWindow,
     openPip: openWindow,
     closePip: closeWindow,
-    isPipOpen: !!pipWindow,
+    isPipOpen: isTauri ? isTauriPipOpen : !!pipWindow,
   };
 }

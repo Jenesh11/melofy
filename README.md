@@ -10,6 +10,8 @@
 
   <div align="center">
     <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-16.0-black?style=for-the-badge&logo=next.js" alt="Next.js" /></a>
+    <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Tauri_v2-1.0-FFC107?style=for-the-badge&logo=tauri&logoColor=black" alt="Tauri v2" /></a>
+    <a href="https://capacitorjs.com/"><img src="https://img.shields.io/badge/Capacitor-6.0-119EFF?style=for-the-badge&logo=capacitor&logoColor=white" alt="Capacitor" /></a>
     <a href="https://expressjs.com/"><img src="https://img.shields.io/badge/Express-4.19-333333?style=for-the-badge&logo=express" alt="Express" /></a>
     <a href="https://firebase.google.com/"><img src="https://img.shields.io/badge/Firebase-11.0-FFCA28?style=for-the-badge&logo=firebase&logoColor=black" alt="Firebase" /></a>
     <a href="https://tailwindcss.com/"><img src="https://img.shields.io/badge/Tailwind_CSS-4.0-06B6D4?style=for-the-badge&logo=tailwind-css" alt="Tailwind CSS" /></a>
@@ -25,7 +27,7 @@
 
 ## 📽️ The Melofy Vision
 
-**Melofy** isn't just a Spotify clone; it's a meticulously crafted digital stage for your music. Built on a powerful monorepo architecture, it bridges the gap between high-speed web interfaces and robust audio processing servers.
+**Melofy** isn't just a music web application; it's a meticulously crafted digital ecosystem for your music. Powered by a high-speed Turborepo monorepo, it bridges the gap between premium client interfaces (Web, Frameless Desktop, and Native Mobile) and a robust audio streaming backend.
 
 <div align="center">
   <table border="0" cellspacing="0" cellpadding="20">
@@ -41,12 +43,12 @@
     </tr>
     <tr>
       <td width="300" valign="top" style="border: 1px solid #333; border-radius: 15px; background: rgba(255,255,255,0.05);">
-        <h3>⚡ Turbo Core</h3>
-        <p>Managed via <b>Turborepo</b> for lightning-fast builds and synchronized development.</p>
+        <h3>🖥️ Frameless Desktop</h3>
+        <p>Ultra-secure, inspect-proof, frameless desktop client powered by <b>Tauri v2</b>.</p>
       </td>
       <td width="300" valign="top" style="border: 1px solid #333; border-radius: 15px; background: rgba(255,255,255,0.05);">
-        <h3>🔐 Secure & Social</h3>
-        <p>Integrated with <b>Firebase Auth</b> and <b>Discord</b> for a connected experience.</p>
+        <h3>📱 Smart Mobile</h3>
+        <p>Native feeling client with hardware optimization powered by <b>Capacitor</b>.</p>
       </td>
     </tr>
   </table>
@@ -56,7 +58,7 @@
 
 ## 🏗️ System Architecture
 
-Melofy employs a distributed service architecture separating the frontend interface, the main API gateway, and the dedicated audio streaming engine.
+Melofy employs a distributed service architecture separating client layers, the main API gateway, and the dedicated audio streaming engine.
 
 ```mermaid
 graph TD
@@ -70,10 +72,11 @@ graph TD
 
     subgraph Clients ["📱 Client Layer"]
         Web["Web Application"]:::client
-        Mobile["Android App (Capacitor)"]:::client
+        Desktop["Tauri v2 Desktop App"]:::client
+        Mobile["Capacitor Mobile App"]:::client
     end
 
-    subgraph Frontend ["🎨 Frontend (Next.js)"]
+    subgraph Frontend ["🎨 Frontend (Next.js 16)"]
         UI["User Interface"]:::frontend
         State["Zustand State"]:::frontend
         AudioPlayer["Web Audio API Player"]:::frontend
@@ -98,6 +101,7 @@ graph TD
 
     %% Client Interactions
     Web -->|Renders| UI
+    Desktop -->|Webview API| UI
     Mobile -->|WebView| UI
     UI <--> State
     State -->|HTTP Requests| Router
@@ -128,7 +132,11 @@ graph TD
     </tr>
     <tr>
       <td><b>Frontend</b></td>
-      <td><code>Next.js 16</code> • <code>TypeScript</code> • <code>Zustand</code> • <code>Radix UI</code> • <code>Lucide</code></td>
+      <td><code>Next.js 16</code> • <code>React 19</code> • <code>TypeScript</code> • <code>Zustand</code> • <code>Radix UI</code> • <code>Lucide</code></td>
+    </tr>
+    <tr>
+      <td><b>Clients</b></td>
+      <td><code>Tauri v2</code> (Desktop) • <code>Capacitor 6</code> (Mobile)</td>
     </tr>
     <tr>
       <td><b>Styling</b></td>
@@ -152,8 +160,10 @@ graph TD
 ```bash
 melofy/
 ├── apps/
-│   ├── web/        # Next.js 16 Frontend
-│   └── api/        # Express.js Backend (Audio Controller)
+│   ├── web/        # Next.js 16 Frontend Web Client
+│   ├── api/        # Express.js Backend (Audio Controller)
+│   ├── desktop/    # Tauri v2 Desktop App Config
+│   └── mobile/     # Capacitor Mobile App (Android/iOS wrapper)
 ├── NodeLink/       # NodeLink Audio Server
 ├── turbo.json      # Monorepo Orchestration
 └── package.json    # Project Manifest
@@ -180,9 +190,9 @@ cp apps/web/.env.example apps/web/.env.local
 cp apps/api/.env.example apps/api/.env
 ```
 
-Important production vars:
-- `apps/api`: `FIREBASE_API_KEY`, `CORS_ORIGINS`, NodeLink + Spotify + Upstash vars
-- `apps/web`: Firebase public vars, Upstash vars, and `BACKEND_API_URL`
+Important production variables:
+- `apps/api`: `FIREBASE_API_KEY`, `CORS_ORIGINS`, NodeLink + Spotify + Upstash variables
+- `apps/web`: Firebase public variables, Upstash variables, and `BACKEND_API_URL`
 
 ### 3️⃣ Launch the Engines
 
@@ -191,7 +201,7 @@ Important production vars:
 npm run dev
 ```
 
-> **Pro Tip:** If you want to run the audio server separately, navigate to `NodeLink/` and run `npm start`.
+> **Pro Tip:** If you want to run the NodeLink audio server separately, navigate to `NodeLink/` and run `npm start`.
 
 ---
 
@@ -223,4 +233,3 @@ If you appreciate the work and want to support the development of Melofy, consid
   <p>Built with 💖 and ☕ by <b><a href="https://github.com/ShreyJaiswal1">ShreyJaiswal1</a></b></p>
   <p><i>© 2026 Melofy. Licensed under ISC.</i></p>
 </div>
-

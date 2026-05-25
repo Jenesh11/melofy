@@ -1,9 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ChevronDown,
-  Radio,
   Shuffle,
   SkipBack,
   Pause,
@@ -32,8 +31,6 @@ interface MobilePlayerProps {
   isExpanded: boolean;
   setIsExpanded: (expanded: boolean) => void;
   currentTrack: Track;
-  isAutoplay: boolean;
-  toggleAutoplay: () => void;
   progressPercent: number;
   currentDisplayTime: string;
   durationTime: string;
@@ -55,8 +52,6 @@ export function MobilePlayer({
   isExpanded,
   setIsExpanded,
   currentTrack,
-  isAutoplay,
-  toggleAutoplay,
   progressPercent,
   currentDisplayTime,
   durationTime,
@@ -81,6 +76,26 @@ export function MobilePlayer({
   const queue = usePlayerStore((state) => state.queue);
   const playFromQueue = usePlayerStore((state) => state.playFromQueue);
   const setQueue = usePlayerStore((state) => state.setQueue);
+
+  useEffect(() => {
+    const handleHardwareBack = (e: Event) => {
+      if (showQueue) {
+        e.preventDefault();
+        setShowQueue(false);
+      } else if (showLyrics) {
+        e.preventDefault();
+        setShowLyrics(false);
+      } else if (isExpanded) {
+        e.preventDefault();
+        setIsExpanded(false);
+      }
+    };
+
+    window.addEventListener('hardwareBack', handleHardwareBack);
+    return () => {
+      window.removeEventListener('hardwareBack', handleHardwareBack);
+    };
+  }, [isExpanded, showQueue, showLyrics, setIsExpanded]);
 
   if (!isExpanded) return null;
 
@@ -135,17 +150,6 @@ export function MobilePlayer({
           </div>
           <div className='flex items-center gap-1'>
             <ListenAlongPopover />
-            <Button
-              variant='ghost'
-              size='icon'
-              onClick={toggleAutoplay}
-              className={cn(
-                'transition-colors hover:bg-white/10',
-                isAutoplay ? 'text-primary bg-primary/20' : 'text-white/50',
-              )}
-            >
-              <Radio className='h-6 w-6' />
-            </Button>
           </div>
         </div>
 

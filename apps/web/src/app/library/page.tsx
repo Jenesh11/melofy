@@ -117,7 +117,7 @@ export default function LibraryPage() {
       </header>
 
       <div className='flex flex-col gap-10 items-start w-full'>
-        <div className='w-full max-w-2xl'>
+        <div className='w-full max-w-5xl'>
           <ImportPlaylistCard onImportSuccess={fetchPlaylists} />
         </div>
 

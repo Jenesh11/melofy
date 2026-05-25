@@ -2,7 +2,6 @@
 
 import {
   Shuffle,
-  Radio,
   SkipBack,
   Pause,
   Play,
@@ -31,8 +30,6 @@ interface DesktopPlayerProps {
   currentTrack: Track;
   isShuffle: boolean;
   toggleShuffle: () => void;
-  isAutoplay: boolean;
-  toggleAutoplay: () => void;
   playPrevious: () => void;
   handleTogglePlay: () => void;
   handleSkipNext: () => void;
@@ -61,8 +58,6 @@ export function DesktopPlayer({
   currentTrack,
   isShuffle,
   toggleShuffle,
-  isAutoplay,
-  toggleAutoplay,
   playPrevious,
   handleTogglePlay,
   handleSkipNext,
@@ -222,23 +217,6 @@ export function DesktopPlayer({
             }}
           >
             <Shuffle className='h-4 w-4' />
-          </Button>
-          <Button
-            variant='ghost'
-            size='icon'
-            className={cn(
-              'hidden md:inline-flex h-8 w-8 transition-colors',
-              isAutoplay
-                ? 'text-primary bg-primary/10'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleAutoplay();
-            }}
-            title='Autoplay similar songs'
-          >
-            <Radio className='h-4 w-4' />
           </Button>
           <Button
             variant='ghost'
