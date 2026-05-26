@@ -42,10 +42,13 @@ export default function ListenJoinPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const tauriDetected = '__TAURI_INTERNALS__' in window || '__TAURI__' in window;
-      setIsTauri(tauriDetected);
-      
       const capacitorDetected = 'Capacitor' in window || (typeof navigator !== 'undefined' && /Capacitor/i.test(navigator.userAgent));
-      setIsMobile(capacitorDetected || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+      const mobileDetected = capacitorDetected || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      setTimeout(() => {
+        setIsTauri(tauriDetected);
+        setIsMobile(mobileDetected);
+      }, 0);
     }
   }, []);
 
@@ -111,7 +114,7 @@ export default function ListenJoinPage() {
   return (
     <div className='flex h-screen w-full flex-col items-center justify-center bg-background text-foreground gap-6 px-4'>
       <div className='flex flex-col items-center text-center space-y-2'>
-        <h2 className='text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent'>
+        <h2 className='text-3xl font-bold tracking-tight bg-linear-to-r from-primary to-blue-400 bg-clip-text text-transparent'>
           Listen Along
         </h2>
         <div className='flex flex-col items-center gap-1'>

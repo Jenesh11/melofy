@@ -12,6 +12,20 @@ import { useAuth } from '@/lib/firebase/auth-context';
 import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
 import { useLikedSongs } from '@/hooks/useLikedSongs';
 import { useLyricsPanelStore } from '@/store/useLyricsPanelStore';
+import type { Track } from '@/store/usePlayerStore';
+
+interface PipState {
+  currentTrack: Track | null;
+  isPlaying: boolean;
+  isBuffering: boolean;
+  progressPercent: number;
+  currentDisplayTime: string;
+  durationTime: string;
+  isLiked: boolean;
+  isShuffle: boolean;
+  isRepeat: boolean;
+  volume: number;
+}
 
 export function PlayerShell() {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -27,7 +41,7 @@ export function PlayerShell() {
 
   // Synchronize state and commands with the Tauri PiP window
   const channelRef = useRef<BroadcastChannel | null>(null);
-  const latestStateRef = useRef<any>(null);
+  const latestStateRef = useRef<PipState | null>(null);
 
   latestStateRef.current = {
     currentTrack: playback.currentTrack,

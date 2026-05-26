@@ -122,7 +122,7 @@ export function ExternalIntegrations() {
     const isTauri = '__TAURI_INTERNALS__' in window;
     if (!isTauri) return;
 
-    let cleanupFns: (() => void)[] = [];
+    const cleanupFns: (() => void)[] = [];
 
     const setup = async () => {
       const { invoke } = await import('@tauri-apps/api/core');

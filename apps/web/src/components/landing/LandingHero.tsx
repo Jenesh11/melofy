@@ -360,7 +360,7 @@ export function LandingHero() {
     }
     const isTauriEnv = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
     if (isTauriEnv) {
-      setIsTauri(true);
+      setTimeout(() => setIsTauri(true), 0);
     }
   }, []);
   return (

@@ -78,7 +78,7 @@ export function usePlayerSync(
     const { partyId } = usePlayerStore.getState();
     if (partyId) {
       console.log(`[PlayerSync] Active party session detected (${partyId}). Skipping database hydration to prevent state override.`);
-      setIsHydrated(true);
+      setTimeout(() => setIsHydrated(true), 0);
       return;
     }
 

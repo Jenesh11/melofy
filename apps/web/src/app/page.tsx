@@ -183,8 +183,8 @@ export default function Home() {
         if (recRes.ok) setRecommendations(await recRes.json());
 
         setHasFetched(true);
-      } catch (error: any) {
-        if (error.name === 'AbortError') {
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === 'AbortError') {
           // Expected: unmount cleanup or user logout — not an error
           console.log('[Dashboard] Fetch was aborted (unmount or user change).');
           return;

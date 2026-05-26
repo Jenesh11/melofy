@@ -30,6 +30,7 @@ interface JoinPartyResponse {
     listenersCanControl?: boolean;
     listeners?: PartyListener[];
   };
+  error?: string;
 }
 
 export function usePartyEvents({
@@ -43,7 +44,6 @@ export function usePartyEvents({
 }: PartyEventsProps) {
   const lastReceivedTrackRef = useRef<string | null>(null);
   const prevPartyIdRef = useRef<string | null>(null);
-  const hasAttemptedRejoin = useRef(false);
   const pendingSyncTimeRef = useRef<number | null>(null);
 
   // Incoming socket events
