@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { motion } from 'framer-motion';
 import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -94,6 +94,40 @@ export default function Home() {
     playPlaylist(newReleasesTracksToPlay);
   }, [playPlaylist, newReleasesTracksToPlay]);
 
+  // Autoplay carousel scroll
+  const isHoveredRef = useRef(false);
+
+  useEffect(() => {
+    if (popularPlaylists.length <= 1) return;
+
+    const intervalId = setInterval(() => {
+      const container = document.getElementById('hero-scroll');
+      if (!container || isHoveredRef.current) return;
+
+      const firstCard = container.firstElementChild as HTMLElement;
+      if (!firstCard) return;
+
+      // Card width plus the gap-6 (24px)
+      const scrollAmount = firstCard.clientWidth + 24;
+      const maxScrollLeft = container.scrollWidth - container.clientWidth;
+
+      // If we are near the end, loop back smoothly to the beginning
+      if (container.scrollLeft >= maxScrollLeft - 30) {
+        container.scrollTo({ left: 0, behavior: 'smooth' });
+      } else {
+        container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+      }
+    }, 4000); // Scroll every 4 seconds for an immersive carousel experience
+
+    return () => clearInterval(intervalId);
+  }, [popularPlaylists]);
+
+  // Use a ref so we can access current history inside the fetch without
+  // including it in the dependency array (history changes on every song play,
+  // which would re-trigger the entire dashboard fetch unnecessarily).
+  const historyRef = useRef(history);
+  useEffect(() => { historyRef.current = history; }, [history]);
+
   useEffect(() => {
     if (!user) return;
     if (hasFetched) {
@@ -101,13 +135,16 @@ export default function Home() {
       return;
     }
 
+    // Abort controller tied to this effect's lifetime — cancels on unmount
+    // or when deps change (e.g. user logs out), preventing the AbortError
+    // that occurred when the fetch outlived the component render cycle.
+    const controller = new AbortController();
+
     const fetchDashboardData = async () => {
       try {
         setIsFetching(true);
         const authHeaders = await getFirebaseAuthHeaders(user);
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        if (controller.signal.aborted) return;
 
         const fetchOptions = { headers: authHeaders, signal: controller.signal };
 
@@ -123,9 +160,10 @@ export default function Home() {
         if (mixRes.ok) setMixes(await mixRes.json());
         if (popularRes.ok) setPopularPlaylists(await popularRes.json());
 
-        // Fetch Discovery Mixes based on history
-        if (history.length > 0) {
-          const artists = history.map(t => t.artist).filter(Boolean);
+        // Fetch Discovery Mixes based on current history (via ref, not deps)
+        const currentHistory = historyRef.current;
+        if (currentHistory.length > 0) {
+          const artists = currentHistory.map(t => t.artist).filter(Boolean);
           const discRes = await fetch('/api/spotify/discovery', {
             method: 'POST',
             headers: { ...authHeaders, 'Content-Type': 'application/json' },
@@ -143,10 +181,14 @@ export default function Home() {
         );
 
         if (recRes.ok) setRecommendations(await recRes.json());
-        
-        clearTimeout(timeoutId);
+
         setHasFetched(true);
-      } catch (error) {
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          // Expected: unmount cleanup or user logout — not an error
+          console.log('[Dashboard] Fetch was aborted (unmount or user change).');
+          return;
+        }
         console.error('Failed to fetch dashboard data:', error);
       } finally {
         setIsFetching(false);
@@ -154,7 +196,12 @@ export default function Home() {
     };
 
     void fetchDashboardData();
-  }, [user, hasFetched, history, setTrending, setNewReleases, setMixes, setPopularPlaylists, setDiscoveryMixes, setRecommendations, setHasFetched]);
+
+    return () => {
+      // Abort in-flight requests when the component unmounts or user changes
+      controller.abort();
+    };
+  }, [user, hasFetched, setTrending, setNewReleases, setMixes, setPopularPlaylists, setDiscoveryMixes, setRecommendations, setHasFetched]);
 
   if (loading) return <div className='min-h-screen bg-background' />;
 
@@ -225,7 +272,9 @@ export default function Home() {
 
         <div
           id='hero-scroll'
-          className='flex overflow-x-auto gap-6 pb-4 custom-scrollbar snap-x snap-mandatory scroll-smooth relative'
+          onMouseEnter={() => { isHoveredRef.current = true; }}
+          onMouseLeave={() => { isHoveredRef.current = false; }}
+          className='flex overflow-x-auto gap-6 pb-4 carousel-scrollbar snap-x snap-mandatory scroll-smooth relative'
         >
           {popularPlaylists.slice(0, 8).map((playlist, index) => (
             <HeroPlaylistCard

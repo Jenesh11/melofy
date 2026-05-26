@@ -92,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // ── Tauri Deep Link Listener ──────────────────────────────────────────
     let unlistenTauriDeepLink: (() => void) | undefined;
     if (typeof window !== 'undefined' && '__TAURI__' in window) {
-      // Helper to process a melofy:// auth deep link URL
+      // Helper to process a melofy:// deep link URL (auth or listening sessions)
       const handleDeepLinkUrl = async (url: string) => {
         if (url.startsWith('melofy://auth')) {
           const urlObj = new URL(url);
@@ -101,6 +101,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log('[Auth] Deep link received. Signing in with Custom Token...');
             const { signInWithCustomToken } = await import('firebase/auth');
             signInWithCustomToken(auth, customToken).catch(console.error);
+          }
+        } else if (url.startsWith('melofy://listen/')) {
+          const partyId = url.replace('melofy://listen/', '').split('?')[0];
+          if (partyId) {
+            console.log(`[DeepLink] Redirecting to listen session: ${partyId}`);
+            window.location.href = `/listen/${partyId.toUpperCase()}`;
           }
         }
       };

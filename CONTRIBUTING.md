@@ -70,8 +70,8 @@ graph TD
 - **Hydration**: On mount, player configuration is populated dynamically from `/api/player-state`.
 - **Throttling**: Changes to volume, history, track selections, or loop/shuffle states are queued and synced back to the backend database every **2 seconds** using a throttled `setTimeout` mechanism. This minimizes Firestore/network writes while keeping state persistent across page reloads.
 
-### 3. PreMiD Discord Rich Presence Exposer
-- Handled in `apps/web/src/components/PreMiDExposer.tsx`.
+### 3. External Integrations Coordinator
+- Handled in `apps/web/src/components/ExternalIntegrations.tsx`.
 - Rather than running heavy local listeners, the player exposes current metadata structures directly to `window.melofy`.
 - Dispatches a custom `melofy_state_update` browser event on track or playback adjustments so the PreMiD integration can seamlessly reflect user activity on Discord.
 

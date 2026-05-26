@@ -257,3 +257,12 @@
     scrollbar-color: color-mix(in oklch, var(--foreground) 12%, transparent) transparent;
   }
 }
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

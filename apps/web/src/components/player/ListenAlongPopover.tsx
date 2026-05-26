@@ -161,9 +161,9 @@ export function ListenAlongPopover() {
                 Start a real-time listening session with friends. Everyone stays in sync perfectly.
               </p>
               
-              <Button onClick={handleCreateParty} className='w-full' disabled={isLoading}>
-                {isLoading ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : null}
-                Start New Session
+              <Button onClick={handleCreateParty} className='w-full font-bold' disabled={isLoading || !isConnected}>
+                {isLoading || !isConnected ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : null}
+                {!isConnected ? 'Connecting to Sync...' : 'Start New Session'}
               </Button>
 
               <div className='relative'>
@@ -171,20 +171,21 @@ export function ListenAlongPopover() {
                   <span className='w-full border-t border-muted' />
                 </div>
                 <div className='relative flex justify-center text-xs uppercase'>
-                  <span className='bg-background px-2 text-muted-foreground'>Or join existing</span>
+                  <span className='bg-background px-2 text-muted-foreground font-semibold'>Or join existing</span>
                 </div>
               </div>
 
               <form onSubmit={handleJoinParty} className='flex space-x-2'>
                 <Input
-                  className='h-9 flex-1'
-                  placeholder='Enter session code'
+                  className='h-9 flex-1 font-semibold'
+                  placeholder={!isConnected ? 'Connecting...' : 'Enter session code'}
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                   maxLength={6}
+                  disabled={!isConnected}
                 />
-                <Button type='submit' className='h-9' disabled={!joinCode.trim() || isLoading}>
-                  {isLoading ? <Loader2 className='h-4 w-4 animate-spin' /> : 'Join'}
+                <Button type='submit' className='h-9 font-bold' disabled={!joinCode.trim() || isLoading || !isConnected}>
+                  {isLoading ? <Loader2 className='h-4 w-4 animate-spin' /> : (!isConnected ? '...' : 'Join')}
                 </Button>
               </form>
             </div>

@@ -36,6 +36,19 @@ export default function ListenJoinPage() {
   const [isJoining, setIsJoining] = useState(false);
   const [partyInfo, setPartyInfo] = useState<{ hostName?: string; currentTrack?: Track } | null>(null);
 
+  const [isTauri, setIsTauri] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const tauriDetected = '__TAURI_INTERNALS__' in window || '__TAURI__' in window;
+      setIsTauri(tauriDetected);
+      
+      const capacitorDetected = 'Capacitor' in window || (typeof navigator !== 'undefined' && /Capacitor/i.test(navigator.userAgent));
+      setIsMobile(capacitorDetected || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    }
+  }, []);
+
   useEffect(() => {
     if (!id) {
       router.push('/');
@@ -93,15 +106,19 @@ export default function ListenJoinPage() {
     });
   };
 
+  const showDesktopLauncher = !isTauri && !isMobile;
+
   return (
-    <div className='flex h-screen w-full flex-col items-center justify-center bg-background text-foreground gap-6'>
+    <div className='flex h-screen w-full flex-col items-center justify-center bg-background text-foreground gap-6 px-4'>
       <div className='flex flex-col items-center text-center space-y-2'>
-        <h2 className='text-3xl font-bold tracking-tight'>Listen Along</h2>
+        <h2 className='text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-400 bg-clip-text text-transparent'>
+          Listen Along
+        </h2>
         <div className='flex flex-col items-center gap-1'>
-          <p className='text-muted-foreground'>
+          <p className='text-muted-foreground max-w-xs sm:max-w-md leading-relaxed text-sm sm:text-base'>
             {partyInfo?.hostName ? (
               <>
-                <span className='font-semibold text-foreground underline decoration-primary/50 underline-offset-4'>
+                <span className='font-bold text-foreground underline decoration-primary/50 underline-offset-4'>
                   {partyInfo.hostName}
                 </span>{' '}
                 invited you to join their jam
@@ -110,18 +127,42 @@ export default function ListenJoinPage() {
               "You've been invited to a session"
             )}
           </p>
-          <span className='font-mono text-primary font-bold text-sm bg-primary/10 px-2 py-0.5 rounded'>
+          <span className='font-mono text-primary font-bold text-sm bg-primary/10 border border-primary/20 px-3 py-0.5 rounded-full mt-1'>
              #{id?.toUpperCase()}
           </span>
         </div>
       </div>
 
-      <Button disabled={isJoining || !isConnected} onClick={handleJoin} size='lg' className='w-48'>
-        {isJoining ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : null}
-        {isJoining ? 'Joining...' : 'Join Session'}
-      </Button>
+      <div className='flex flex-col sm:flex-row gap-4 items-center justify-center w-full max-w-sm sm:max-w-lg mt-2'>
+        {showDesktopLauncher && (
+          <Button
+            onClick={() => {
+              window.location.href = `melofy://listen/${id?.toUpperCase()}`;
+            }}
+            size='lg'
+            className='w-full sm:w-48 bg-primary hover:bg-primary/95 text-primary-foreground font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 rounded-[1.25rem] h-12 transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center'
+          >
+            Open Desktop App
+          </Button>
+        )}
 
-      <p className='text-xs text-muted-foreground opacity-75'>{status}</p>
+        <Button
+          disabled={isJoining || !isConnected}
+          onClick={handleJoin}
+          size='lg'
+          variant={showDesktopLauncher ? 'outline' : 'default'}
+          className={`w-full sm:w-48 font-bold rounded-[1.25rem] h-12 flex items-center justify-center transition-all ${
+            showDesktopLauncher 
+              ? 'border-foreground/10 hover:border-foreground/20 hover:bg-foreground/5' 
+              : 'bg-primary hover:bg-primary/95 text-primary-foreground shadow-lg shadow-primary/20'
+          }`}
+        >
+          {isJoining ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : null}
+          {isJoining ? 'Joining...' : showDesktopLauncher ? 'Join in Browser' : 'Join Session'}
+        </Button>
+      </div>
+
+      <p className='text-xs text-muted-foreground opacity-75 font-medium'>{status}</p>
     </div>
   );
 }

@@ -74,6 +74,14 @@ export function usePlayerSync(
   useEffect(() => {
     if (!user?.uid) return;
 
+    // Skip database hydration if an active party session is already loaded in-memory (e.g. joined a session or started hosting)
+    const { partyId } = usePlayerStore.getState();
+    if (partyId) {
+      console.log(`[PlayerSync] Active party session detected (${partyId}). Skipping database hydration to prevent state override.`);
+      setIsHydrated(true);
+      return;
+    }
+
     getAuthHeader()
       .then((headers) => {
         if (!headers) {

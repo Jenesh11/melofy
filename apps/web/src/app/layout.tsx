@@ -12,7 +12,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { SocketProvider } from '@/lib/socket-context';
 import { AppWrapper } from '@/components/layout/AppWrapper';
 import { Toaster } from 'sonner';
-import { PreMiDExposer } from '@/components/PreMiDExposer';
+import { ExternalIntegrations } from '@/components/ExternalIntegrations';
 import type { Viewport } from 'next';
 
 export const viewport: Viewport = {
@@ -26,7 +26,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://melofy.jene.in'),
-  title: 'Melofy | Elevate Your Sound',
+  title: 'Melofy - Stream High-Fidelity Music & Port Spotify Playlists',
   applicationName: 'Melofy',
   manifest: '/manifest.json',
   appleWebApp: {
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
     title: 'Melofy',
   },
   description:
-    'The ultimate destination for music lovers. Port your Spotify playlists, discover new sounds, and experience high-fidelity streaming in a stunning, minimalist interface.',
+    'Import Spotify playlists instantly, sync with friends using Listen Along, and stream high-fidelity audio inside a stunning, minimalist music experience.',
   keywords: [
     'music streaming',
     'spotify importer',
@@ -46,6 +46,8 @@ export const metadata: Metadata = {
     'melofy music streaming',
     'high fidelity audio',
     'personalized playlists',
+    'listen along',
+    'music sync',
   ],
   authors: [{ name: 'Melofy Team', url: 'https://melofy.jene.in' }],
   creator: 'Melofy',
@@ -63,9 +65,9 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: 'https://melofy.jene.in',
     siteName: 'Melofy',
-    title: 'Melofy - Your World Of Music',
+    title: 'Melofy - Stream High-Fidelity Music & Port Spotify Playlists',
     description:
-      'Experience sound like never before with Melofy. Minimalist, premium, and designed for audiophiles.',
+      'Import Spotify playlists instantly, sync with friends using Listen Along, and stream high-fidelity audio inside a stunning, minimalist music experience.',
     images: [
       {
         url: '/logo.png',
@@ -76,9 +78,10 @@ export const metadata: Metadata = {
     ],
   },
   twitter: {
-    card: 'summary_large_image',
-    title: 'Melofy - Your World Of Music',
-    description: 'The most premium music experience on the web.',
+    card: 'summary',
+    title: 'Melofy - Stream High-Fidelity Music & Port Spotify Playlists',
+    description:
+      'Import Spotify playlists instantly, sync with friends using Listen Along, and stream high-fidelity audio inside a stunning, minimalist music experience.',
     images: ['/logo.png'],
     creator: '@lazy_shrey',
   },
@@ -111,7 +114,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <SocketProvider>
-              <PreMiDExposer />
+              <ExternalIntegrations />
               <AppWrapper>{children}</AppWrapper>
               <Toaster richColors position='bottom-right' />
             </SocketProvider>

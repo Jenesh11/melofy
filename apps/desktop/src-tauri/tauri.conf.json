@@ -52,12 +52,43 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "resources": [
+      "icons/media/media-prev.ico",
+      "icons/media/media-prev-disabled.ico",
+      "icons/media/media-play.ico",
+      "icons/media/media-pause.ico",
+      "icons/media/media-next.ico",
+      "icons/media/media-next-disabled.ico"
     ]
   },
   "plugins": {
     "deep-link": {
       "desktop": {
         "schemes": ["melofy"]
+      }
+    },
+    "taskbar": {
+      "autoAttach": true,
+      "windowLabel": "main",
+      "icons": {
+        "previous": "icons/media/media-prev.ico",
+        "previousDisabled": "icons/media/media-prev-disabled.ico",
+        "play": "icons/media/media-play.ico",
+        "pause": "icons/media/media-pause.ico",
+        "next": "icons/media/media-next.ico",
+        "nextDisabled": "icons/media/media-next-disabled.ico"
+      },
+      "events": {
+        "previous": "media-prev",
+        "toggle": "media-toggle",
+        "next": "media-next"
+      },
+      "tooltips": {
+        "previous": "Previous",
+        "play": "Play",
+        "pause": "Pause",
+        "next": "Next"
       }
     }
   }

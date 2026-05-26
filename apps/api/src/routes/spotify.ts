@@ -28,8 +28,8 @@ router.get('/trending', async (req, res) => {
     // This is a publicly accessible playlist, not a Spotify editorial featured list
     // The Top 50 - Global is accessible via playlist tracks endpoint
     const playlistId = '37i9dQZEVXbMDoHDwVN2tF';
-    // 2026 Update: Even if playlists allow more, we cap to 10 for consistency and performance
-    const data = await spotifyGet(`/playlists/${playlistId}/tracks?limit=10`);
+    // Fetch full 50 tracks from Top 50 Global playlist
+    const data = await spotifyGet(`/playlists/${playlistId}/tracks?limit=50`);
     res.json(data.items.filter((item: any) => item.track));
   } catch (error: any) {
     // Fallback: use search API for popular tracks
@@ -38,7 +38,7 @@ router.get('/trending', async (req, res) => {
         '[Spotify] Playlist fallback — using search API for trending',
       );
       const data = await spotifyGet(
-        `/search?q=year:2024-2025&type=track&limit=10&market=US`,
+        `/search?q=year:2024-2025&type=track&limit=50&market=US`,
       );
       // Transform to match the {track} shape expected by frontend
       res.json(data.tracks.items.map((track: any) => ({ track })));

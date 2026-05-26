@@ -2,6 +2,8 @@ import crypto from 'crypto';
 import { Server as SocketIOServer, Socket as SocketIOSocket } from 'socket.io';
 import { Redis } from '@upstash/redis';
 
+const hostDisconnectTimers = new Map<string, NodeJS.Timeout>();
+
 export function registerJamHandlers(
   io: SocketIOServer,
   socket: SocketIOSocket,
@@ -105,17 +107,27 @@ export function registerJamHandlers(
 
       if (isHost) {
         console.log(`Socket ${socket.id} rejoined party ${roomId} as host`);
+        const timer = hostDisconnectTimers.get(partyId.toUpperCase());
+        if (timer) {
+          clearTimeout(timer);
+          hostDisconnectTimers.delete(partyId.toUpperCase());
+          console.log(`[JamSync] Host rejoined party ${partyId}. Grace period cancelled.`);
+        }
         callback?.({ ok: true, initialState: partyData, isHost: true });
       } else {
         console.log(`Socket ${socket.id} joined party ${roomId} as listener`);
         if (!partyData.listeners) partyData.listeners = [];
-        if (!partyData.listeners.find((l: any) => l.userId === userId)) {
+        const isNewListener = !partyData.listeners.find((l: any) => l.userId === userId);
+        if (isNewListener) {
           partyData.listeners.push({ userId, username });
           await redis.set(roomId, JSON.stringify(partyData), { ex: 4 * 60 * 60 });
         }
         callback?.({ ok: true, initialState: partyData, isHost: false });
-        socket.to(roomId).emit('listener_joined', { username });
-        io.to(roomId).emit('listeners_update', { listeners: partyData.listeners });
+        
+        if (isNewListener) {
+          socket.to(roomId).emit('listener_joined', { username });
+          io.to(roomId).emit('listeners_update', { listeners: partyData.listeners });
+        }
       }
     } catch (error) {
       console.error('Failed to join party:', error);
@@ -228,9 +240,26 @@ export function registerJamHandlers(
 
   socket.on('disconnect', async () => {
     const pId = socket.data.partyId;
-    if (!pId || socket.data.isPartyHost) return;
+    if (!pId) return;
 
     const roomId = `party:${pId}`;
+
+    if (socket.data.isPartyHost) {
+      console.log(`[JamSync] Host for party ${pId} disconnected. Starting 15s grace period...`);
+      const timer = setTimeout(async () => {
+        hostDisconnectTimers.delete(pId);
+        console.log(`[JamSync] Host grace period expired. Ending party ${pId} permanently.`);
+        try {
+          await redis.del(roomId);
+          io.to(roomId).emit('party_ended');
+        } catch (err) {
+          console.error('Error ending party after host disconnect:', err);
+        }
+      }, 15000); // 15 seconds grace period
+      hostDisconnectTimers.set(pId, timer);
+      return;
+    }
+
     try {
       const partyDataStr = await redis.get<string | object>(roomId);
       if (partyDataStr) {

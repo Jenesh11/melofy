@@ -73,6 +73,11 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
         auth: {
           token,
         },
+        // Skip HTTP long-polling entirely — connect straight to WebSocket.
+        // This prevents the 500 (polling error) → 400 (stale session-ID) cascade
+        // that occurs when socket.io tries to resume a dead polling session
+        // after a reconnect or page refresh.
+        transports: ['websocket'],
       });
 
       socketInstance.on('connect', () => {
