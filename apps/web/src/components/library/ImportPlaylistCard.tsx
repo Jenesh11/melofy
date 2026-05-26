@@ -32,8 +32,14 @@ export function ImportPlaylistCard({
     setImportSuccess(false);
 
     try {
+      const token = await user.getIdToken();
       const response = await fetch(
         `/api/search?q=${encodeURIComponent(importUrl)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
       );
       const data = await response.json();
 
@@ -73,29 +79,29 @@ export function ImportPlaylistCard({
   };
 
   return (
-    <Card className='lg:col-span-1 bg-card/40 backdrop-blur-xl border-border rounded-[2rem] overflow-hidden shadow-2xl'>
+    <Card className='w-full bg-card/40 backdrop-blur-xl border-border rounded-[2rem] overflow-hidden shadow-2xl'>
       <CardHeader className='p-8 pb-4'>
         <CardTitle className='text-2xl font-bold text-foreground flex items-center gap-3'>
           <Sparkles className='h-6 w-6 text-foreground' />
           Import Playlist
         </CardTitle>
         <CardDescription className='text-muted-foreground font-light'>
-          Paste a Spotify playlist URL to instantly port your favorite tracks.
+          Paste a Spotify or youtube playlist URL to instantly port your favorite tracks.
         </CardDescription>
       </CardHeader>
       <CardContent className='p-8 pt-0 space-y-6'>
-        <div className='space-y-4'>
+        <div className='flex flex-col sm:flex-row gap-4 items-center w-full'>
           <Input
             placeholder='https://open.spotify.com/playlist/...'
             value={importUrl}
             onChange={(e) => setImportUrl(e.target.value)}
-            className='bg-muted/50 border-border h-12 rounded-2xl focus-visible:ring-primary/50 text-foreground placeholder:text-muted-foreground font-light'
+            className='bg-muted/50 border-border h-14 rounded-2xl focus-visible:ring-primary/50 text-foreground placeholder:text-muted-foreground font-light w-full'
             disabled={isImporting || !user}
           />
           <Button
             onClick={handleImport}
             disabled={isImporting || !importUrl.trim() || !user}
-            className='w-full h-14 rounded-2xl bg-primary text-primary-foreground font-bold hover:scale-[1.02] transition-all active:scale-[0.98] group border-none'
+            className='h-14 sm:w-56 w-full rounded-2xl bg-primary text-primary-foreground font-bold hover:scale-[1.02] transition-all active:scale-[0.98] group border-none shrink-0'
           >
             {isImporting ? (
               <>

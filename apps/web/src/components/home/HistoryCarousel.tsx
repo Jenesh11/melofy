@@ -1,6 +1,9 @@
-import { Play, Music2 } from 'lucide-react';
+import { Play, Music2, ListPlus } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Track } from '@/store/usePlayerStore';
+import { Track, usePlayerStore } from '@/store/usePlayerStore';
+import { TrackOptionsMenu } from '@/components/ui/TrackOptionsMenu';
+import { toast } from 'sonner';
+import Image from 'next/image';
 
 interface HistoryCarouselProps {
   history: Track[];
@@ -19,14 +22,41 @@ export function HistoryCarousel({
   onPause,
   onResume,
 }: HistoryCarouselProps) {
+  const addToQueue = usePlayerStore((state) => state.addToQueue);
+
   if (history.length === 0) return null;
+
+  const handleAddToQueue = (track: Track) => {
+    addToQueue(track);
+    toast('Added to Queue', {
+      className: 'bg-primary text-primary-foreground border-none shadow-2xl',
+      description: (
+        <div className="flex items-center gap-2 mt-1">
+          {track.artworkUrl && (
+            <Image 
+              src={track.artworkUrl} 
+              alt="" 
+              width={32}
+              height={32}
+              className="h-8 w-8 rounded-md object-cover shadow-md brightness-90" 
+            />
+          )}
+          <div className="flex flex-col min-w-0">
+            <span className="font-bold text-xs truncate opacity-90">{track.title}</span>
+          </div>
+        </div>
+      ),
+      icon: <ListPlus className="h-4 w-4" />,
+      duration: 2500,
+    });
+  };
 
   return (
     <section className='mt-4'>
       <h3 className='text-3xl font-bold text-foreground flex items-center gap-2 mb-6'>
         Jump Back In
       </h3>
-      <div className='flex overflow-x-auto gap-6 pb-6 custom-scrollbar scroll-smooth snap-x snap-mandatory'>
+      <div className='flex overflow-x-auto gap-6 pb-6 custom-scrollbar carousel-scrollbar scroll-smooth snap-x snap-mandatory'>
         {Array.from(new Map(history.map((item) => [item.title, item])).values())
           .reverse()
           .slice(0, 10)
@@ -49,16 +79,19 @@ export function HistoryCarousel({
                 <div className='absolute bottom-3 right-3 z-20'>
                   <div className='w-12 h-12 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-xl group-hover:scale-105 transition-transform'>
                     {currentTrack?.title === track.title && isPlaying ? (
-                      <div className='h-5 w-5 flex items-end justify-center gap-[2px]'>
-                        <span className='w-1 h-full bg-black animate-bounce'></span>
-                        <span
-                          className='w-1 h-3/4 bg-black animate-bounce'
-                          style={{ animationDelay: '0.2s' }}
-                        ></span>
-                        <span
-                          className='w-1 h-1/2 bg-black animate-bounce'
-                          style={{ animationDelay: '0.4s' }}
-                        ></span>
+                      <div className='flex items-center justify-center gap-0.5 h-4'>
+                        <div
+                          className='w-1 h-3 bg-black animate-bounce'
+                          style={{ animationDelay: '0ms' }}
+                        />
+                        <div
+                          className='w-1 h-5 bg-black animate-bounce'
+                          style={{ animationDelay: '100ms' }}
+                        />
+                        <div
+                          className='w-1 h-3 bg-black animate-bounce'
+                          style={{ animationDelay: '200ms' }}
+                        />
                       </div>
                     ) : (
                       <Play className='h-5 w-5 fill-black translate-x-0.5' />
@@ -68,9 +101,11 @@ export function HistoryCarousel({
                 <div className='absolute inset-0 bg-background/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10 pointer-events-none' />
                 <div className='h-full w-full bg-linear-to-br from-muted to-background group-hover:scale-110 transition-transform duration-700 flex items-center justify-center'>
                   {track.artworkUrl ? (
-                    <img
+                    <Image
                       src={track.artworkUrl}
                       alt={track.title}
+                      width={200}
+                      height={200}
                       className='w-full h-full object-cover'
                     />
                   ) : (
@@ -78,13 +113,21 @@ export function HistoryCarousel({
                   )}
                 </div>
               </div>
-              <div className='flex flex-col px-2'>
-                <p className='text-foreground font-bold truncate text-base group-hover:text-primary transition-colors'>
-                  {track.title}
-                </p>
-                <p className='text-muted-foreground text-xs truncate uppercase tracking-tighter mt-1 font-medium'>
-                  {track.artist}
-                </p>
+              <div className='flex items-start justify-between px-2 gap-2'>
+                <div className='flex flex-col min-w-0'>
+                  <p className='text-foreground font-bold truncate text-base group-hover:text-primary transition-colors'>
+                    {track.title}
+                  </p>
+                  <p className='text-muted-foreground text-xs truncate uppercase tracking-tighter mt-1 font-medium'>
+                    {track.artist}
+                  </p>
+                </div>
+                <div className='opacity-0 group-hover:opacity-100 transition-opacity shrink-0' onClick={(e) => e.stopPropagation()}>
+                  <TrackOptionsMenu 
+                    track={track} 
+                    onAddToQueue={() => handleAddToQueue(track)} 
+                  />
+                </div>
               </div>
             </motion.div>
           ))}

@@ -11,11 +11,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { useAuth } from '@/lib/firebase/auth-context';
 
 export default function NotFound() {
-  const { user } = useAuth();
-
   return (
     <div className='min-h-[80vh] flex flex-col items-center justify-center p-6 text-center relative overflow-hidden'>
       {/* Background Decorative Elements */}
@@ -80,7 +77,7 @@ export default function NotFound() {
             transition={{ delay: 0.2 }}
             className='text-zinc-500 max-w-md mx-auto text-lg'
           >
-            The track you're looking for has drifted off into the void. Let's
+            The track you&apos;re looking for has drifted off into the void. Let&apos;s
             get you back to the music.
           </motion.p>
         </div>

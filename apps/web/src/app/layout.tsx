@@ -12,29 +12,56 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { SocketProvider } from '@/lib/socket-context';
 import { AppWrapper } from '@/components/layout/AppWrapper';
 import { Toaster } from 'sonner';
+import { PreMiDExposer } from '@/components/PreMiDExposer';
+import type { Viewport } from 'next';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+  themeColor: '#000000',
+};
 
 export const metadata: Metadata = {
-  title: 'Melofy - Syncing Your Soundscape',
+  metadataBase: new URL('https://melofy.jene.in'),
+  title: 'Melofy | Elevate Your Sound',
+  applicationName: 'Melofy',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Melofy',
+  },
   description:
     'The ultimate destination for music lovers. Port your Spotify playlists, discover new sounds, and experience high-fidelity streaming in a stunning, minimalist interface.',
   keywords: [
     'music streaming',
     'spotify importer',
     'melofy',
+    'melofy music',
+    'melofy app',
+    'melofy music app',
+    'melofy music streaming',
     'high fidelity audio',
     'personalized playlists',
   ],
-  authors: [{ name: 'Melofy Team' }],
+  authors: [{ name: 'Melofy Team', url: 'https://melofy.jene.in' }],
   creator: 'Melofy',
   publisher: 'Melofy',
   icons: {
-    icon: '/logo.png',
-    apple: '/logo.png',
+    icon: [
+      { url: '/logo.png' },
+      { url: '/logo.png', sizes: '32x32', type: 'image/png' },
+      { url: '/logo.png', sizes: '16x16', type: 'image/png' },
+    ],
+    apple: [{ url: '/logo.png', sizes: '180x180', type: 'image/png' }],
   },
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://melofy.vercel.app',
+    url: 'https://melofy.jene.in',
     siteName: 'Melofy',
     title: 'Melofy - Your World Of Music',
     description:
@@ -53,6 +80,18 @@ export const metadata: Metadata = {
     title: 'Melofy - Your World Of Music',
     description: 'The most premium music experience on the web.',
     images: ['/logo.png'],
+    creator: '@lazy_shrey',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
   },
 };
 
@@ -72,6 +111,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <SocketProvider>
+              <PreMiDExposer />
               <AppWrapper>{children}</AppWrapper>
               <Toaster richColors position='bottom-right' />
             </SocketProvider>

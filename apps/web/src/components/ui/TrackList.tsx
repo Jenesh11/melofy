@@ -1,39 +1,31 @@
 'use client';
 
-import { Music2 } from 'lucide-react';
+import { useCallback, useMemo } from 'react';
+import { Music2, Heart, ListPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePlayerStore, Track as PlayerTrack } from '@/store/usePlayerStore';
 import { toast } from 'sonner';
+import { getAuth } from 'firebase/auth';
+import { app } from '@/lib/firebase/config';
+import { mapTrackItemToPlayerTrack } from '@/lib/track-mappers';
+import { useLikedSongs } from '@/hooks/useLikedSongs';
+import type { TrackItem } from '@/lib/track-types';
 
-/**
- * Unified track shape consumable by TrackList.
- * Both Spotify metadata and internal Melofy tracks can be mapped to this.
- */
-export interface TrackItem {
-  id: string;
-  identifier?: string; // YouTube Video ID
-  title: string;
-  artist: string;
-  artworkUrl: string;
-  duration: number; // ms
-  /** Album or secondary label shown in the ALBUM column */
-  album?: string;
-  /** NodeLink encoded URL – if present, direct play. If absent, we search for it. */
-  encoded?: string;
-}
+export type { TrackItem };
 
 interface TrackListProps {
   tracks: TrackItem[];
-  /** Show a column header row */
   showHeader?: boolean;
 }
 
-/**
- * Resolves a TrackItem into a playable PlayerTrack.
- * If the track already has an encoded URL, returns immediately.
- * Otherwise, searches NodeLink/Kazagumo and only takes the encoded URL,
- * keeping the original Spotify-style metadata (title, artist, artwork).
- */
+async function getClientAuthHeaders(): Promise<Record<string, string>> {
+  const currentUser = getAuth(app).currentUser;
+  if (!currentUser) return {};
+
+  const token = await currentUser.getIdToken();
+  return { Authorization: `Bearer ${token}` };
+}
+
 async function resolvePlayableTrack(
   item: TrackItem,
 ): Promise<PlayerTrack | null> {
@@ -51,12 +43,13 @@ async function resolvePlayableTrack(
 
   try {
     const searchQuery = `${item.title} ${item.artist}`;
-    const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
+    const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`, {
+      headers: await getClientAuthHeaders(),
+    });
     const data = await res.json();
 
     if (data?.tracks?.length > 0) {
       const found = data.tracks[0];
-      // IMPORTANT: Keep original Spotify metadata, only grab the encoded stream URL and identifier
       return {
         id: item.id,
         identifier: found.info.identifier,
@@ -67,23 +60,28 @@ async function resolvePlayableTrack(
         url: found.encoded,
       };
     }
-  } catch (e) {
-    console.error('[TrackList] Failed to resolve playable URL:', e);
+  } catch (error) {
+    console.error('[TrackList] Failed to resolve playable URL:', error);
   }
 
   return null;
 }
 
-// Export this so other components (TrackCarousel etc.) can reuse it
 export { resolvePlayableTrack };
 
-/**
- * A reusable, consistent list view for tracks across the app.
- * Mirrors the design of the /playlist/[id] page for a cohesive look.
- */
 export function TrackList({ tracks, showHeader = true }: TrackListProps) {
-  const { currentTrack, isPlaying, playInContext, pause, resume } =
-    usePlayerStore();
+  const currentTrack = usePlayerStore((state) => state.currentTrack);
+  const isPlaying = usePlayerStore((state) => state.isPlaying);
+  const playInContext = usePlayerStore((state) => state.playInContext);
+  const pause = usePlayerStore((state) => state.pause);
+  const resume = usePlayerStore((state) => state.resume);
+  const addToQueue = usePlayerStore((state) => state.addToQueue);
+  const { toggleLike, isLiked } = useLikedSongs();
+
+  const contextTracks = useMemo(
+    () => tracks.map((track) => mapTrackItemToPlayerTrack(track)),
+    [tracks],
+  );
 
   const formatDuration = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
@@ -92,42 +90,65 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const handlePlay = async (item: TrackItem, index: number) => {
-    // If same track – toggle
-    if (currentTrack?.title === item.title) {
-      isPlaying ? pause() : resume();
-      return;
-    }
+  const handlePlay = useCallback(
+    async (item: TrackItem, index: number) => {
+      if (currentTrack?.title === item.title) {
+        if (isPlaying) {
+          pause();
+        } else {
+          resume();
+        }
+        return;
+      }
 
-    const resolved = await resolvePlayableTrack(item);
-    if (!resolved) {
-      toast.error('Could not find a playable version of this track');
-      return;
-    }
+      const resolved = await resolvePlayableTrack(item);
+      if (!resolved) {
+        toast.error('Could not find a playable version of this track');
+        return;
+      }
 
-    // Build queue context: resolve all remaining tracks in the background
-    // For now, build the queue from the track items with their metadata.
-    // The player will resolve encoded URLs when it needs them via playNext.
-    const contextTracks: PlayerTrack[] = tracks.map((t) => ({
-      id: t.id,
-      identifier: t.identifier,
-      title: t.title,
-      artist: t.artist,
-      artworkUrl: t.artworkUrl,
-      duration: t.duration,
-      url: t.encoded || '',
-    }));
+      const nextContextTracks = [...contextTracks];
+      nextContextTracks[index] = resolved;
+      playInContext(resolved, nextContextTracks);
+    },
+    [contextTracks, currentTrack?.title, isPlaying, pause, playInContext, resume],
+  );
 
-    // Set the resolved track's URL in the context
-    contextTracks[index] = resolved;
-
-    playInContext(resolved, contextTracks);
-  };
+  const handleAddToQueue = useCallback(
+    async (item: TrackItem, index: number) => {
+      let trackToAdd = contextTracks[index];
+      if (!trackToAdd.url) {
+        const resolved = await resolvePlayableTrack(item);
+        if (!resolved) {
+          toast.error('Could not find a playable version of this track');
+          return;
+        }
+        trackToAdd = resolved;
+      }
+      addToQueue(trackToAdd);
+      toast('Added to Queue', {
+        className: 'bg-primary text-primary-foreground border-none shadow-2xl',
+        description: (
+          <div className="flex items-center gap-2 mt-1">
+            {trackToAdd.artworkUrl && (
+              <img src={trackToAdd.artworkUrl} alt="" className="h-8 w-8 rounded-md object-cover shadow-md brightness-90" />
+            )}
+            <div className="flex flex-col min-w-0">
+              <span className="font-bold text-xs truncate opacity-90">{trackToAdd.title}</span>
+            </div>
+          </div>
+        ),
+        icon: <ListPlus className="h-4 w-4" />,
+        duration: 2500,
+      });
+    },
+    [contextTracks, addToQueue]
+  );
 
   return (
     <div className='flex flex-col gap-1'>
       {showHeader && (
-        <div className='grid grid-cols-[2rem_1fr_auto] md:grid-cols-[2rem_1fr_minmax(0,200px)_auto] gap-4 px-4 py-2 border-b border-border text-muted-foreground text-[10px] font-bold tracking-wider uppercase mb-2'>
+        <div className='grid grid-cols-[2rem_1fr_auto_5rem] md:grid-cols-[2rem_1fr_minmax(0,200px)_auto_5rem] gap-4 px-4 py-2 border-b border-border text-muted-foreground text-[10px] font-bold tracking-wider uppercase mb-2'>
           <span className='text-center'>#</span>
           <span>Title</span>
           <span className='hidden md:block'>Album</span>
@@ -147,6 +168,7 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
               <polyline points='12 6 12 12 16 14' />
             </svg>
           </span>
+          <span></span>
         </div>
       )}
 
@@ -155,13 +177,11 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
         return (
           <div
             key={item.id + index}
-            onClick={() => handlePlay(item, index)}
             className={cn(
-              'grid grid-cols-[2rem_1fr_auto] md:grid-cols-[2rem_1fr_minmax(0,200px)_auto] gap-4 px-4 py-3 rounded-xl transition-all group cursor-pointer items-center',
+              'grid grid-cols-[2rem_1fr_auto_5rem] md:grid-cols-[2rem_1fr_minmax(0,200px)_auto_5rem] gap-4 px-4 py-3 rounded-xl transition-all group items-center',
               isActive ? 'bg-foreground/10 shadow-sm' : 'hover:bg-foreground/5',
             )}
           >
-            {/* Index / Equalizer */}
             <span
               className={cn(
                 'text-center text-sm tabular-nums',
@@ -190,8 +210,10 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
               )}
             </span>
 
-            {/* Artwork + Title + Artist */}
-            <div className='flex items-center gap-3 min-w-0'>
+            <div
+              className='flex items-center gap-3 min-w-0 cursor-pointer'
+              onClick={() => handlePlay(item, index)}
+            >
               <div className='h-10 w-10 rounded-lg bg-muted shrink-0 overflow-hidden'>
                 {item.artworkUrl ? (
                   <img
@@ -221,15 +243,45 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
               </div>
             </div>
 
-            {/* Album column (hidden on mobile) */}
             <span className='text-xs text-muted-foreground truncate hidden md:block'>
               {item.album || item.artist}
             </span>
 
-            {/* Duration */}
-            <span className='text-xs text-muted-foreground tabular-nums font-light flex justify-end items-center'>
+            <span
+              className='text-xs text-muted-foreground tabular-nums font-light flex justify-end items-center cursor-pointer'
+              onClick={() => handlePlay(item, index)}
+            >
               {formatDuration(item.duration)}
             </span>
+
+            <div className='flex items-center justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100' style={{ opacity: isLiked(contextTracks[index]?.id || '') ? 1 : undefined }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddToQueue(item, index);
+                }}
+                className='flex items-center justify-center h-8 w-8 rounded-full hover:bg-foreground/10 transition-colors'
+                title='Add to queue'
+              >
+                <ListPlus className='h-4 w-4 text-muted-foreground hover:text-foreground transition-all' />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleLike(contextTracks[index]);
+                }}
+                className='flex items-center justify-center h-8 w-8 rounded-full hover:bg-foreground/10 transition-colors'
+              >
+                <Heart
+                  className={cn(
+                    'h-4 w-4 transition-all',
+                    isLiked(contextTracks[index]?.id || '')
+                      ? 'fill-primary text-primary'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                />
+              </button>
+            </div>
           </div>
         );
       })}

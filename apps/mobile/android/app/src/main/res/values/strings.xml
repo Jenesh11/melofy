@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Melofy</string>
+    <string name="title_activity_main">Melofy</string>
+    <string name="package_name">com.melofy.app</string>
+    <string name="custom_url_scheme">com.melofy.app</string>
+</resources>

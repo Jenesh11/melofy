@@ -13,6 +13,7 @@ const SocketContext = createContext<SocketContextData>({
   socket: null,
   isConnected: false,
 });
+const SOCKET_TOKEN_REFRESH_INTERVAL_MS = 45 * 60 * 1000;
 
 export const useSocket = () => {
   return useContext(SocketContext);
@@ -24,33 +25,104 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
 
   useEffect(() => {
-    const socketInstance = io('/', {
-      transports: ['websocket'],
-      auth: {
-        username: user?.displayName || 'Guest',
-      },
-    });
+    let activeSocket: Socket | null = null;
+    let refreshInterval: ReturnType<typeof setInterval> | null = null;
+    let reconnectAuthHandler: (() => void) | null = null;
+    let cancelled = false;
 
-    socketInstance.on('connect', () => {
-      console.log('Connected to Audio Backend socket server');
-      setIsConnected(true);
-    });
+    if (!user) {
+      return;
+    }
 
-    socketInstance.on('disconnect', () => {
-      console.log('Disconnected from Audio Backend socket server');
+    const refreshSocketToken = async (forceRefresh = false) => {
+      if (!activeSocket || cancelled) return;
+
+      try {
+        const refreshedToken = await user.getIdToken(forceRefresh);
+        if (cancelled || !activeSocket) return;
+
+        activeSocket.auth = { token: refreshedToken };
+        if (activeSocket.connected) {
+          activeSocket.emit(
+            'refresh_token',
+            refreshedToken,
+            (response?: { ok?: boolean; error?: string }) => {
+              if (response?.ok) return;
+
+              console.error(
+                'Socket token refresh rejected:',
+                response?.error || 'Unknown error',
+              );
+              activeSocket?.disconnect();
+            },
+          );
+        }
+      } catch (error) {
+        console.error('Failed to refresh socket token:', error);
+      }
+    };
+
+    const connectSocket = async () => {
+      const token = await user.getIdToken();
+      if (cancelled) return;
+
+      const backendUrl = process.env.BACKEND_API_URL || '/';
+
+      const socketInstance = io(backendUrl, {
+        path: '/api/socket.io/',
+        auth: {
+          token,
+        },
+      });
+
+      socketInstance.on('connect', () => {
+        console.log('Connected to Audio Backend socket server');
+        setIsConnected(true);
+        void refreshSocketToken(false);
+      });
+
+      socketInstance.on('disconnect', () => {
+        console.log('Disconnected from Audio Backend socket server');
+        setIsConnected(false);
+      });
+
+      socketInstance.on('auth_error', (payload) => {
+        console.error('Socket authentication error:', payload);
+        socketInstance.disconnect();
+      });
+
+      reconnectAuthHandler = () => {
+        void refreshSocketToken(true);
+      };
+      socketInstance.io.on('reconnect_attempt', reconnectAuthHandler);
+
+      activeSocket = socketInstance;
+      setSocket(socketInstance);
+      refreshInterval = setInterval(() => {
+        void refreshSocketToken(true);
+      }, SOCKET_TOKEN_REFRESH_INTERVAL_MS);
+    };
+
+    connectSocket().catch((error) => {
+      console.error('Failed to establish socket connection:', error);
       setIsConnected(false);
     });
 
-    setSocket(socketInstance);
-
     return () => {
-      socketInstance.disconnect();
+      cancelled = true;
+      if (refreshInterval) clearInterval(refreshInterval);
+      if (activeSocket && reconnectAuthHandler) {
+        activeSocket.io.off('reconnect_attempt', reconnectAuthHandler);
+      }
+      activeSocket?.disconnect();
+      setSocket(null);
+      setIsConnected(false);
     };
-  }, [user?.displayName]);
+  }, [user]);
 
   useEffect(() => {
     if (isConnected && socket) {
-      const roomId = user?.uid || socket.id;
+      const roomId = user?.uid;
       if (roomId) {
         socket.emit('join_room', roomId);
       }

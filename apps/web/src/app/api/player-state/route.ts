@@ -1,43 +1,60 @@
-import { NextResponse } from 'next/server';
-import { Redis } from '@upstash/redis';
+import { NextRequest, NextResponse } from 'next/server';
+import { buildBackendUrl } from '@/lib/server/backend-url';
 
-// Initialize Redis client using Upstash env variables
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
-
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get('userId');
-
-  if (!userId) {
-    return NextResponse.json({ error: 'Missing userId parameter' }, { status: 400 });
+export async function GET(req: NextRequest) {
+  const authorization = req.headers.get('authorization');
+  if (!authorization) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const data = await redis.get(`player:${userId}`);
-    return NextResponse.json({ state: data || null });
+    const backendRes = await fetch(buildBackendUrl('/api/player-state'), {
+      headers: { Authorization: authorization },
+    });
+
+    if (!backendRes.ok) {
+      return NextResponse.json(
+        { error: 'Backend state fetch failed' },
+        { status: backendRes.status }
+      );
+    }
+
+    const data = await backendRes.json();
+    return NextResponse.json(data);
   } catch (error) {
-    console.error('Error fetching player state from Redis:', error);
-    return NextResponse.json({ error: 'Failed to fetch player state' }, { status: 500 });
+    console.error('Player state GET error:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
-export async function POST(request: Request) {
-  const body = await request.json();
-  const { userId, state } = body;
-
-  if (!userId || !state) {
-    return NextResponse.json({ error: 'Missing userId or state in body' }, { status: 400 });
+export async function POST(req: NextRequest) {
+  const authorization = req.headers.get('authorization');
+  if (!authorization) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    // Overwrite the user's player state in Redis
-    await redis.set(`player:${userId}`, JSON.stringify(state));
-    return NextResponse.json({ success: true });
+    const body = await req.json();
+    const backendRes = await fetch(buildBackendUrl('/api/player-state'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: authorization,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!backendRes.ok) {
+      return NextResponse.json(
+        { error: 'Backend state save failed' },
+        { status: backendRes.status }
+      );
+    }
+
+    const data = await backendRes.json();
+    return NextResponse.json(data);
   } catch (error) {
-    console.error('Error saving player state to Redis:', error);
-    return NextResponse.json({ error: 'Failed to save player state' }, { status: 500 });
+    console.error('Player state POST error:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

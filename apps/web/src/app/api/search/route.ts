@@ -1,19 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { buildBackendUrl } from '@/lib/server/backend-url';
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
   const query = searchParams.get('q');
+  const authorization = req.headers.get('authorization');
 
   if (!query) {
     return NextResponse.json({ error: 'Missing query' }, { status: 400 });
   }
+  if (!authorization) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
 
   try {
-    // Fetch directly from Lavalink Backend
     const backendRes = await fetch(
-      `http://localhost:3001/api/search?q=${encodeURIComponent(query)}`
+      `${buildBackendUrl('/api/search')}?q=${encodeURIComponent(query)}`,
+      {
+        headers: {
+          Authorization: authorization,
+        },
+      },
     );
-    
+
     if (!backendRes.ok) {
       return NextResponse.json(
         { error: 'Backend search failed' },
@@ -26,6 +35,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error('Search API error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 },
+    );
   }
 }

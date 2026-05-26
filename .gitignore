@@ -44,4 +44,7 @@ ehthumbs.db
 coverage/
 .vercel
 next-env.d.ts
-/Nodelink
+
+# Firebase service account key
+serviceAccountKey.json
+/graphify-out

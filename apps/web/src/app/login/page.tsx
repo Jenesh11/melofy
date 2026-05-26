@@ -2,21 +2,31 @@
 
 import { LoginView } from '@/components/auth/LoginView';
 import { useAuth } from '@/lib/firebase/auth-context';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, Suspense } from 'react';
 
-export default function LoginPage() {
+function LoginContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     if (!loading && user) {
-      router.push('/');
+      const callbackUrl = searchParams.get('callbackUrl');
+      router.push(callbackUrl || '/');
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, searchParams]);
 
   if (loading) return null;
   if (user) return null; // Let the redirect happen
 
   return <LoginView />;
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
+  );
 }

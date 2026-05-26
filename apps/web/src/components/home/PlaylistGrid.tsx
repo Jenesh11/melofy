@@ -1,19 +1,35 @@
 'use client';
 
+import { useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Disc, Play } from 'lucide-react';
-import { usePlayerStore, Track } from '@/store/usePlayerStore';
+import { Disc, Play, Plus } from 'lucide-react';
+import { usePlayerStore } from '@/store/usePlayerStore';
 import { resolvePlayableTrack, TrackItem } from '@/components/ui/TrackList';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { mapTrackItemToPlayerTrack } from '@/lib/track-mappers';
+
+interface PlaylistGridItem {
+  id: string;
+  name?: string;
+  identifier?: string;
+  duration_ms?: number;
+  encoded?: string;
+  description?: string;
+  images?: Array<{ url?: string }>;
+  artists?: Array<{ name?: string }>;
+  owner?: { display_name?: string };
+  tracks?: { total?: number };
+}
 
 interface PlaylistGridProps {
   title: string;
-  items: any[];
+  items: PlaylistGridItem[];
   isAlbum?: boolean;
   isCarousel?: boolean;
-  onPlayPlaylist?: (playlist: any) => void;
+  onPlayPlaylist?: (playlist: PlaylistGridItem) => void;
+  onImport?: (playlist: PlaylistGridItem) => void;
 }
 
 export function PlaylistGrid({
@@ -22,60 +38,79 @@ export function PlaylistGrid({
   isAlbum = false,
   isCarousel = false,
   onPlayPlaylist,
+  onImport,
 }: PlaylistGridProps) {
-  const { playInContext, currentTrack, isPlaying, pause, resume } =
-    usePlayerStore();
+  const playInContext = usePlayerStore((state) => state.playInContext);
+  const currentTrack = usePlayerStore((state) => state.currentTrack);
+  const isPlaying = usePlayerStore((state) => state.isPlaying);
+  const pause = usePlayerStore((state) => state.pause);
+  const resume = usePlayerStore((state) => state.resume);
   const router = useRouter();
 
+  const albumContextTracks = useMemo(
+    () =>
+      (items || []).map((item) => {
+        const trackItem: TrackItem = {
+          id: item.id,
+          identifier: item.identifier,
+          title: item.name || 'Unknown Title',
+          artist: item.artists?.[0]?.name || 'Unknown',
+          artworkUrl: item.images?.[0]?.url || '',
+          duration: item.duration_ms || 0,
+          album: item.name || 'Unknown Album',
+          encoded: item.encoded || '',
+        };
+
+        return mapTrackItemToPlayerTrack(trackItem);
+      }),
+    [items],
+  );
+
+  const handlePlayItem = useCallback(
+    async (item: PlaylistGridItem, index: number) => {
+      if (onPlayPlaylist) {
+        onPlayPlaylist(item);
+        return;
+      }
+
+      if (!isAlbum) return;
+
+      const trackTitle = item.name;
+      if (currentTrack?.title === trackTitle) {
+        if (isPlaying) {
+          pause();
+        } else {
+          resume();
+        }
+        return;
+      }
+
+      const trackItem: TrackItem = {
+        id: item.id,
+        title: item.name || 'Unknown Title',
+        artist: item.artists?.[0]?.name || 'Unknown',
+        artworkUrl: item.images?.[0]?.url || '',
+        duration: item.duration_ms || 0,
+        album: item.name || 'Unknown Album',
+      };
+
+      const resolved = await resolvePlayableTrack(trackItem);
+      if (!resolved) {
+        toast.error('Could not find a playable version of this track');
+        return;
+      }
+
+      const nextContextTracks = [...albumContextTracks];
+      if (index >= 0 && index < nextContextTracks.length) {
+        nextContextTracks[index] = resolved;
+      }
+
+      playInContext(resolved, nextContextTracks);
+    },
+    [albumContextTracks, currentTrack?.title, isAlbum, isPlaying, onPlayPlaylist, pause, playInContext, resume],
+  );
+
   if (!items || items.length === 0) return null;
-
-  const handlePlayItem = async (item: any, index: number) => {
-    // If it's a collection (playlist or album) and we have a handler, play the collection
-    if (onPlayPlaylist) {
-      onPlayPlaylist(item);
-      return;
-    }
-
-    // Otherwise, try to play as a single track (fallback)
-    if (!isAlbum) return;
-
-    const trackTitle = item.name;
-    if (currentTrack?.title === trackTitle) {
-      isPlaying ? pause() : resume();
-      return;
-    }
-
-    const trackItem: TrackItem = {
-      id: item.id,
-      title: item.name,
-      artist: item.artists?.[0]?.name || 'Unknown',
-      artworkUrl: item.images?.[0]?.url || '',
-      duration: item.duration_ms || 0,
-      album: item.name,
-    };
-
-    const resolved = await resolvePlayableTrack(trackItem);
-    if (!resolved) {
-      toast.error('Could not find a playable version of this track');
-      return;
-    }
-
-    // Build context from all album items
-    const contextTracks: Track[] = items
-      .filter((i: any) => i.name)
-      .map((i: any) => ({
-        id: i.id,
-        identifier: (i as any).identifier,
-        title: i.name,
-        artist: i.artists?.[0]?.name || 'Unknown',
-        artworkUrl: i.images?.[0]?.url || '',
-        duration: i.duration_ms || 0,
-        url: '',
-      }));
-    contextTracks[index] = resolved;
-
-    playInContext(resolved, contextTracks);
-  };
 
   return (
     <section className='mt-8'>
@@ -88,7 +123,7 @@ export function PlaylistGrid({
             variant='ghost'
             size='sm'
             className='text-primary hover:text-primary/80 flex items-center gap-2 group/playall'
-            onClick={() => onPlayPlaylist(items[0])} // This is a bit simplified, but follows the "play featured" vibe
+            onClick={() => onPlayPlaylist(items[0])}
           >
             <Play className='h-4 w-4 fill-current group-hover/playall:scale-110 transition-transform' />
             <span className='text-xs uppercase tracking-widest font-bold'>
@@ -100,16 +135,16 @@ export function PlaylistGrid({
       <div
         className={
           isCarousel
-            ? 'flex overflow-x-auto gap-6 pb-4 custom-scrollbar snap-x snap-mandatory scroll-smooth'
+            ? 'flex overflow-x-auto gap-6 pb-4 custom-scrollbar carousel-scrollbar snap-x snap-mandatory scroll-smooth'
             : 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6'
         }
       >
-        {items.map((item, i) => (
+        {items.map((item, index) => (
           <motion.div
-            key={item.id + i}
+            key={item.id + index}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: i * 0.05 }}
+            transition={{ delay: index * 0.05 }}
             className={`flex flex-col gap-3 group cursor-pointer ${
               isCarousel
                 ? 'min-w-[160px] w-[160px] md:min-w-[200px] md:w-[200px] lg:min-w-[220px] lg:w-[220px] snap-start shrink-0'
@@ -118,21 +153,32 @@ export function PlaylistGrid({
             onClick={() => router.push(`/playlist/${item.id}`)}
           >
             <div className='aspect-square rounded-[2rem] bg-muted relative overflow-hidden shadow-xl group-hover:shadow-primary/10 transition-all duration-500'>
-              {/* Play button overlay - Always centered like Library route */}
-              <div className='absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10'>
+              <div className='absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-10'>
                 <Button
                   size='icon'
                   className='h-14 w-14 rounded-full bg-primary text-primary-foreground hover:scale-110 transition-all shadow-2xl'
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePlayItem(item, i);
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void handlePlayItem(item, index);
                   }}
                 >
                   <Play className='h-7 w-7 fill-current transition-colors ml-1' />
                 </Button>
+                {onImport && (
+                  <Button
+                    size='icon'
+                    variant='outline'
+                    className='h-14 w-14 rounded-full border-white/10 bg-white/5 hover:bg-white/10 text-white hover:scale-110 transition-all shadow-2xl'
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onImport(item);
+                    }}
+                  >
+                    <Plus className='h-7 w-7' />
+                  </Button>
+                )}
               </div>
 
-              {/* Background Image */}
               <div className='h-full w-full bg-linear-to-br from-muted to-background group-hover:scale-110 transition-transform duration-700 flex items-center justify-center'>
                 {item.images?.[0]?.url ? (
                   <img
@@ -145,7 +191,6 @@ export function PlaylistGrid({
                 )}
               </div>
 
-              {/* Tracks Count Badge (Bottom Right like Library) */}
               <div className='absolute bottom-4 right-4 bg-background/60 backdrop-blur-md px-3 py-1 rounded-full border border-border z-20'>
                 <p className='text-[10px] text-foreground font-bold tracking-wider uppercase'>
                   {item.tracks?.total

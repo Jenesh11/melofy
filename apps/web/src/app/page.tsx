@@ -1,63 +1,121 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { motion } from 'framer-motion';
-import {
-  Play,
-  Sparkles,
-  TrendingUp,
-  Clock,
-  Disc,
-  Headphones,
-  Music2,
-  Loader2,
-} from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LandingPage } from '@/components/layout/LandingPage';
 import { TrackCarousel } from '@/components/home/TrackCarousel';
 import { PlaylistGrid } from '@/components/home/PlaylistGrid';
 import { usePlayerStore } from '@/store/usePlayerStore';
-import { toast } from 'sonner';
 import Link from 'next/link';
 import { HeroPlaylistCard } from '@/components/home/HeroPlaylistCard';
 import { HistoryCarousel } from '@/components/home/HistoryCarousel';
 import { useSpotifyCollection } from '@/hooks/useSpotifyCollection';
-import { useRef } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
+import {
+  mapSpotifyTrackToPlayerTrack,
+  type SpotifyTrackLike,
+} from '@/lib/track-mappers';
+import { useHomeStore } from '@/store/useHomeStore';
 
 export default function Home() {
   const { user, loading } = useAuth();
-  const {
-    history,
-    play,
-    currentTrack,
-    isPlaying,
-    pause,
-    resume,
-    playPlaylist,
-  } = usePlayerStore();
+  const history = usePlayerStore((state) => state.history);
+  const play = usePlayerStore((state) => state.play);
+  const currentTrack = usePlayerStore((state) => state.currentTrack);
+  const isPlaying = usePlayerStore((state) => state.isPlaying);
+  const pause = usePlayerStore((state) => state.pause);
+  const resume = usePlayerStore((state) => state.resume);
+  const playPlaylist = usePlayerStore((state) => state.playPlaylist);
 
-  const [trending, setTrending] = useState<any[]>([]);
-  const [newReleases, setNewReleases] = useState<any[]>([]);
-  const [recommendations, setRecommendations] = useState<any[]>([]);
-  const [mixes, setMixes] = useState<any[]>([]);
-  const [popularPlaylists, setPopularPlaylists] = useState<any[]>([]);
-  const [isFetching, setIsFetching] = useState(true);
+  const {
+    trending,
+    newReleases,
+    recommendations,
+    mixes,
+    popularPlaylists,
+    discoveryMixes,
+    hasFetched,
+    setTrending,
+    setNewReleases,
+    setRecommendations,
+    setMixes,
+    setPopularPlaylists,
+    setDiscoveryMixes,
+    setHasFetched,
+  } = useHomeStore();
+  const [isFetching, setIsFetching] = useState(!hasFetched);
 
   const { handlePlaySpotifyCollection } = useSpotifyCollection();
 
+  const trendingTracks = useMemo(
+    () =>
+      trending
+        .map((item) => item.track)
+        .filter((track): track is SpotifyTrackLike => Boolean(track)),
+    [trending],
+  );
+
+  const trendingTracksToPlay = useMemo(
+    () => trendingTracks.map((track) => mapSpotifyTrackToPlayerTrack(track)),
+    [trendingTracks],
+  );
+
+  const recommendationTracksToPlay = useMemo(
+    () => recommendations.map((track) => mapSpotifyTrackToPlayerTrack(track)),
+    [recommendations],
+  );
+
+  const newReleasesAsTracks = useMemo(() => {
+    return newReleases.map((track: SpotifyTrackLike) => ({
+      id: track.id,
+      name: track.name,
+      artists: track.artists || [{ name: 'Unknown' }],
+      album: track.album,
+    } as SpotifyTrackLike));
+  }, [newReleases]);
+
+  const newReleasesTracksToPlay = useMemo(
+    () => newReleasesAsTracks.map((track) => mapSpotifyTrackToPlayerTrack(track)),
+    [newReleasesAsTracks],
+  );
+
+  const handlePlayTrending = useCallback(() => {
+    playPlaylist(trendingTracksToPlay);
+  }, [playPlaylist, trendingTracksToPlay]);
+
+  const handlePlayRecommendations = useCallback(() => {
+    playPlaylist(recommendationTracksToPlay);
+  }, [playPlaylist, recommendationTracksToPlay]);
+
+  const handlePlayNewReleases = useCallback(() => {
+    playPlaylist(newReleasesTracksToPlay);
+  }, [playPlaylist, newReleasesTracksToPlay]);
+
   useEffect(() => {
     if (!user) return;
+    if (hasFetched) {
+      setIsFetching(false);
+      return;
+    }
 
     const fetchDashboardData = async () => {
       try {
         setIsFetching(true);
+        const authHeaders = await getFirebaseAuthHeaders(user);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const fetchOptions = { headers: authHeaders, signal: controller.signal };
+
         const [trendRes, newRes, mixRes, popularRes] = await Promise.all([
-          fetch('/api/spotify/trending'),
-          fetch('/api/spotify/new-releases'),
-          fetch('/api/spotify/mixes'),
-          fetch('/api/spotify/popular-playlists'),
+          fetch('/api/spotify/trending', fetchOptions),
+          fetch('/api/spotify/new-releases', fetchOptions),
+          fetch('/api/spotify/mixes', fetchOptions),
+          fetch('/api/spotify/popular-playlists', fetchOptions),
         ]);
 
         if (trendRes.ok) setTrending(await trendRes.json());
@@ -65,13 +123,29 @@ export default function Home() {
         if (mixRes.ok) setMixes(await mixRes.json());
         if (popularRes.ok) setPopularPlaylists(await popularRes.json());
 
-        // Use genre-based smart search for recommendations (Spotify /recommendations was deprecated Nov 2024)
+        // Fetch Discovery Mixes based on history
+        if (history.length > 0) {
+          const artists = history.map(t => t.artist).filter(Boolean);
+          const discRes = await fetch('/api/spotify/discovery', {
+            method: 'POST',
+            headers: { ...authHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ artists }),
+            signal: controller.signal,
+          });
+          if (discRes.ok) setDiscoveryMixes(await discRes.json());
+        }
+
         const genres = ['pop', 'hip-hop', 'r&b', 'indie', 'electronic', 'soul'];
         const randomGenre = genres[Math.floor(Math.random() * genres.length)];
         const recRes = await fetch(
           `/api/spotify/recommendations?genre=${randomGenre}`,
+          fetchOptions,
         );
+
         if (recRes.ok) setRecommendations(await recRes.json());
+        
+        clearTimeout(timeoutId);
+        setHasFetched(true);
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
       } finally {
@@ -79,13 +153,11 @@ export default function Home() {
       }
     };
 
-    fetchDashboardData();
-  }, [user]);
+    void fetchDashboardData();
+  }, [user, hasFetched, history, setTrending, setNewReleases, setMixes, setPopularPlaylists, setDiscoveryMixes, setRecommendations, setHasFetched]);
 
-  // Show a blank screen while checking auth
   if (loading) return <div className='min-h-screen bg-background' />;
 
-  // Display the detailed Landing Page if not logged in
   if (!user) {
     return <LandingPage />;
   }
@@ -101,7 +173,7 @@ export default function Home() {
   const greeting = getGreeting();
 
   return (
-    <div className='p-4 md:p-8 flex flex-col gap-10 overflow-x-hidden min-h-screen'>
+    <div className='p-4 md:p-6 flex flex-col gap-10 overflow-x-hidden'>
       <header className='flex flex-col gap-2'>
         <motion.p
           initial={{ opacity: 0, x: -20 }}
@@ -131,8 +203,8 @@ export default function Home() {
               size='icon'
               className='h-8 w-8 rounded-full border border-white/5 bg-zinc-900/50 hover:bg-zinc-800 transition-colors opacity-0 group-hover/hero:opacity-100'
               onClick={() => {
-                const el = document.getElementById('hero-scroll');
-                if (el) el.scrollBy({ left: -400, behavior: 'smooth' });
+                const element = document.getElementById('hero-scroll');
+                if (element) element.scrollBy({ left: -400, behavior: 'smooth' });
               }}
             >
               <ChevronLeft className='h-4 w-4' />
@@ -142,8 +214,8 @@ export default function Home() {
               size='icon'
               className='h-8 w-8 rounded-full border border-white/5 bg-zinc-900/50 hover:bg-zinc-800 transition-colors opacity-0 group-hover/hero:opacity-100'
               onClick={() => {
-                const el = document.getElementById('hero-scroll');
-                if (el) el.scrollBy({ left: 400, behavior: 'smooth' });
+                const element = document.getElementById('hero-scroll');
+                if (element) element.scrollBy({ left: 400, behavior: 'smooth' });
               }}
             >
               <ChevronRight className='h-4 w-4' />
@@ -155,11 +227,11 @@ export default function Home() {
           id='hero-scroll'
           className='flex overflow-x-auto gap-6 pb-4 custom-scrollbar snap-x snap-mandatory scroll-smooth relative'
         >
-          {popularPlaylists.slice(0, 8).map((playlist, i) => (
+          {popularPlaylists.slice(0, 8).map((playlist, index) => (
             <HeroPlaylistCard
-              key={playlist.id + i}
+              key={playlist.id + index}
               playlist={playlist}
-              index={i}
+              index={index}
               onPlay={handlePlaySpotifyCollection}
             />
           ))}
@@ -174,8 +246,7 @@ export default function Home() {
           </p>
         </div>
       ) : (
-        <div className='flex flex-col gap-10 pb-24'>
-          {/* Jump Back In (History) */}
+        <div className='flex flex-col gap-10'>
           <HistoryCarousel
             history={history}
             currentTrack={currentTrack}
@@ -185,13 +256,20 @@ export default function Home() {
             onResume={resume}
           />
 
+          {discoveryMixes.length > 0 && (
+            <PlaylistGrid
+              title='Made For You'
+              items={discoveryMixes}
+              onPlayPlaylist={handlePlaySpotifyCollection}
+            />
+          )}
+
           <PlaylistGrid
             title='Popular Playlists'
             items={popularPlaylists}
             onPlayPlaylist={handlePlaySpotifyCollection}
           />
 
-          {/* Trending section with clickable title */}
           <section className='mt-8'>
             <div className='flex items-center justify-between mb-6'>
               <Link href='/trending' className='group flex items-center gap-2'>
@@ -209,48 +287,25 @@ export default function Home() {
                 </Button>
               </Link>
             </div>
-            {/* Render TrackCarousel content inline but without its own title */}
             <TrackCarousel
               title=''
-              tracks={trending.map((item: any) => item.track).filter(Boolean)}
-              onPlayAll={() => {
-                const tracks = trending.map((item: any) => ({
-                  id: item.track?.id || item.id,
-                  title: item.track?.name || item.name,
-                  artist:
-                    item.track?.artists?.map((a: any) => a.name).join(', ') ||
-                    '',
-                  artworkUrl: item.track?.album?.images?.[0]?.url || '',
-                  duration: item.track?.duration_ms || 0,
-                  url: '',
-                }));
-                playPlaylist(tracks);
-              }}
+              tracks={trendingTracks}
+              onPlayAll={handlePlayTrending}
             />
           </section>
 
           <TrackCarousel
             title='Because You Like Music'
             tracks={recommendations}
-            onPlayAll={() => {
-              const tracks = recommendations.map((t: any) => ({
-                id: t.id,
-                title: t.name,
-                artist: t.artists?.map((a: any) => a.name).join(', ') || '',
-                artworkUrl: t.album?.images?.[0]?.url || '',
-                duration: t.duration_ms || 0,
-                url: '',
-              }));
-              playPlaylist(tracks);
-            }}
+            onPlayAll={handlePlayRecommendations}
           />
-          <PlaylistGrid
+
+          <TrackCarousel
             title='New Releases'
-            items={newReleases}
-            isAlbum={true}
-            isCarousel={true}
-            onPlayPlaylist={handlePlaySpotifyCollection}
+            tracks={newReleasesAsTracks}
+            onPlayAll={handlePlayNewReleases}
           />
+
           <PlaylistGrid
             title='Your Curated Mixes'
             items={mixes}

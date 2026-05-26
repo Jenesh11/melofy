@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Melofy</title>
+  <style>
+    :root {
+      --primary: #1db954;
+      --background: #000;
+      --foreground: #fff;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: var(--background);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Outfit', 'Segoe UI', Roboto, sans-serif;
+      color: var(--foreground);
+      overflow: hidden;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 40px;
+      gap: 32px;
+      max-width: 400px;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .container.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .icon-box {
+      width: 80px;
+      height: 80px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .icon-box::after {
+      content: '';
+      position: absolute;
+      inset: -10px;
+      background: var(--primary);
+      filter: blur(40px);
+      opacity: 0.1;
+      border-radius: 50%;
+      z-index: -1;
+    }
+    .logo-text {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: -1.5px;
+      margin-bottom: 8px;
+    }
+    .status-text {
+      font-size: 18px;
+      font-weight: 400;
+      color: rgba(255,255,255,0.6);
+      line-height: 1.5;
+    }
+    .btn {
+      background: var(--foreground);
+      color: var(--background);
+      padding: 16px 32px;
+      border-radius: 100px;
+      font-weight: 800;
+      font-size: 16px;
+      border: none;
+      cursor: pointer;
+      display: none;
+      transition: transform 0.2s;
+    }
+    .btn:active { transform: scale(0.95); }
+    
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    .glow {
+      position: absolute;
+      width: 300px;
+      height: 300px;
+      background: var(--primary);
+      filter: blur(120px);
+      opacity: 0.05;
+      border-radius: 50%;
+      z-index: -1;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow" style="top: -100px; left: -100px;"></div>
+  <div class="glow" style="bottom: -100px; right: -100px;"></div>
+
+  <div id="app" class="container">
+    <div class="icon-box">
+      <div id="status-icon" class="spinner"></div>
+      <svg id="offline-icon" style="display:none; width:32px; height:32px; color:rgba(255,255,255,0.3)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2l20 20M8.5 8.5a5 5 0 0 1 7 7M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07M2.83 5.17a10 10 0 0 0 0 14.14M5.66 8a5 5 0 0 0 0 8"/></svg>
+    </div>
+    <div>
+      <h1 class="logo-text">Melofy</h1>
+      <p id="status-desc" class="status-text">Connecting to your sound...</p>
+    </div>
+    <button id="retry-btn" class="btn" onclick="checkConnection()">Retry Connection</button>
+  </div>
+
+  <script>
+    const LIVE_URL = 'https://melofy.jene.in';
+    const container = document.getElementById('app');
+    const statusDesc = document.getElementById('status-desc');
+    const statusIcon = document.getElementById('status-icon');
+    const offlineIcon = document.getElementById('offline-icon');
+    const retryBtn = document.getElementById('retry-btn');
+
+    function showOffline() {
+      statusDesc.innerText = 'You are currently offline. Please check your connection to start Melofy.';
+      statusIcon.style.display = 'none';
+      offlineIcon.style.display = 'block';
+      retryBtn.style.display = 'block';
+      container.classList.add('visible');
+    }
+
+    async function checkConnection() {
+      container.classList.remove('visible');
+      
+      // Give it a tiny bit of time for animation feel
+      setTimeout(async () => {
+        if (navigator.onLine) {
+          try {
+            // Try to ping the server to be sure
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), 5000);
+            const response = await fetch(LIVE_URL, { mode: 'no-cors', signal: controller.signal });
+            clearTimeout(id);
+            
+            // If we are here, we are online and server is reachable
+            window.location.replace(LIVE_URL);
+          } catch (e) {
+            showOffline();
+          }
+        } else {
+          showOffline();
+        }
+      }, 800);
+    }
+
+    // Initial check
+    window.onload = () => {
+      container.classList.add('visible');
+      checkConnection();
+    };
+  </script>
+</body>
+</html>
