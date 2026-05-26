@@ -212,6 +212,22 @@ export default function PlaylistPage() {
     }));
   }, [isSpotifySource, playlist]);
 
+  const totalDurationMs = useMemo(() => {
+    return trackItems.reduce((acc, track) => acc + (track.duration || 0), 0);
+  }, [trackItems]);
+
+  const formattedDuration = useMemo(() => {
+    const totalSeconds = Math.floor(totalDurationMs / 1000);
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    
+    if (hours > 0) {
+      return `${hours} hr ${minutes} min`;
+    }
+    return `${minutes} min`;
+  }, [totalDurationMs]);
+
   const tracksToPlay = useMemo(
     () => trackItems.map((track) => mapTrackItemToPlayerTrack(track)),
     [trackItems],
@@ -314,13 +330,14 @@ export default function PlaylistPage() {
               {playlist.description.replace(/<[^>]*>?/gm, '')}
             </p>
           )}
-          <div className='flex items-center gap-2 text-muted-foreground text-sm font-light mt-2'>
+          <div className='flex items-center flex-wrap gap-1.5 text-muted-foreground text-sm font-light mt-2'>
             <span className='font-semibold text-foreground'>
               {isSpotifySource ? 'Spotify' : isYoutubeSource ? 'YouTube' : user?.displayName || 'User'}
             </span>
             <span>&middot;</span>
             <span>
-              {playlist.trackCount || playlist.tracks?.length || 0} tracks
+              {trackItems.length} {trackItems.length === 1 ? 'song' : 'songs'}
+              {formattedDuration && `, ${formattedDuration}`}
             </span>
           </div>
         </div>
