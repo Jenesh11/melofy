@@ -1,6 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use std::sync::Mutex;
 use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
+use tauri::Manager;
 
 pub struct DiscordState {
     client: Mutex<Option<DiscordIpcClient>>,
@@ -12,6 +13,10 @@ impl DiscordState {
             client: Mutex::new(None),
         }
     }
+}
+
+pub struct TrayState {
+    pub minimize_to_tray: tauri::menu::CheckMenuItem<tauri::Wry>,
 }
 
 #[tauri::command]
@@ -191,16 +196,60 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_taskbar::init())
         .setup(|app| {
+            // 1. Create the system tray menu items
+            let toggle_minimize = tauri::menu::CheckMenuItem::with_id(
+                app,
+                "toggle_minimize",
+                "Minimize to System Tray",
+                true, // enabled
+                true, // checked by default
+                None::<&str>
+            ).expect("failed to create check menu item");
+
+            let exit_item = tauri::menu::MenuItem::with_id(
+                app,
+                "exit",
+                "Exit",
+                true, // enabled
+                None::<&str>
+            ).expect("failed to create exit menu item");
+
+            // 2. Create the menu
+            let menu = tauri::menu::Menu::new(app).expect("failed to create tray menu");
+            let _ = menu.append(&toggle_minimize);
+            let _ = menu.append(&exit_item);
+
+            // 3. Build the Tray Icon
+            let _tray = tauri::tray::TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::Click {
+                        button: tauri::tray::MouseButton::Left,
+                        ..
+                    } = event {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)
+                .expect("failed to build tray icon");
+
+            // 4. Manage the tray state so it's accessible in window events
+            app.manage(TrayState {
+                minimize_to_tray: toggle_minimize,
+            });
+
             // ── Deep Link: handle URLs that arrived before the app was ready ───
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             {
-                use tauri::Manager;
                 use tauri_plugin_deep_link::DeepLinkExt;
                 if let Ok(Some(urls)) = app.deep_link().get_current() {
                     for url in urls {
                         println!("[Melofy] Deep link received on startup: {}", url);
-                        // Inject the pending URL into the WebView's JS context
-                        // so the auth-context listener can pick it up.
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.eval(&format!(
                                 r#"window.__MELOFY_PENDING_DEEP_LINK = "{}";"#,
@@ -217,6 +266,25 @@ pub fn run() {
             update_discord_presence,
             clear_discord_presence
         ])
+        .on_menu_event(|app, event| {
+            if event.id.as_ref() == "exit" {
+                app.exit(0);
+            }
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" {
+                    let app = window.app_handle();
+                    let state = app.state::<TrayState>();
+                    if state.minimize_to_tray.is_checked().unwrap_or(true) {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    } else {
+                        app.exit(0);
+                    }
+                }
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
