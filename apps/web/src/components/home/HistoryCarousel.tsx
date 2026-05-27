@@ -69,7 +69,11 @@ export function HistoryCarousel({
               className='flex flex-col gap-3 group cursor-pointer snap-start min-w-[200px] w-[200px]'
               onClick={() => {
                 if (currentTrack?.title === track.title) {
-                  isPlaying ? onPause() : onResume();
+                  if (isPlaying) {
+                    onPause();
+                  } else {
+                    onResume();
+                  }
                 } else {
                   onPlay(track);
                 }

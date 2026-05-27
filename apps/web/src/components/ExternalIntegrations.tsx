@@ -193,6 +193,7 @@ export function ExternalIntegrations() {
     return () => {
       cleanupFns.forEach((fn) => fn());
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only register once on mount
 
   // 4. Sync playback state dynamically to taskbar thumbnail buttons on state changes

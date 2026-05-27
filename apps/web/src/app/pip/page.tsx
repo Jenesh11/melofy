@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { PipPlayer } from '@/components/player/PipPlayer';
 import { Track } from '@/store/usePlayerStore';
 
@@ -53,42 +53,49 @@ export default function PipPage() {
     };
   }, []);
 
-  // Dispatch helpers to send command events back to main window
-  const handleTogglePlay = () => {
+  // Optimistic + dispatch: update local state immediately, then notify main window.
+  // The authoritative state-update from main window will correct any drift.
+
+  const handleTogglePlay = useCallback(() => {
+    setIsPlaying(prev => !prev);
     channelRef.current?.postMessage({ type: 'command', action: 'togglePlay' });
-  };
+  }, []);
 
-  const handleSkipNext = () => {
+  const handleSkipNext = useCallback(() => {
     channelRef.current?.postMessage({ type: 'command', action: 'skipNext' });
-  };
+  }, []);
 
-  const playPrevious = () => {
+  const playPrevious = useCallback(() => {
     channelRef.current?.postMessage({ type: 'command', action: 'playPrevious' });
-  };
+  }, []);
 
-  const handleSeek = (val: number[]) => {
+  const handleSeek = useCallback((val: number[]) => {
     channelRef.current?.postMessage({ type: 'command', action: 'seek', value: val[0] });
-  };
+  }, []);
 
-  const handleSetVolume = (val: number) => {
+  const handleSetVolume = useCallback((val: number) => {
+    setVolume(val);
     channelRef.current?.postMessage({ type: 'command', action: 'volume', value: val });
-  };
+  }, []);
 
-  const toggleLike = () => {
+  const toggleLike = useCallback(() => {
+    setIsLiked(prev => !prev);
     channelRef.current?.postMessage({ type: 'command', action: 'toggleLike' });
-  };
+  }, []);
 
-  const toggleShuffle = () => {
+  const toggleShuffle = useCallback(() => {
+    setIsShuffle(prev => !prev);
     channelRef.current?.postMessage({ type: 'command', action: 'toggleShuffle' });
-  };
+  }, []);
 
-  const toggleRepeat = () => {
+  const toggleRepeat = useCallback(() => {
+    setIsRepeat(prev => !prev);
     channelRef.current?.postMessage({ type: 'command', action: 'toggleRepeat' });
-  };
+  }, []);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     channelRef.current?.postMessage({ type: 'command', action: 'close' });
-  };
+  }, []);
 
   return (
     <div

@@ -207,7 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Determine the URL depending on dev/prod
         const isDev = window.location.hostname === 'localhost';
-        const baseUrl = isDev ? 'http://localhost:3000' : 'https://melofy.jene.in';
+        const baseUrl = isDev ? 'http://localhost:3001' : 'https://melofy.jene.in';
 
         await openBrowserUrl(`${baseUrl}/desktop-login`);
       } else {

@@ -259,6 +259,33 @@ pub fn run() {
                     }
                 }
             }
+
+            // ── Reconnectivity check: redirect to offline screen if remote server is unreachable ──
+            {
+                use std::net::ToSocketAddrs;
+                let is_reachable = if let Ok(addrs) = "melofy.jene.in:443".to_socket_addrs() {
+                    let addr_list: Vec<_> = addrs.collect();
+                    if !addr_list.is_empty() {
+                        std::net::TcpStream::connect_timeout(&addr_list[0], std::time::Duration::from_millis(1500)).is_ok()
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+
+                if !is_reachable {
+                    println!("[Melofy] Live site melofy.jene.in is unreachable. Loading local offline screen.");
+                    if let Some(window) = app.get_webview_window("main") {
+                        if let Ok(resource_path) = app.path().resolve("src/offline.html", tauri::path::BaseDirectory::Resource) {
+                            if let Ok(file_url) = tauri::Url::from_file_path(resource_path) {
+                                let _ = window.navigate(file_url);
+                            }
+                        }
+                    }
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

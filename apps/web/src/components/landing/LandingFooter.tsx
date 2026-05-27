@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -15,7 +16,7 @@ export function LandingFooter() {
         if (!res.ok) throw new Error('Health check failed');
         const data = await res.json();
         setStatus(data.status === 'ok' ? 'ok' : 'degraded');
-      } catch (err) {
+      } catch {
         setStatus('error');
       }
     };
@@ -187,7 +188,7 @@ export function LandingFooter() {
             rel="noopener noreferrer"
             className="flex items-center gap-1.5"
           >
-            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-foreground/[0.03] border border-border/50 ${color} transition-colors duration-500 hover:bg-foreground/[0.06] cursor-pointer`}>
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-foreground/3 border border-border/50 ${color} transition-colors duration-500 hover:bg-foreground/6 cursor-pointer`}>
               <Globe className='w-3 h-3 text-current' />
               <span className='text-[10px] font-bold uppercase tracking-wider'>
                 {text}

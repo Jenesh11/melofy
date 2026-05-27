@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import { useCallback } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { db } from '@/lib/firebase/config';

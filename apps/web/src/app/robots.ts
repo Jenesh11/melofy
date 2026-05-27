@@ -5,7 +5,15 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/api/', '/settings'],
+      disallow: [
+        '/api/',
+        '/settings',
+        '/pip',
+        '/desktop-login',
+        '/github',
+        '/playing',
+        '/listen/',
+      ],
     },
     sitemap: 'https://melofy.jene.in/sitemap.xml',
   };

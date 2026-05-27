@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
@@ -45,7 +46,7 @@ export function TrackCarousel({
 
   const handlePlay = useCallback(
     async (index: number) => {
-      const item = trackItems[index];
+      const item = trackItems.at(index);
       if (!item) return;
 
       if (currentTrack?.title === item.title) {
@@ -64,7 +65,7 @@ export function TrackCarousel({
       }
 
       const nextContextTracks = [...contextTracks];
-      nextContextTracks[index] = resolved;
+      nextContextTracks.splice(index, 1, resolved);
       playInContext(resolved, nextContextTracks);
     },
     [contextTracks, currentTrack?.title, isPlaying, pause, playInContext, resume, trackItems],
@@ -74,10 +75,11 @@ export function TrackCarousel({
 
   const handleAddToQueue = useCallback(
     async (index: number) => {
-      const item = trackItems[index];
+      const item = trackItems.at(index);
       if (!item) return;
 
-      let trackToAdd = contextTracks[index];
+      let trackToAdd = contextTracks.at(index);
+      if (!trackToAdd) return;
       if (!trackToAdd.url) {
         const resolved = await resolvePlayableTrack(item);
         if (!resolved) {
@@ -131,7 +133,7 @@ export function TrackCarousel({
       </div>
       <div className='flex overflow-x-auto gap-6 pb-6 custom-scrollbar carousel-scrollbar scroll-smooth snap-x snap-mandatory'>
         {tracks.map((track, index) => {
-          const trackItem = trackItems[index];
+          const trackItem = trackItems.at(index);
           const titleText = trackItem?.title || 'Unknown Title';
           const artistText = trackItem?.artist || 'Unknown Artist';
           const artworkUrl = trackItem?.artworkUrl || '';
@@ -193,7 +195,7 @@ export function TrackCarousel({
                 </div>
                 <div className='opacity-0 group-hover:opacity-100 transition-opacity shrink-0' onClick={(e) => e.stopPropagation()}>
                   <TrackOptionsMenu 
-                    track={contextTracks[index]} 
+                    track={contextTracks.at(index)!} 
                     onAddToQueue={() => handleAddToQueue(index)} 
                   />
                 </div>

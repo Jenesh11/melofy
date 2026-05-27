@@ -64,20 +64,20 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
 
     const connectSocket = async () => {
       const token = await user.getIdToken();
-      if (cancelled) return;
-
-      const backendUrl = process.env.BACKEND_API_URL || '/';
+      let backendUrl = process.env.BACKEND_API_URL || '/';
+      if (typeof window !== 'undefined' && window.location.port === '3000') {
+        backendUrl = `http://${window.location.hostname}:3001`;
+      }
 
       const socketInstance = io(backendUrl, {
-        path: '/api/socket.io/',
+        path: '/api/socket.io',
         auth: {
           token,
         },
-        // Skip HTTP long-polling entirely — connect straight to WebSocket.
-        // This prevents the 500 (polling error) → 400 (stale session-ID) cascade
-        // that occurs when socket.io tries to resume a dead polling session
-        // after a reconnect or page refresh.
-        transports: ['websocket'],
+        // Enable both HTTP long-polling and WebSockets, allowing a graceful
+        // fallback to polling if the reverse proxy/Next.js rewrites do not
+        // support WebSocket upgrade requests.
+        transports: ['polling', 'websocket'],
       });
 
       socketInstance.on('connect', () => {

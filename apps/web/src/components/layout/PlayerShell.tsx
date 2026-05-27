@@ -12,7 +12,7 @@ import { useAuth } from '@/lib/firebase/auth-context';
 import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
 import { useLikedSongs } from '@/hooks/useLikedSongs';
 import { useLyricsPanelStore } from '@/store/useLyricsPanelStore';
-import type { Track } from '@/store/usePlayerStore';
+import { usePlayerStore, type Track } from '@/store/usePlayerStore';
 
 interface PipState {
   currentTrack: Track | null;
@@ -172,8 +172,13 @@ export function PlayerShell() {
         });
         setStreamSrc(`/api/stream?${params.toString()}`);
       } catch (error) {
-        if (!cancelled) setStreamSrc(undefined);
-        console.error('[PlayerShell] Failed to prepare stream URL:', error);
+        if (!cancelled) {
+          setStreamSrc(undefined);
+          console.error('[PlayerShell] Failed to prepare stream URL:', error);
+          const trackTitle = playback.currentTrack?.title || 'Unknown Track';
+          toast.error(`Failed to stream "${trackTitle}". Skipping...`);
+          usePlayerStore.getState().playNext(true, true);
+        }
       }
     };
 
@@ -182,7 +187,7 @@ export function PlayerShell() {
     return () => {
       cancelled = true;
     };
-  }, [playback.currentTrack?.url, user]);
+  }, [playback.currentTrack?.url, playback.currentTrack?.title, user]);
 
   const sharedProps = playback.currentTrack ? {
     currentTrack: playback.currentTrack,
@@ -229,9 +234,13 @@ export function PlayerShell() {
           if (!playback.currentTrack?.url) return;
           const error = e.currentTarget.error;
           console.error('[PlayerShell] Audio error:', error);
+          const trackTitle = playback.currentTrack?.title || 'Unknown Track';
           if (error?.code === 4) {
-            toast.error('This track is currently unavailable or unsupported');
+            toast.error(`Track "${trackTitle}" is currently unavailable or unsupported. Skipping...`);
+          } else {
+            toast.error(`Playback issue with "${trackTitle}". Skipping...`);
           }
+          usePlayerStore.getState().playNext(true, true);
         }}
       />
 

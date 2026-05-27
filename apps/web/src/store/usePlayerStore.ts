@@ -61,7 +61,7 @@ interface PlayerState {
     force?: boolean
   ) => void;
   playFromQueue: (index: number, force?: boolean) => void;
-  playNext: (force?: boolean) => void;
+  playNext: (force?: boolean, ignoreRepeat?: boolean) => void;
   playPrevious: (force?: boolean) => void;
   toggleShuffle: () => void;
   toggleRepeat: () => void;
@@ -191,12 +191,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       progress: 0,
     });
   },
-  playNext: (force = false) => {
+  playNext: (force = false, ignoreRepeat = false) => {
     if (!force && !get().canControlPlayback()) return;
     const { queue, currentTrack, history, isRepeat, isShuffle } = get();
 
     // Handle repeat state
-    if (isRepeat && currentTrack) {
+    if (isRepeat && currentTrack && !ignoreRepeat) {
       set({ progress: 0, isPlaying: true });
       return;
     }
@@ -228,7 +228,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       if (
         activePlaylistContext &&
         activePlaylistContext.length > 0 &&
-        isRepeat
+        isRepeat &&
+        !ignoreRepeat
       ) {
         let firstTrack = activePlaylistContext[0];
         let remainingTracks = activePlaylistContext.slice(1);

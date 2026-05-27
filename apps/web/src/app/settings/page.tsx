@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';import { useAuth } from '@/lib/firebase/auth-context';
+import { useState, useEffect, useCallback } from 'react';import { useAuth } from '@/lib/firebase/auth-context';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,17 @@ import { cn } from '@/lib/utils';
 
 import { DonateButton } from '@/components/common/DonateButton';
 
+interface GitHubAsset {
+  name: string;
+  browser_download_url: string;
+}
+
+interface GitHubRelease {
+  html_url: string;
+  tag_name: string;
+  assets?: GitHubAsset[];
+}
+
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const { essence, setEssence, mode, setMode } = useTheme();
@@ -42,17 +53,132 @@ export default function SettingsPage() {
   const router = useRouter();
   const [isNative, setIsNative] = useState(false);
   const [isTauri, setIsTauri] = useState(false);
+  const [localVersion, setLocalVersion] = useState<string>('');
+  const [latestRelease, setLatestRelease] = useState<GitHubRelease | null>(null);
+  const [updateState, setUpdateState] = useState<'idle' | 'checking' | 'up-to-date' | 'update-available' | 'error'>('idle');
+
+  const isNewerVersion = (latest: string, current: string): boolean => {
+    const cleanLatest = latest.replace(/^v/, '');
+    const cleanCurrent = current.replace(/^v/, '');
+    const lParts = cleanLatest.split('.').map(Number);
+    const cParts = cleanCurrent.split('.').map(Number);
+    for (let i = 0; i < Math.max(lParts.length, cParts.length); i++) {
+      const l = lParts[i] || 0;
+      const c = cParts[i] || 0;
+      if (l > c) return true;
+      if (l < c) return false;
+      }
+    return false;
+  };
+
+  const checkForUpdates = useCallback(async () => {
+    setUpdateState('checking');
+    try {
+      let currentVersion = '1.0.4'; // fallback
+      const isTauriEnv = typeof window !== 'undefined' && (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== undefined;
+      const isCapacitorNative = typeof window !== 'undefined' && (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
+
+      if (isTauriEnv) {
+        try {
+          const { getVersion } = await import('@tauri-apps/api/app');
+          currentVersion = await getVersion();
+        } catch (err) {
+          console.error('Failed to get Tauri app version:', err);
+        }
+      } else if (isCapacitorNative) {
+        try {
+          const { App } = await import('@capacitor/app');
+          const info = await App.getInfo();
+          currentVersion = info.version;
+        } catch (err) {
+          console.error('Failed to get Capacitor app info:', err);
+        }
+      }
+      setLocalVersion(currentVersion);
+
+      const res = await fetch('https://api.github.com/repos/ShreyJaiswal1/melofy/releases/latest');
+      if (!res.ok) throw new Error('GitHub Releases API error');
+      
+      const release = await res.json();
+      setLatestRelease(release);
+
+      const latestTag = release.tag_name;
+      const isNewer = isNewerVersion(latestTag, currentVersion);
+      
+      if (isNewer) {
+        setUpdateState('update-available');
+      } else {
+        setUpdateState('up-to-date');
+      }
+    } catch (err) {
+      console.error('Update check failed:', err);
+      setUpdateState('error');
+    }
+  }, []);
+
+  const handleDownloadUpdate = async () => {
+    if (!latestRelease) return;
+    
+    let downloadUrl = latestRelease.html_url; // fallback to GitHub Release web page
+    
+    if (isTauri) {
+      const winAsset = latestRelease.assets?.find((a) => a.name.endsWith('.msi'));
+      if (winAsset) {
+        downloadUrl = winAsset.browser_download_url;
+      }
+    } else if (isNative) {
+      const apkAsset = latestRelease.assets?.find((a) => a.name.endsWith('.apk'));
+      if (apkAsset) {
+        downloadUrl = apkAsset.browser_download_url;
+      }
+    }
+
+    if (isTauri) {
+      try {
+        const { openUrl } = await import('@tauri-apps/plugin-opener');
+        await openUrl(downloadUrl);
+      } catch (err) {
+        console.error('Failed to open link with Tauri opener:', err);
+        window.open(downloadUrl, '_blank');
+      }
+    } else {
+      window.open(downloadUrl, '_blank');
+    }
+  };
+
+  const handleViewChangelog = async () => {
+    if (!latestRelease) return;
+    
+    const url = latestRelease.html_url;
+
+    if (isTauri) {
+      try {
+        const { openUrl } = await import('@tauri-apps/plugin-opener');
+        await openUrl(url);
+      } catch (err) {
+        console.error('Failed to open link with Tauri opener:', err);
+        window.open(url, '_blank');
+      }
+    } else {
+      window.open(url, '_blank');
+    }
+  };
+
 
   useEffect(() => {
     const isCapacitorNative = typeof window !== 'undefined' && (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
     if (isCapacitorNative) {
       setTimeout(() => setIsNative(true), 0);
     }
-    const isTauriEnv = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+    const isTauriEnv = typeof window !== 'undefined' && (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== undefined;
     if (isTauriEnv) {
       setTimeout(() => setIsTauri(true), 0);
     }
-  }, []);
+
+    if (isTauriEnv || isCapacitorNative) {
+      void checkForUpdates();
+    }
+  }, [checkForUpdates]);
 
   const handleSignOut = async () => {
     try {
@@ -254,6 +380,80 @@ export default function SettingsPage() {
 
           <div className='grid grid-cols-1 md:grid-cols-2 gap-6 items-start'>
             <div className='flex flex-col gap-6'>
+              {/* Update Center (Tauri/Capacitor only) */}
+              {(isTauri || isNative) && (
+                <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] flex flex-col gap-4 relative overflow-hidden'>
+                  <div className='absolute -bottom-16 -right-16 h-40 w-40 bg-primary/5 blur-[50px] rounded-full' />
+                  
+                  <div className='flex items-center justify-between gap-2 mb-2'>
+                    <div className='flex items-center gap-2'>
+                      <Sparkles className='h-5 w-5 text-primary animate-pulse' />
+                      <h3 className='font-bold text-foreground text-lg'>Update Center</h3>
+                    </div>
+                    {localVersion && (
+                      <span className='text-xs px-2.5 py-1 rounded-full bg-foreground/5 text-muted-foreground font-semibold'>
+                        v{localVersion}
+                      </span>
+                    )}
+                  </div>
+
+                  {updateState === 'checking' && (
+                    <div className='flex flex-col items-center justify-center py-6 gap-3 text-center'>
+                      <div className='h-8 w-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin' />
+                      <p className='text-sm text-muted-foreground'>Checking for latest updates...</p>
+                    </div>
+                  )}
+
+                  {updateState === 'error' && (
+                    <div className='flex flex-col gap-3 py-2'>
+                      <p className='text-sm text-red-400'>Failed to retrieve the latest version information.</p>
+                      <Button onClick={checkForUpdates} variant='outline' className='w-full rounded-full font-bold'>
+                        Retry Check
+                      </Button>
+                    </div>
+                  )}
+
+                  {updateState === 'up-to-date' && (
+                    <div className='flex flex-col gap-4 py-2'>
+                      <div className='flex items-center gap-2.5 text-emerald-400 bg-emerald-500/10 p-4 rounded-2xl border border-emerald-500/10'>
+                        <span className='text-sm font-bold'>You are running the latest version!</span>
+                      </div>
+                      <p className='text-xs text-muted-foreground leading-relaxed'>
+                        Your app shell is fully up to date. No action is required.
+                      </p>
+                      <Button onClick={checkForUpdates} variant='ghost' className='w-full rounded-full text-xs text-muted-foreground hover:text-foreground font-bold'>
+                        Check Again
+                      </Button>
+                    </div>
+                  )}
+
+                  {updateState === 'update-available' && (
+                    <div className='flex flex-col gap-4 py-2 relative z-10'>
+                      <div className='flex items-center gap-2.5 text-amber-400 bg-amber-500/10 p-4 rounded-2xl border border-amber-500/10'>
+                        <div className='h-2.5 w-2.5 rounded-full bg-amber-400 animate-ping' />
+                        <span className='text-sm font-bold'>New version v{latestRelease?.tag_name} is available!</span>
+                      </div>
+
+                      <div className='flex flex-col gap-2'>
+                        <Button 
+                          onClick={handleDownloadUpdate} 
+                          className='w-full rounded-full font-bold shadow-xl shadow-primary/20'
+                        >
+                          Download Update
+                        </Button>
+                        <Button 
+                          onClick={handleViewChangelog} 
+                          variant='outline'
+                          className='w-full rounded-full font-bold border-border/60 hover:bg-foreground/5'
+                        >
+                          View Changelog
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              )}
+
               {/* Desktop App */}
               {!isTauri && (
                 <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] flex flex-col gap-4'>

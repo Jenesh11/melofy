@@ -361,13 +361,20 @@ router.get('/playlists/:id', async (req, res) => {
     const data = await fetchFullSpotifyPlaylist(id);
     const allItems = data.tracks?.items || [];
 
+    const filteredTracks = (allItems.map((item: any) => item.track).filter(Boolean) || [])
+      .filter((t: any) => {
+        const hasValidTitle = t.name && typeof t.name === 'string' && t.name.toLowerCase() !== 'unknown' && t.name.toLowerCase() !== 'unknown title';
+        const hasValidDuration = typeof t.duration_ms === 'number' && t.duration_ms > 0;
+        return t.id && hasValidTitle && hasValidDuration;
+      });
+
     const formattedData = {
       id: data.id,
       name: data.name,
       description: data.description,
       artworkUrl: data.images?.[0]?.url || '',
-      trackCount: data.tracks?.total || 0,
-      tracks: allItems.map((item: any) => item.track).filter(Boolean) || [],
+      trackCount: filteredTracks.length,
+      tracks: filteredTracks,
     };
 
     // 3. Save to Redis Cache (Expire after 1 hour = 3600 seconds)

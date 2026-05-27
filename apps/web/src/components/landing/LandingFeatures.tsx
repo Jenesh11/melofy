@@ -50,33 +50,6 @@ function BentoCard({ children, className, glowColor }: { children: React.ReactNo
 }
 
 export function LandingFeatures() {
-  const features = [
-    {
-      icon: <Music2 className='w-6 h-6' />,
-      title: 'Millions of Tracks',
-      description:
-        'Access a vast library of music from every genre and era, all at your fingertips.',
-    },
-    {
-      icon: <Users className='w-6 h-6' />,
-      title: 'Listen Along',
-      description:
-        'Share your listening session with friends in real-time and experience music together.',
-    },
-    {
-      icon: <Smartphone className='w-6 h-6' />,
-      title: 'Listen Anywhere',
-      description:
-        'Seamlessly switch between your desktop and mobile devices without missing a beat.',
-    },
-    {
-      icon: <CloudLightning className='w-6 h-6' />,
-      title: 'High Fidelity',
-      description:
-        'Experience crystal clear audio quality that brings every note to life.',
-    },
-  ];
-
   const details = [
     {
       title: 'Real-time Sync',
@@ -124,7 +97,7 @@ export function LandingFeatures() {
           <div className='grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto'>
             {/* Bento Card 1: Library (2 cols) */}
             <BentoCard 
-              className='md:col-span-2 bg-gradient-to-br from-card to-background' 
+              className='md:col-span-2 bg-linear-to-br from-card to-background' 
               glowColor='rgba(255, 255, 255, 0.05)'
             >
               <div className='absolute -right-10 -top-10 w-64 h-64 bg-primary/10 blur-[80px] rounded-full group-hover:bg-primary/20 transition-all duration-700 pointer-events-none' />
@@ -185,7 +158,7 @@ export function LandingFeatures() {
 
             {/* Bento Card 4: High Fidelity (2 cols) */}
             <BentoCard 
-              className='md:col-span-2 bg-gradient-to-tr from-card to-background' 
+              className='md:col-span-2 bg-linear-to-tr from-card to-background' 
               glowColor='rgba(234, 179, 8, 0.15)'
             >
               <div className='absolute -left-10 -bottom-10 w-64 h-64 bg-yellow-500/10 blur-[80px] rounded-full group-hover:bg-yellow-500/20 transition-all duration-700 pointer-events-none' />
