@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-update-discord-presence"
+description = "Enables the update_discord_presence command without any pre-configured scope."
+commands.allow = ["update_discord_presence"]
+
+[[permission]]
+identifier = "deny-update-discord-presence"
+description = "Denies the update_discord_presence command without any pre-configured scope."
+commands.deny = ["update_discord_presence"]

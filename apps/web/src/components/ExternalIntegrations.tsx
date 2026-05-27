@@ -95,11 +95,11 @@ export function ExternalIntegrations() {
           invoke('update_discord_presence', {
             title: currentTrack.title,
             artist: currentTrack.artist,
-            artworkUrl: currentTrack.artworkUrl,
+            artwork_url: currentTrack.artworkUrl,
             duration: currentTrack.duration,
             progress: progress,
-            isPlaying: isPlaying,
-            partyId: partyId,
+            is_playing: isPlaying,
+            party_id: partyId,
           }).catch((err) => {
             console.error('[DiscordRPC] failed to update presence:', err);
           });

@@ -19,6 +19,8 @@
     "core:window:allow-maximize",
     "core:window:allow-unmaximize",
     "core:window:allow-is-maximized",
-    "taskbar:default"
+    "taskbar:default",
+    "allow-update-discord-presence",
+    "allow-clear-discord-presence"
   ]
 }
