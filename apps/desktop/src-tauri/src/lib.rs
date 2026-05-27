@@ -3,6 +3,7 @@ use std::sync::Mutex;
 use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
 use tauri::Manager;
 
+
 pub struct DiscordState {
     client: Mutex<Option<DiscordIpcClient>>,
 }
@@ -24,7 +25,7 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 fn update_discord_presence(
     state: tauri::State<'_, DiscordState>,
     title: String,
@@ -196,6 +197,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_taskbar::init())
         .setup(|app| {
+
             // 1. Create the system tray menu items
             let toggle_minimize = tauri::menu::CheckMenuItem::with_id(
                 app,

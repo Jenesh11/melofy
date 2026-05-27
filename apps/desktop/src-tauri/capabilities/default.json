@@ -7,7 +7,7 @@
     "pip"
   ],
   "remote": {
-    "urls": ["https://melofy.jene.in/*"]
+    "urls": ["https://melofy.jene.in/**"]
   },
   "permissions": [
     "core:default",
