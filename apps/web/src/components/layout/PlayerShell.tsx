@@ -218,6 +218,29 @@ export function PlayerShell() {
         onLoadedData={(e) => {
           e.currentTarget.volume = playback.volume;
         }}
+        onDurationChange={(e) => {
+          const audio = e.currentTarget;
+          if (audio && audio.duration && playback.currentTrack) {
+            const actualDurationMs = Math.floor(audio.duration * 1000);
+            if (
+              actualDurationMs > 0 &&
+              isFinite(actualDurationMs) &&
+              Math.abs(playback.currentTrack.duration - actualDurationMs) > 1000
+            ) {
+              usePlayerStore.setState((state) => {
+                if (state.currentTrack && state.currentTrack.id === playback.currentTrack.id) {
+                  return {
+                    currentTrack: {
+                      ...state.currentTrack,
+                      duration: actualDurationMs,
+                    }
+                  };
+                }
+                return {};
+              });
+            }
+          }
+        }}
         onEnded={playback.handleTrackEnd}
         onWaiting={() => playback.setIsBuffering(true)}
         onCanPlay={(e) => {

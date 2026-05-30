@@ -398,7 +398,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
       }}
     >
       {showTitleBar && <TitleBar />}
-      <div className='flex flex-1 overflow-hidden transition-all duration-300'>
+      <div className='flex flex-1 overflow-hidden'>
         <div className='hidden md:flex h-full'>
           <Sidebar />
         </div>

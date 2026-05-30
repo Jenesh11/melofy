@@ -49,7 +49,7 @@ export function useTrackDiscovery() {
           if (data?.tracks?.length > 0) {
             const found = data.tracks[0];
             if (found?.encoded) {
-              updateTrackUrl(currentTrack.id, found.encoded, found.info.identifier);
+              updateTrackUrl(currentTrack.id, found.encoded, found.info.identifier, found.info.length);
               success = true;
             }
           }

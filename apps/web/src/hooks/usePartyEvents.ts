@@ -57,6 +57,7 @@ export function usePartyEvents({
       if (data.type === 'play_track' && data.track) {
         lastReceivedTrackRef.current = data.track.id;
         usePlayerStore.getState().play(data.track, true);
+        if (audio) audio.playbackRate = 1.0; // Reset any drift correction from previous track
         if (typeof data.time === 'number') {
           if (audio.readyState >= 1) {
             audio.currentTime = data.time;
@@ -98,10 +99,27 @@ export function usePartyEvents({
         }
 
         if (audio.readyState >= 1) {
-          const drift = Math.abs(audio.currentTime - data.time);
-          if (drift > 0.6) {
-            console.log(`[JamSync] Re-aligning drift of ${drift.toFixed(2)}s`);
+          const signedDrift = data.time - audio.currentTime; // positive = listener behind host
+          const absDrift = Math.abs(signedDrift);
+
+          if (absDrift > 3.0) {
+            // Severe desync — hard seek is unavoidable
+            console.log(`[JamSync] Hard re-align: drift ${absDrift.toFixed(2)}s`);
             audio.currentTime = data.time;
+            audio.playbackRate = 1.0;
+          } else if (absDrift > 1.0) {
+            // Moderate drift — gradual correction via playback rate (inaudible at 3%)
+            const newRate = signedDrift > 0 ? 1.03 : 0.97;
+            if (audio.playbackRate !== newRate) {
+              console.log(`[JamSync] Gradual correction: drift ${absDrift.toFixed(2)}s, rate → ${newRate}`);
+              audio.playbackRate = newRate;
+            }
+          } else {
+            // Within acceptable range — ensure normal speed
+            if (audio.playbackRate !== 1.0) {
+              console.log(`[JamSync] Drift resolved (${absDrift.toFixed(2)}s), rate → 1.0`);
+              audio.playbackRate = 1.0;
+            }
           }
         } else {
           pendingSyncTimeRef.current = data.time;
@@ -139,6 +157,8 @@ export function usePartyEvents({
       toast.info(`${data.username} left the session`);
 
     const handlePartyEnded = () => {
+      const audio = audioRef.current;
+      if (audio) audio.playbackRate = 1.0; // Restore normal playback speed
       usePlayerStore.getState().clearParty();
       toast.info('The session has ended.');
     };
@@ -295,7 +315,10 @@ export function usePartyEvents({
     if (!userUid || !isHydrated || !isPlaying) return;
     const intervalId = setInterval(() => {
       if (!audioRef.current || audioRef.current.paused) return;
-      syncStateToServer();
+      // Only persist to database when NOT in a party session (party state lives in Redis)
+      if (!usePlayerStore.getState().partyId) {
+        syncStateToServer();
+      }
       if (socket && usePlayerStore.getState().isPartyHost) {
         socket.emit('playback_state', {
           type: 'sync',
@@ -304,7 +327,7 @@ export function usePartyEvents({
           track: currentTrack || undefined,
         });
       }
-    }, 3000); // Increased frequency to 3 seconds for extremely high-fidelity synchronization
+    }, 5000); // 5s heartbeat — sufficient with 3s drift tolerance, avoids over-correction
     return () => clearInterval(intervalId);
   }, [userUid, isHydrated, isPlaying, syncStateToServer, socket, audioRef, currentTrack]);
 }

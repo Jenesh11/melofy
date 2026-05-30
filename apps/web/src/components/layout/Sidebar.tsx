@@ -116,7 +116,7 @@ export function Sidebar() {
 
   return (
     <div className={cn(
-      'flex h-full flex-col bg-sidebar/40 backdrop-blur-xl border-r border-sidebar-border text-sidebar-foreground overflow-hidden transition-all duration-300 select-none',
+      'flex h-full flex-col bg-sidebar/40 backdrop-blur-xl border-r border-sidebar-border text-sidebar-foreground overflow-hidden transition-[width] duration-300 ease-in-out select-none',
       isCollapsed ? 'w-18 items-center p-3' : 'w-64 p-4'
     )}>
       {/* Brand Header & Toggle */}
@@ -128,7 +128,7 @@ export function Sidebar() {
           <Link
             href={`/playlist/${activeCollectionId}`}
             className={cn(
-              'flex items-center gap-2 transition-all duration-300 cursor-pointer hover:opacity-80 active:scale-95',
+              'flex items-center gap-2 transition-opacity duration-200 cursor-pointer hover:opacity-80 active:scale-95',
             )}
           >
             <div className='h-8 w-8 overflow-hidden flex items-center justify-center shrink-0 shadow-lg shadow-primary/20 rounded-lg relative'>
@@ -182,7 +182,7 @@ export function Sidebar() {
           <Link key={route.href} href={route.href} className='w-full flex justify-center'>
             <div
               className={cn(
-                'flex items-center rounded-md text-sm font-medium transition-all duration-300 group/item cursor-pointer',
+                'flex items-center rounded-md text-sm font-medium transition-colors duration-200 group/item cursor-pointer',
                 isCollapsed ? 'justify-center w-10 h-10 p-0' : 'gap-4 px-3 py-2 w-full',
                 route.active
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground'
@@ -192,7 +192,7 @@ export function Sidebar() {
             >
               <route.icon className='h-5 w-5 shrink-0 transition-transform group-hover/item:scale-105' />
               {!isCollapsed && (
-                <span className='truncate font-medium transition-all duration-300'>
+                <span className='truncate font-medium'>
                   {route.label}
                 </span>
               )}
@@ -226,7 +226,7 @@ export function Sidebar() {
                     <Link href={`/playlist/${playlist.id}`} className='w-full flex justify-center'>
                       <div
                         className={cn(
-                          'flex items-center rounded-md text-sm transition-all duration-300 group/playlist cursor-pointer',
+                          'flex items-center rounded-md text-sm transition-colors duration-200 group/playlist cursor-pointer',
                           isCollapsed ? 'justify-center w-10 h-10 p-0' : 'gap-3 px-3 py-2 w-full',
                           pathname === `/playlist/${playlist.id}`
                             ? 'bg-sidebar-accent text-sidebar-accent-foreground'
@@ -253,7 +253,7 @@ export function Sidebar() {
                               alt={playlist.name}
                               width={32}
                               height={32}
-                              className='h-full w-full object-cover group-hover/playlist:scale-110 transition-transform duration-300'
+                              className='h-full w-full object-cover group-hover/playlist:scale-110 transition-transform duration-200'
                             />
                           ) : (
                             <ListMusic className='h-4 w-4 text-muted-foreground group-hover/playlist:text-primary transition-colors' />

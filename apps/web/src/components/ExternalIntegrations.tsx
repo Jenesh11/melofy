@@ -35,9 +35,18 @@ export function ExternalIntegrations() {
   const lastDuration = useRef<number>(0);
   const lastPartyId = useRef<string | null>(null);
 
+  // Safety tracking for Discord connection to prevent redundant attempts (avoids Tauri IPC stuttering)
+  const isDiscordConnected = useRef<boolean>(true); // Assume connected initially to allow first attempt
+  const lastConnectAttempt = useRef<number>(0);
+  const COOLDOWN_MS = 60000; // 1-minute cooldown if Discord client is offline
+
+  // Fresh state reference for the 15-second heartbeat interval (prevents clearing and resetting the interval timer)
+  const latestStateRef = useRef({ currentTrack, isPlaying, progress, partyId });
+  latestStateRef.current = { currentTrack, isPlaying, progress, partyId };
+
   const [taskbarInitialized, setTaskbarInitialized] = useState(false);
 
-  // 1. PreMiD Browser Exposer Integration
+  // 1. PreMiD Browser Exposer Integration (Event-driven)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if (!window.melofy) {
@@ -61,7 +70,7 @@ export function ExternalIntegrations() {
     }
   }, [currentTrack, isPlaying, progress, partyId]);
 
-  // 2. Tauri Native Discord Rich Presence Integration
+  // 2. Tauri Native Discord Rich Presence Integration (Event-driven)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const isTauri = '__TAURI_INTERNALS__' in window;
@@ -89,30 +98,123 @@ export function ExternalIntegrations() {
     lastPartyId.current = partyId;
     lastUpdatedTime.current = now;
 
+    const shouldUpdateDiscord = 
+      isDiscordConnected.current || 
+      (now - lastConnectAttempt.current > COOLDOWN_MS);
+
     if (trackChanged || playStateChanged || seeked || durationChanged || partyIdChanged) {
       if (currentTrack) {
-        import('@tauri-apps/api/core').then(({ invoke }) => {
-          invoke('update_discord_presence', {
-            title: currentTrack.title,
-            artist: currentTrack.artist,
-            artwork_url: currentTrack.artworkUrl,
-            duration: currentTrack.duration,
-            progress: progress,
-            is_playing: isPlaying,
-            party_id: partyId,
-          }).catch((err) => {
-            console.error('[DiscordRPC] failed to update presence:', err);
+        if (shouldUpdateDiscord) {
+          import('@tauri-apps/api/core').then(({ invoke }) => {
+            invoke('update_discord_presence', {
+              title: currentTrack.title,
+              artist: currentTrack.artist,
+              artwork_url: currentTrack.artworkUrl,
+              duration: currentTrack.duration,
+              progress: progress,
+              is_playing: isPlaying,
+              party_id: partyId,
+            })
+            .then(() => {
+              isDiscordConnected.current = true;
+            })
+            .catch((err) => {
+              console.error('[DiscordRPC] failed to update presence:', err);
+              isDiscordConnected.current = false;
+              lastConnectAttempt.current = Date.now();
+            });
           });
-        });
+        }
       } else {
-        import('@tauri-apps/api/core').then(({ invoke }) => {
-          invoke('clear_discord_presence').catch((err) => {
-            console.error('[DiscordRPC] failed to clear presence:', err);
+        if (shouldUpdateDiscord) {
+          import('@tauri-apps/api/core').then(({ invoke }) => {
+            invoke('clear_discord_presence')
+            .then(() => {
+              isDiscordConnected.current = true;
+            })
+            .catch((err) => {
+              console.error('[DiscordRPC] failed to clear presence:', err);
+              isDiscordConnected.current = false;
+              lastConnectAttempt.current = Date.now();
+            });
           });
-        });
+        }
       }
     }
   }, [currentTrack, isPlaying, progress, partyId]);
+
+  // 3. Periodic Discord Rich Presence Heartbeat & Auto-Recovery (Every 15s)
+  useEffect(() => {
+    const runHeartbeat = () => {
+      const { currentTrack, isPlaying, progress, partyId } = latestStateRef.current;
+      
+      // A. Dispatches periodic heartbeat update for PreMiD (web client)
+      if (typeof window !== 'undefined') {
+        if (!window.melofy) {
+          window.melofy = {
+            track: currentTrack,
+            isPlaying,
+            progress,
+            partyId,
+            version: '5.0.1',
+          };
+        } else {
+          window.melofy.track = currentTrack;
+          window.melofy.isPlaying = isPlaying;
+          window.melofy.progress = progress;
+          window.melofy.partyId = partyId;
+        }
+        window.dispatchEvent(new CustomEvent('melofy_state_update', { detail: window.melofy }));
+      }
+
+      // B. Refresh Tauri Native Discord Presence (desktop app)
+      if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+        const now = Date.now();
+        const shouldAttemptConnect = 
+          isDiscordConnected.current || 
+          (now - lastConnectAttempt.current > COOLDOWN_MS);
+
+        if (shouldAttemptConnect) {
+          if (currentTrack) {
+            import('@tauri-apps/api/core').then(({ invoke }) => {
+              invoke('update_discord_presence', {
+                title: currentTrack.title,
+                artist: currentTrack.artist,
+                artwork_url: currentTrack.artworkUrl,
+                duration: currentTrack.duration,
+                progress: progress,
+                is_playing: isPlaying,
+                party_id: partyId,
+              })
+              .then(() => {
+                isDiscordConnected.current = true;
+              })
+              .catch((err) => {
+                console.error('[DiscordRPC] periodic presence heartbeat failed:', err);
+                isDiscordConnected.current = false;
+                lastConnectAttempt.current = Date.now();
+              });
+            });
+          } else {
+            import('@tauri-apps/api/core').then(({ invoke }) => {
+              invoke('clear_discord_presence')
+              .then(() => {
+                isDiscordConnected.current = true;
+              })
+              .catch((err) => {
+                console.error('[DiscordRPC] periodic clear presence heartbeat failed:', err);
+                isDiscordConnected.current = false;
+                lastConnectAttempt.current = Date.now();
+              });
+            });
+          }
+        }
+      }
+    };
+
+    const intervalId = setInterval(runHeartbeat, 15000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   // 3. Windows Taskbar Thumbnail Toolbar (Tauri-only)
   // The plugin requires explicit JS-side initialization via invoke, then
