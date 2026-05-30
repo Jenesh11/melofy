@@ -220,15 +220,16 @@ export function PlayerShell() {
         }}
         onDurationChange={(e) => {
           const audio = e.currentTarget;
-          if (audio && audio.duration && playback.currentTrack) {
+          const track = playback.currentTrack;
+          if (audio && audio.duration && track) {
             const actualDurationMs = Math.floor(audio.duration * 1000);
             if (
               actualDurationMs > 0 &&
               isFinite(actualDurationMs) &&
-              Math.abs(playback.currentTrack.duration - actualDurationMs) > 1000
+              Math.abs(track.duration - actualDurationMs) > 1000
             ) {
               usePlayerStore.setState((state) => {
-                if (state.currentTrack && state.currentTrack.id === playback.currentTrack.id) {
+                if (state.currentTrack && state.currentTrack.id === track.id) {
                   return {
                     currentTrack: {
                       ...state.currentTrack,
