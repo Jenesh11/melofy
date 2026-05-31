@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePlayerStore, Track } from '@/store/usePlayerStore';
 
 declare global {
@@ -27,86 +27,24 @@ export function ExternalIntegrations() {
   const progress = usePlayerStore((state) => state.progress);
   const partyId = usePlayerStore((state) => state.partyId);
 
-  // ── Discord RPC: single throttled update function ────────────────────────────
-  // Minimum interval between Discord IPC calls to prevent socket flooding
-  const MIN_DISCORD_UPDATE_MS = 5000;
-  const DISCORD_OFFLINE_COOLDOWN_MS = 60000;
+  // References for smart Discord presence update detection (throttling, seeking & metadata loads)
+  const lastTrackId = useRef<string | null>(null);
+  const lastIsPlaying = useRef<boolean>(false);
+  const lastUpdatedTime = useRef<number>(0);
+  const lastProgress = useRef<number>(0);
+  const lastDuration = useRef<number>(0);
+  const lastPartyId = useRef<string | null>(null);
 
-  const isDiscordConnected = useRef<boolean>(true);
-  const lastConnectAttempt = useRef<number>(0);
-  const lastDiscordUpdate = useRef<number>(0);
-  const pendingUpdateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Safety tracking for Discord connection to prevent redundant attempts and allow retry loops
+  const isDiscordConnected = useRef<boolean>(false);
 
-  // Fresh state ref so the heartbeat interval and deferred updates always read current values
+  // Fresh state reference for the auto-recovery retry loop
   const latestStateRef = useRef({ currentTrack, isPlaying, progress, partyId });
   latestStateRef.current = { currentTrack, isPlaying, progress, partyId };
 
   const [taskbarInitialized, setTaskbarInitialized] = useState(false);
 
-  /**
-   * Core Discord update — called from both event-driven changes and periodic heartbeat.
-   * Throttled: if called too soon after the last successful dispatch, it schedules
-   * a deferred call instead of firing immediately, so at most 1 IPC per 5 seconds.
-   */
-  const sendDiscordUpdate = useCallback((force = false) => {
-    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
-
-    const now = Date.now();
-
-    // Respect offline cooldown — don't spam reconnect attempts
-    const canAttempt =
-      isDiscordConnected.current ||
-      (now - lastConnectAttempt.current > DISCORD_OFFLINE_COOLDOWN_MS);
-    if (!canAttempt) return;
-
-    // Throttle: if a call was sent recently, defer this one
-    const elapsed = now - lastDiscordUpdate.current;
-    if (!force && elapsed < MIN_DISCORD_UPDATE_MS) {
-      // Schedule a deferred update for the remaining time (coalesce rapid changes)
-      if (!pendingUpdateTimer.current) {
-        pendingUpdateTimer.current = setTimeout(() => {
-          pendingUpdateTimer.current = null;
-          sendDiscordUpdate(true);
-        }, MIN_DISCORD_UPDATE_MS - elapsed);
-      }
-      return;
-    }
-
-    const { currentTrack, isPlaying, progress, partyId } = latestStateRef.current;
-    lastDiscordUpdate.current = now;
-
-    if (currentTrack) {
-      import('@tauri-apps/api/core').then(({ invoke }) => {
-        invoke('update_discord_presence', {
-          title: currentTrack.title,
-          artist: currentTrack.artist,
-          artwork_url: currentTrack.artworkUrl,
-          duration: currentTrack.duration,
-          progress: progress,
-          is_playing: isPlaying,
-          party_id: partyId,
-        })
-        .then(() => { isDiscordConnected.current = true; })
-        .catch((err) => {
-          console.error('[DiscordRPC] failed to update presence:', err);
-          isDiscordConnected.current = false;
-          lastConnectAttempt.current = Date.now();
-        });
-      });
-    } else {
-      import('@tauri-apps/api/core').then(({ invoke }) => {
-        invoke('clear_discord_presence')
-        .then(() => { isDiscordConnected.current = true; })
-        .catch((err) => {
-          console.error('[DiscordRPC] failed to clear presence:', err);
-          isDiscordConnected.current = false;
-          lastConnectAttempt.current = Date.now();
-        });
-      });
-    }
-  }, []);
-
-  // ── 1. PreMiD Browser Exposer Integration (runs on every state change) ─────
+  // 1. PreMiD Browser Exposer Integration
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if (!window.melofy) {
@@ -124,69 +62,113 @@ export function ExternalIntegrations() {
         window.melofy.partyId = partyId;
         window.melofy.version = '5.0.1';
       }
+      
+      // Dispatch event to proactively notify external listeners (like PreMiD)
       window.dispatchEvent(new CustomEvent('melofy_state_update', { detail: window.melofy }));
     }
   }, [currentTrack, isPlaying, progress, partyId]);
 
-  // ── 2. Discord RPC — event-driven updates (NO progress dependency) ─────────
-  // Only fires on meaningful changes: track switch, play/pause, party join/leave.
+  // 2. Tauri Native Discord Rich Presence Integration (Event-driven)
   useEffect(() => {
-    sendDiscordUpdate();
-  }, [currentTrack, isPlaying, partyId, sendDiscordUpdate]);
+    if (typeof window === 'undefined') return;
+    const isTauri = '__TAURI_INTERNALS__' in window;
+    if (!isTauri) return;
 
-  // ── 3. Discord RPC — seek detection (lightweight progress watcher) ─────────
-  // Tracks progress via refs to detect manual seeks without triggering the Discord effect.
-  const lastProgressRef = useRef<number>(progress);
-  const lastProgressTimeRef = useRef<number>(Date.now());
-
-  useEffect(() => {
-    const prevProgress = lastProgressRef.current;
-    const prevTime = lastProgressTimeRef.current;
     const now = Date.now();
-    const dt = now - prevTime;
-
-    lastProgressRef.current = progress;
-    lastProgressTimeRef.current = now;
-
-    // Detect seek: progress jump > 2.5s beyond normal elapsed playback
-    const expectedProgress = prevProgress + (isPlaying ? dt : 0);
+    const dt = now - lastUpdatedTime.current;
+    
+    const trackChanged = currentTrack?.id !== lastTrackId.current;
+    const playStateChanged = isPlaying !== lastIsPlaying.current;
+    const durationChanged = currentTrack?.duration !== lastDuration.current;
+    const partyIdChanged = partyId !== lastPartyId.current;
+    
+    // Calculate if a manual seek occurred: progress jump of more than 2.5 seconds
+    // relative to normal elapsed time since the last tick (~200ms ago).
+    const expectedProgress = lastProgress.current + (isPlaying ? dt : 0);
     const seeked = Math.abs(progress - expectedProgress) > 2500;
 
-    if (seeked) {
-      sendDiscordUpdate();
+    // We always update the tracking references on every tick to measure consecutive drift
+    // and prevent accumulation of natural wall-clock vs audio device sample clock drift.
+    lastTrackId.current = currentTrack?.id || null;
+    lastIsPlaying.current = isPlaying;
+    lastProgress.current = progress;
+    lastDuration.current = currentTrack?.duration || 0;
+    lastPartyId.current = partyId;
+    lastUpdatedTime.current = now;
+
+    if (trackChanged || playStateChanged || seeked || durationChanged || partyIdChanged) {
+      if (currentTrack) {
+        import('@tauri-apps/api/core').then(({ invoke }) => {
+          invoke('update_discord_presence', {
+            title: currentTrack.title,
+            artist: currentTrack.artist,
+            artwork_url: currentTrack.artworkUrl,
+            duration: currentTrack.duration,
+            progress: progress,
+            is_playing: isPlaying,
+            party_id: partyId,
+          })
+          .then(() => {
+            isDiscordConnected.current = true;
+          })
+          .catch((err) => {
+            console.error('[DiscordRPC] failed to update presence:', err);
+            isDiscordConnected.current = false;
+          });
+        });
+      } else {
+        import('@tauri-apps/api/core').then(({ invoke }) => {
+          invoke('clear_discord_presence')
+          .then(() => {
+            isDiscordConnected.current = true;
+          })
+          .catch((err) => {
+            console.error('[DiscordRPC] failed to clear presence:', err);
+            isDiscordConnected.current = false;
+          });
+        });
+      }
     }
-  }, [progress, isPlaying, sendDiscordUpdate]);
+  }, [currentTrack, isPlaying, progress, partyId]);
 
-  // ── 4. Periodic heartbeat (15s) — keeps presence alive & recovers from drops ─
+  // 3. Discord RPC Auto-Recovery Retry Loop (Every 10s)
+  // Periodically retries connecting to Discord only if we are currently disconnected.
+  // This gracefully recovers the presence if Discord is launched after Melofy.
   useEffect(() => {
-    const heartbeat = () => {
-      // A. PreMiD refresh
-      const { currentTrack, isPlaying, progress, partyId } = latestStateRef.current;
-      if (typeof window !== 'undefined') {
-        if (!window.melofy) {
-          window.melofy = { track: currentTrack, isPlaying, progress, partyId, version: '5.0.1' };
-        } else {
-          window.melofy.track = currentTrack;
-          window.melofy.isPlaying = isPlaying;
-          window.melofy.progress = progress;
-          window.melofy.partyId = partyId;
+    if (typeof window === 'undefined') return;
+    const isTauri = '__TAURI_INTERNALS__' in window;
+    if (!isTauri) return;
+
+    const retryInterval = setInterval(() => {
+      if (!isDiscordConnected.current) {
+        const { currentTrack, isPlaying, progress, partyId } = latestStateRef.current;
+        if (currentTrack) {
+          console.log('[DiscordRPC] Retry: Attempting to connect & apply presence...');
+          import('@tauri-apps/api/core').then(({ invoke }) => {
+            invoke('update_discord_presence', {
+              title: currentTrack.title,
+              artist: currentTrack.artist,
+              artwork_url: currentTrack.artworkUrl,
+              duration: currentTrack.duration,
+              progress: progress,
+              is_playing: isPlaying,
+              party_id: partyId,
+            })
+            .then(() => {
+              console.log('[DiscordRPC] Retry Success: Connected & applied presence');
+              isDiscordConnected.current = true;
+            })
+            .catch((err) => {
+              console.log('[DiscordRPC] Retry Failed: Discord client still not reachable:', err);
+              isDiscordConnected.current = false;
+            });
+          });
         }
-        window.dispatchEvent(new CustomEvent('melofy_state_update', { detail: window.melofy }));
       }
+    }, 10000); // Check/retry every 10 seconds
 
-      // B. Discord RPC refresh (force = true bypasses throttle since heartbeat is already 15s)
-      sendDiscordUpdate(true);
-    };
-
-    const id = setInterval(heartbeat, 15000);
-    return () => {
-      clearInterval(id);
-      if (pendingUpdateTimer.current) {
-        clearTimeout(pendingUpdateTimer.current);
-        pendingUpdateTimer.current = null;
-      }
-    };
-  }, [sendDiscordUpdate]);
+    return () => clearInterval(retryInterval);
+  }, []);
 
   // 3. Windows Taskbar Thumbnail Toolbar (Tauri-only)
   // The plugin requires explicit JS-side initialization via invoke, then

@@ -42,6 +42,7 @@ interface PlayerState {
   listenersCanControl: boolean;
   partyListeners: PartyListener[];
   lyricsCache: Record<string, LyricsData>;
+  seekTrigger?: number;
 
   // Actions
   canControlPlayback: () => boolean;
@@ -97,6 +98,7 @@ const initialState = {
   listenersCanControl: false,
   partyListeners: [],
   lyricsCache: {},
+  seekTrigger: 0,
 };
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({

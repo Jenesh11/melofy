@@ -253,6 +253,11 @@ export function PlayerShell() {
         onLoadStart={() => playback.setIsBuffering(true)}
         onPlaying={() => playback.setIsBuffering(false)}
         onTimeUpdate={(e) => playback.setCurrentTime(e.currentTarget.currentTime)}
+        onSeeked={() => {
+          usePlayerStore.setState((state) => ({
+            seekTrigger: (state.seekTrigger || 0) + 1,
+          }));
+        }}
         autoPlay={playback.isPlaying}
         onError={(e) => {
           if (!playback.currentTrack?.url) return;
