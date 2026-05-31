@@ -125,7 +125,7 @@ export function useMediaSession({
         try {
           // Cast the string to the native MediaSessionAction type
           navigator.mediaSession.setActionHandler(action as globalThis.MediaSessionAction, handler);
-        } catch (e) {}
+        } catch {}
       }
     }
 
@@ -139,7 +139,7 @@ export function useMediaSession({
         for (const [action] of actionHandlers) {
           try {
             navigator.mediaSession.setActionHandler(action as globalThis.MediaSessionAction, null);
-          } catch (e) {}
+          } catch {}
         }
       }
     };

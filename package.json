@@ -1,7 +1,7 @@
 {
   "name": "melofy",
   "private": true,
-  "version": "5.0.0",
+  "version": "1.0.4",
   "packageManager": "npm@10.8.2",
   "workspaces": [
     "apps/*",
@@ -16,9 +16,9 @@
     "test": "turbo run test"
   },
   "devDependencies": {
-    "turbo": "latest",
+    "turbo": "^2.9.15",
     "typescript": "^5.0.0"
   },
-  "author": "ShreyJaiswal1",
+  "author": "lazyshrey",
   "license": "ISC"
 }

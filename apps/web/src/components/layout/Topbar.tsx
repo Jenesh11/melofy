@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
 import { Search, User, X, Loader2, Play, PlusCircle, ListPlus } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -125,7 +126,6 @@ export function Topbar() {
         <div className="flex items-center gap-2 mt-1">
           {mappedTrack.artworkUrl && (
             <img
-              // eslint-disable-next-line @next/next/no-img-element
               src={mappedTrack.artworkUrl}
               alt=""
               className="h-8 w-8 rounded-md object-cover shadow-md brightness-90"

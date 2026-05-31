@@ -20,6 +20,9 @@
   </div>
 
   <br />
+  <div align="center">
+    <h3>🖼️ <a href="SCREENSHOTS.md">Explore the Visual Showcase (Screenshots & Interactive GIFs)</a> 🖼️</h3>
+  </div>
   <br />
 </div>
 
@@ -176,7 +179,7 @@ melofy/
 ### 1️⃣ Clone & Fuel Up
 
 ```bash
-git clone https://github.com/ShreyJaiswal1/melofy.git
+git clone https://github.com/lazyshrey/melofy.git
 cd melofy
 npm install
 ```
@@ -230,6 +233,6 @@ If you appreciate the work and want to support the development of Melofy, consid
 ---
 
 <div align="center">
-  <p>Built with 💖 and ☕ by <b><a href="https://github.com/ShreyJaiswal1">ShreyJaiswal1</a></b></p>
+  <p>Built with 💖 and ☕ by <b><a href="https://github.com/lazyshrey">lazyshrey</a></b></p>
   <p><i>© 2026 Melofy. Licensed under ISC.</i></p>
 </div>

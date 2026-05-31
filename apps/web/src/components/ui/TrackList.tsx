@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useMemo } from 'react';
 import { Music2, Heart, ListPlus } from 'lucide-react';
@@ -108,7 +109,7 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
       }
 
       const nextContextTracks = [...contextTracks];
-      nextContextTracks[index] = resolved;
+      nextContextTracks.splice(index, 1, resolved);
       playInContext(resolved, nextContextTracks);
     },
     [contextTracks, currentTrack?.title, isPlaying, pause, playInContext, resume],
@@ -116,7 +117,8 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
 
   const handleAddToQueue = useCallback(
     async (item: TrackItem, index: number) => {
-      let trackToAdd = contextTracks[index];
+      let trackToAdd = contextTracks.at(index);
+      if (!trackToAdd) return;
       if (!trackToAdd.url) {
         const resolved = await resolvePlayableTrack(item);
         if (!resolved) {
@@ -254,7 +256,7 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
               {formatDuration(item.duration)}
             </span>
 
-            <div className='flex items-center justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100' style={{ opacity: isLiked(contextTracks[index]?.id || '') ? 1 : undefined }}>
+            <div className='flex items-center justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus-within:opacity-100' style={{ opacity: isLiked(contextTracks.at(index)?.id || '') ? 1 : undefined }}>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -268,14 +270,15 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  toggleLike(contextTracks[index]);
+                  const targetTrack = contextTracks.at(index);
+                  if (targetTrack) toggleLike(targetTrack);
                 }}
                 className='flex items-center justify-center h-8 w-8 rounded-full hover:bg-foreground/10 transition-colors'
               >
                 <Heart
                   className={cn(
                     'h-4 w-4 transition-all',
-                    isLiked(contextTracks[index]?.id || '')
+                    isLiked(contextTracks.at(index)?.id || '')
                       ? 'fill-primary text-primary'
                       : 'text-muted-foreground hover:text-foreground',
                   )}

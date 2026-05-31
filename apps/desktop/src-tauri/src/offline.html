@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>You're offline - Melofy</title>
+  <style>
+    :root {
+      --bg: #09090b;
+      --card: #18181b;
+      --border: rgba(255, 255, 255, 0.08);
+      --muted: rgba(255, 255, 255, 0.05);
+      --text: #ffffff;
+      --text-muted: #a1a1aa;
+      --red: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      overflow: hidden;
+    }
+
+    /* Minimal Card */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      border-radius: 40px;
+      padding: 48px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 32px;
+      max-width: 384px;
+      width: 100%;
+      text-align: center;
+      animation: card-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes card-enter {
+      0% {
+        opacity: 0;
+        transform: scale(0.95) translateY(10px);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    /* Icon Container */
+    .icon-container {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .wifi-off-icon {
+      width: 32px;
+      height: 32px;
+      color: var(--text-muted);
+    }
+
+    .status-dot-wrapper {
+      position: absolute;
+      bottom: -4px;
+      right: -4px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--red);
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: .4;
+      }
+    }
+
+    /* Typography */
+    .text-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      color: var(--text);
+    }
+
+    p {
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.5;
+    }
+
+    /* Retry Button */
+    .btn {
+      height: 48px;
+      padding: 0 40px;
+      border-radius: 9999px;
+      font-size: 14px;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+    }
+
+    .btn:hover {
+      background: var(--text);
+      color: var(--bg);
+      border-color: var(--text);
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .refresh-icon {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Footer */
+    .footer {
+      position: absolute;
+      bottom: 40px;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.3em;
+      color: rgba(255, 255, 255, 0.15);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <div class="icon-container">
+      <!-- WifiOff Icon from Lucide -->
+      <svg class="wifi-off-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 1l22 22"/>
+        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.5l3-3a15 15 0 0 0-7-4.48"/>
+        <path d="M5 9.5l3 3a10.99 10.99 0 0 1 6.3-3.12"/>
+        <path d="M9.3 6.36A15 15 0 0 1 12 6c3.2 0 6.2 1 8.7 2.7l3-3A19.9 19.9 0 0 0 12 3a19.8 19.8 0 0 0-8.7 2.1"/>
+        <path d="M10.58 16.58L12 18l3.78-3.78"/>
+      </svg>
+      <div class="status-dot-wrapper">
+        <div class="status-dot"></div>
+      </div>
+    </div>
+
+    <div class="text-group">
+      <h2>You're offline</h2>
+      <p>Check your connection and try again.</p>
+    </div>
+
+    <button class="btn" id="retry-btn">
+      <!-- RefreshCcw Icon from Lucide -->
+      <svg class="refresh-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+        <path d="M3 3v5h5"/>
+        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+        <path d="M16 16h5v5"/>
+      </svg>
+      Retry
+    </button>
+  </div>
+
+  <div class="footer">
+    Melofy Desktop Player
+  </div>
+
+  <script>
+    document.getElementById('retry-btn').addEventListener('click', () => {
+      // Reconnect and redirect the webview to the live application URL
+      window.location.href = 'https://melofy.jene.in';
+    });
+  </script>
+</body>
+</html>

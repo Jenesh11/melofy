@@ -1,7 +1,7 @@
 {
   "name": "desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.4",
   "type": "module",
   "scripts": {
     "dev": "tauri dev",
@@ -11,7 +11,8 @@
   "dependencies": {
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-deep-link": "^2.4.9",
-    "@tauri-apps/plugin-opener": "^2"
+    "@tauri-apps/plugin-opener": "^2",
+    "tauri-plugin-taskbar": "^0.1.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

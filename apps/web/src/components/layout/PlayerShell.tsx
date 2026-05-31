@@ -12,6 +12,20 @@ import { useAuth } from '@/lib/firebase/auth-context';
 import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
 import { useLikedSongs } from '@/hooks/useLikedSongs';
 import { useLyricsPanelStore } from '@/store/useLyricsPanelStore';
+import { usePlayerStore, type Track } from '@/store/usePlayerStore';
+
+interface PipState {
+  currentTrack: Track | null;
+  isPlaying: boolean;
+  isBuffering: boolean;
+  progressPercent: number;
+  currentDisplayTime: string;
+  durationTime: string;
+  isLiked: boolean;
+  isShuffle: boolean;
+  isRepeat: boolean;
+  volume: number;
+}
 
 export function PlayerShell() {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -27,7 +41,7 @@ export function PlayerShell() {
 
   // Synchronize state and commands with the Tauri PiP window
   const channelRef = useRef<BroadcastChannel | null>(null);
-  const latestStateRef = useRef<any>(null);
+  const latestStateRef = useRef<PipState | null>(null);
 
   latestStateRef.current = {
     currentTrack: playback.currentTrack,
@@ -158,8 +172,13 @@ export function PlayerShell() {
         });
         setStreamSrc(`/api/stream?${params.toString()}`);
       } catch (error) {
-        if (!cancelled) setStreamSrc(undefined);
-        console.error('[PlayerShell] Failed to prepare stream URL:', error);
+        if (!cancelled) {
+          setStreamSrc(undefined);
+          console.error('[PlayerShell] Failed to prepare stream URL:', error);
+          const trackTitle = playback.currentTrack?.title || 'Unknown Track';
+          toast.error(`Failed to stream "${trackTitle}". Skipping...`);
+          usePlayerStore.getState().playNext(true, true);
+        }
       }
     };
 
@@ -168,7 +187,7 @@ export function PlayerShell() {
     return () => {
       cancelled = true;
     };
-  }, [playback.currentTrack?.url, user]);
+  }, [playback.currentTrack?.url, playback.currentTrack?.title, user]);
 
   const sharedProps = playback.currentTrack ? {
     currentTrack: playback.currentTrack,
@@ -199,6 +218,30 @@ export function PlayerShell() {
         onLoadedData={(e) => {
           e.currentTarget.volume = playback.volume;
         }}
+        onDurationChange={(e) => {
+          const audio = e.currentTarget;
+          const track = playback.currentTrack;
+          if (audio && audio.duration && track) {
+            const actualDurationMs = Math.floor(audio.duration * 1000);
+            if (
+              actualDurationMs > 0 &&
+              isFinite(actualDurationMs) &&
+              Math.abs(track.duration - actualDurationMs) > 1000
+            ) {
+              usePlayerStore.setState((state) => {
+                if (state.currentTrack && state.currentTrack.id === track.id) {
+                  return {
+                    currentTrack: {
+                      ...state.currentTrack,
+                      duration: actualDurationMs,
+                    }
+                  };
+                }
+                return {};
+              });
+            }
+          }
+        }}
         onEnded={playback.handleTrackEnd}
         onWaiting={() => playback.setIsBuffering(true)}
         onCanPlay={(e) => {
@@ -210,14 +253,23 @@ export function PlayerShell() {
         onLoadStart={() => playback.setIsBuffering(true)}
         onPlaying={() => playback.setIsBuffering(false)}
         onTimeUpdate={(e) => playback.setCurrentTime(e.currentTarget.currentTime)}
+        onSeeked={() => {
+          usePlayerStore.setState((state) => ({
+            seekTrigger: (state.seekTrigger || 0) + 1,
+          }));
+        }}
         autoPlay={playback.isPlaying}
         onError={(e) => {
           if (!playback.currentTrack?.url) return;
           const error = e.currentTarget.error;
           console.error('[PlayerShell] Audio error:', error);
+          const trackTitle = playback.currentTrack?.title || 'Unknown Track';
           if (error?.code === 4) {
-            toast.error('This track is currently unavailable or unsupported');
+            toast.error(`Track "${trackTitle}" is currently unavailable or unsupported. Skipping...`);
+          } else {
+            toast.error(`Playback issue with "${trackTitle}". Skipping...`);
           }
+          usePlayerStore.getState().playNext(true, true);
         }}
       />
 

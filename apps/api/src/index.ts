@@ -81,6 +81,7 @@ app.use(helmet({
   },
   crossOriginEmbedderPolicy: false,
   crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
 }));
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '2mb' }));
@@ -269,6 +270,11 @@ app.get('/api/search', requireFirebaseAuth, privateRateLimit, async (req, res) =
         const tracks = (fullData.tracks?.items || [])
           .map((item: any) => item.track)
           .filter(Boolean)
+          .filter((t: any) => {
+            const hasValidTitle = t.name && typeof t.name === 'string' && t.name.toLowerCase() !== 'unknown' && t.name.toLowerCase() !== 'unknown title';
+            const hasValidDuration = typeof t.duration_ms === 'number' && t.duration_ms > 0;
+            return t.id && hasValidTitle && hasValidDuration;
+          })
           .map((t: any) => ({
             encoded: '', // Will be resolved by client on-demand in useAudioPlayback
             info: {
@@ -305,6 +311,20 @@ app.get('/api/search', requireFirebaseAuth, privateRateLimit, async (req, res) =
         { query: trimmedQuery },
         { id: req.user?.uid || 'MelofyInternal' },
       );
+    }
+
+    // Filter out unavailable tracks from general search result if they exist
+    if (finalResult && Array.isArray(finalResult.tracks)) {
+      finalResult.tracks = finalResult.tracks.filter((track: any) => {
+        if (!track || !track.info) return false;
+        const title = track.info.title;
+        const length = track.info.length || track.info.duration || 0;
+        
+        const hasValidTitle = title && typeof title === 'string' && title.toLowerCase() !== 'unknown' && title.toLowerCase() !== 'unknown title';
+        const hasValidDuration = typeof length === 'number' && length > 0;
+        
+        return hasValidTitle && hasValidDuration;
+      });
     }
 
     // Cache the result for 24 hours

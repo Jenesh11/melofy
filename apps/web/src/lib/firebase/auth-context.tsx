@@ -92,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // ── Tauri Deep Link Listener ──────────────────────────────────────────
     let unlistenTauriDeepLink: (() => void) | undefined;
     if (typeof window !== 'undefined' && '__TAURI__' in window) {
-      // Helper to process a melofy:// auth deep link URL
+      // Helper to process a melofy:// deep link URL (auth or listening sessions)
       const handleDeepLinkUrl = async (url: string) => {
         if (url.startsWith('melofy://auth')) {
           const urlObj = new URL(url);
@@ -101,6 +101,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log('[Auth] Deep link received. Signing in with Custom Token...');
             const { signInWithCustomToken } = await import('firebase/auth');
             signInWithCustomToken(auth, customToken).catch(console.error);
+          }
+        } else if (url.startsWith('melofy://listen/')) {
+          const partyId = url.replace('melofy://listen/', '').split('?')[0];
+          if (partyId) {
+            console.log(`[DeepLink] Redirecting to listen session: ${partyId}`);
+            window.location.href = `/listen/${partyId.toUpperCase()}`;
           }
         }
       };
@@ -171,10 +177,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
           return; // Success — exit early
-        } catch (nativeError: any) {
+        } catch (nativeError: unknown) {
           console.error('[Auth] Native SocialLogin failed:', nativeError);
           // Instead, show an alert with the error so the developer/user knows why it failed.
-          const msg = nativeError?.message || String(nativeError);
+          const msg =
+            nativeError && typeof nativeError === 'object' && 'message' in nativeError
+              ? String((nativeError as { message: unknown }).message)
+              : String(nativeError);
           alert(`Google Sign-In failed: ${msg}\n\nMake sure your SHA-1 (Debug or Release) is added to Firebase Console!`);
           throw nativeError;
         }
@@ -198,7 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Determine the URL depending on dev/prod
         const isDev = window.location.hostname === 'localhost';
-        const baseUrl = isDev ? 'http://localhost:3000' : 'https://melofy.jene.in';
+        const baseUrl = isDev ? 'http://localhost:3001' : 'https://melofy.jene.in';
 
         await openBrowserUrl(`${baseUrl}/desktop-login`);
       } else {

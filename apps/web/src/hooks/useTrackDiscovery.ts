@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuth } from '@/lib/firebase/auth-context';
+import { toast } from 'sonner';
 
 export function useTrackDiscovery() {
   const { user } = useAuth();
@@ -37,21 +38,32 @@ export function useTrackDiscovery() {
 
       const resolutionPromise = (async () => {
         setIsBuffering(true);
+        let success = false;
         try {
           const searchQuery = `${currentTrack.title} ${currentTrack.artist}`;
           const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`, {
             headers: (await getAuthHeader()) || {},
           });
           const data = await res.json();
-          if (cancelled || !data?.tracks?.length) return;
-          const found = data.tracks[0];
-          if (!found?.encoded) return;
-          updateTrackUrl(currentTrack.id, found.encoded, found.info.identifier);
+          if (cancelled) return;
+          if (data?.tracks?.length > 0) {
+            const found = data.tracks[0];
+            if (found?.encoded) {
+              updateTrackUrl(currentTrack.id, found.encoded, found.info.identifier, found.info.length);
+              success = true;
+            }
+          }
         } catch (error) {
           console.error('[TrackResolution] Failed:', error);
         } finally {
           pendingTrackResolutionRef.current.delete(currentTrack.id);
-          if (!cancelled) setIsBuffering(false);
+          if (!cancelled) {
+            setIsBuffering(false);
+            if (!success) {
+              toast.error(`Track "${currentTrack.title}" is unavailable. Skipping...`);
+              usePlayerStore.getState().playNext(true, true);
+            }
+          }
         }
       })();
       pendingTrackResolutionRef.current.set(currentTrack.id, resolutionPromise);

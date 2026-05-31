@@ -21,7 +21,7 @@ We have a vibrant hub where Melofy developers and supporters hang out. You can a
 
 ### 3️⃣ GitHub Issues (Bugs & Feature Requests)
 If you've confirmed that you are encountering a bug or have a clear suggestion:
-* **Search Existing Issues**: Look through our [Issues Tracker](https://github.com/ShreyJaiswal1/melofy/issues) to see if someone else has run into the same scenario.
+* **Search Existing Issues**: Look through our [Issues Tracker](https://github.com/lazyshrey/melofy/issues) to see if someone else has run into the same scenario.
 * **Create a New Issue**: If it is a new bug, choose the appropriate issue template (Bug Report or Feature Request) and fill in the details.
 
 ---

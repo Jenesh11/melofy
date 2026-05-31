@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card } from '@/components/ui/card';
-import { ExternalLink, CheckCircle2, Monitor, Chrome } from 'lucide-react';
+import { ExternalLink, Monitor, Chrome } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
@@ -51,7 +51,7 @@ export function PreMidGuide() {
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: idx * 0.1 }}
-              className='flex items-start gap-4 p-4 rounded-2xl bg-foreground/[0.04] border border-foreground/[0.04] hover:bg-foreground/5 hover:border-foreground/10 transition-all duration-300'
+              className='flex items-start gap-4 p-4 rounded-2xl bg-foreground/4 border border-foreground/4 hover:bg-foreground/5 hover:border-foreground/10 transition-all duration-300'
             >
               <div className='h-9 w-9 rounded-xl bg-background/60 flex items-center justify-center border border-foreground/10 shrink-0 shadow-sm'>
                 <step.icon className='h-4.5 w-4.5 text-foreground/80' />
@@ -65,7 +65,7 @@ export function PreMidGuide() {
                       0{idx + 1}
                     </span>
                   </h3>
-                  <p className='text-[11px] text-muted-foreground leading-snug break-words'>
+                  <p className='text-[11px] text-muted-foreground leading-snug wrap-break-word'>
                     {step.description}
                   </p>
                 </div>

@@ -1,6 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 import { SkipBack, SkipForward, Play, Pause, Loader2, Heart, X, Shuffle, Repeat, Music2, Volume2, VolumeX } from 'lucide-react';
 import { Track } from '@/store/usePlayerStore';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 
 interface PipPlayerProps {
   currentTrack: Track | null;
@@ -24,7 +25,7 @@ interface PipPlayerProps {
   onClose: () => void;
 }
 
-export function PipPlayer({
+export const PipPlayer = memo(function PipPlayer({
   currentTrack,
   isPlaying,
   isBuffering,
@@ -46,7 +47,8 @@ export function PipPlayer({
   onClose,
 }: PipPlayerProps) {
   const bgRef = useRef<HTMLDivElement>(null);
-  const [isDraggingVolume, setIsDraggingVolume] = useState(false);
+  const [dragVolume, setDragVolume] = useState<number | null>(null);
+  const [dragProgress, setDragProgress] = useState<number | null>(null);
 
   // Update background image when track changes (inline style to avoid reflow)
   useEffect(() => {
@@ -162,7 +164,6 @@ export function PipPlayer({
           }}>
             {currentTrack && currentTrack.artworkUrl ? (
               <img
-                // eslint-disable-next-line @next/next/no-img-element
                 src={currentTrack.artworkUrl}
                 alt={currentTrack.title}
                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
@@ -247,7 +248,7 @@ export function PipPlayer({
               {/* Play / Pause */}
               <button
                 onClick={handleTogglePlay}
-                disabled={!hasTrack || isBuffering}
+                disabled={!hasTrack}
                 style={{
                   width: 32,
                   height: 32,
@@ -255,17 +256,17 @@ export function PipPlayer({
                   background: '#fff',
                   color: '#000',
                   border: 'none',
-                  cursor: (!hasTrack || isBuffering) ? 'default' : 'pointer',
+                  cursor: !hasTrack ? 'default' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   boxShadow: '0 3px 8px rgba(0,0,0,0.3)',
                   flexShrink: 0,
-                  opacity: (!hasTrack || isBuffering) ? 0.6 : 1,
+                  opacity: !hasTrack ? 0.6 : 1,
                   transition: 'transform 0.1s, opacity 0.15s',
                   padding: 0,
                 }}
-                onMouseEnter={(e) => { if (hasTrack && !isBuffering) e.currentTarget.style.transform = 'scale(1.08)'; }}
+                onMouseEnter={(e) => { if (hasTrack) e.currentTarget.style.transform = 'scale(1.08)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
               >
                 {isBuffering ? (
@@ -334,23 +335,38 @@ export function PipPlayer({
 
                 <div
                   style={{ flex: 1, height: 20, display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative' }}
-                  onClick={(e) => {
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
                     const rect = e.currentTarget.getBoundingClientRect();
                     const x = e.clientX - rect.left;
-                    setVolume(Math.max(0, Math.min(1, x / rect.width)));
+                    const v = Math.max(0, Math.min(1, x / rect.width));
+                    setDragVolume(v);
                   }}
-                  onMouseDown={() => setIsDraggingVolume(true)}
                   onMouseMove={(e) => {
-                    if (!isDraggingVolume) return;
+                    if (dragVolume === null) return;
+                    e.stopPropagation();
                     const rect = e.currentTarget.getBoundingClientRect();
                     const x = e.clientX - rect.left;
-                    setVolume(Math.max(0, Math.min(1, x / rect.width)));
+                    const v = Math.max(0, Math.min(1, x / rect.width));
+                    setDragVolume(v);
                   }}
-                  onMouseUp={() => setIsDraggingVolume(false)}
-                  onMouseLeave={() => setIsDraggingVolume(false)}
+                  onMouseUp={(e) => {
+                    if (dragVolume !== null) {
+                      e.stopPropagation();
+                      setVolume(dragVolume);
+                      setDragVolume(null);
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (dragVolume !== null) {
+                      e.stopPropagation();
+                      setVolume(dragVolume);
+                      setDragVolume(null);
+                    }
+                  }}
                 >
                   <div style={{ height: 2, width: '100%', background: 'rgba(255,255,255,0.15)', borderRadius: 1, overflow: 'hidden', position: 'relative' }}>
-                    <div style={{ height: '100%', width: `${volume * 100}%`, background: 'rgba(255,255,255,0.8)', borderRadius: 1, transition: isDraggingVolume ? 'none' : 'width 0.05s linear' }} />
+                    <div style={{ height: '100%', width: `${(dragVolume !== null ? dragVolume : volume) * 100}%`, background: 'rgba(255,255,255,0.8)', borderRadius: 1, transition: dragVolume !== null ? 'none' : 'width 0.05s linear' }} />
                   </div>
                 </div>
               </div>
@@ -359,23 +375,46 @@ export function PipPlayer({
         </div>
 
         {/* ── Progress bar ── */}
-        <div style={{ width: '100%', opacity: hasTrack ? 1 : 0.3, marginTop: 4 }}>
+        <div style={{ width: '100%', opacity: hasTrack ? 1 : 0.3, marginTop: 4, position: 'relative', zIndex: 5 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 1, padding: '0 2px' }}>
-            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', letterSpacing: '0.05em', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.05em', fontVariantNumeric: 'tabular-nums' }}>
               {hasTrack ? currentDisplayTime : '0:00'}
             </span>
-            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', letterSpacing: '0.05em', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.05em', fontVariantNumeric: 'tabular-nums' }}>
               {hasTrack ? durationTime : '0:00'}
             </span>
           </div>
           
           <div 
-            onClick={(e) => {
+            onMouseDown={(e) => {
               if (!hasTrack) return;
+              e.stopPropagation();
               const rect = e.currentTarget.getBoundingClientRect();
               const x = e.clientX - rect.left;
-              const clickedPercent = (x / rect.width) * 100;
-              handleSeek([clickedPercent]);
+              const percent = Math.max(0, Math.min(100, (x / rect.width) * 100));
+              setDragProgress(percent);
+            }}
+            onMouseMove={(e) => {
+              if (!hasTrack || dragProgress === null) return;
+              e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const percent = Math.max(0, Math.min(100, (x / rect.width) * 100));
+              setDragProgress(percent);
+            }}
+            onMouseUp={(e) => {
+              if (dragProgress !== null) {
+                e.stopPropagation();
+                handleSeek([dragProgress]);
+                setDragProgress(null);
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (dragProgress !== null) {
+                e.stopPropagation();
+                handleSeek([dragProgress]);
+                setDragProgress(null);
+              }
             }}
             style={{
               height: 12,
@@ -392,13 +431,15 @@ export function PipPlayer({
               borderRadius: 1,
               overflow: 'hidden',
               position: 'relative',
+              pointerEvents: 'none',
             }}>
               <div style={{
                 height: '100%',
-                width: `${Math.max(0, Math.min(100, hasTrack ? progressPercent : 0))}%`,
+                width: `${Math.max(0, Math.min(100, dragProgress !== null ? dragProgress : (hasTrack ? progressPercent : 0)))}%`,
                 background: '#fff',
                 borderRadius: 1,
-                transition: 'width 0.1s linear',
+                transition: dragProgress !== null ? 'none' : 'width 0.1s linear',
+                pointerEvents: 'none',
               }} />
             </div>
           </div>
@@ -509,7 +550,6 @@ export function PipPlayer({
         }}>
           {currentTrack && currentTrack.artworkUrl ? (
             <img
-              // eslint-disable-next-line @next/next/no-img-element
               src={currentTrack.artworkUrl}
               alt={currentTrack.title}
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
@@ -580,7 +620,7 @@ export function PipPlayer({
           {/* Play / Pause */}
           <button
             onClick={handleTogglePlay}
-            disabled={!hasTrack || isBuffering}
+            disabled={!hasTrack}
             style={{
               width: 36,
               height: 36,
@@ -588,17 +628,17 @@ export function PipPlayer({
               background: '#fff',
               color: '#000',
               border: 'none',
-              cursor: (!hasTrack || isBuffering) ? 'default' : 'pointer',
+              cursor: !hasTrack ? 'default' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
               flexShrink: 0,
-              opacity: (!hasTrack || isBuffering) ? 0.6 : 1,
+              opacity: !hasTrack ? 0.6 : 1,
               transition: 'transform 0.1s, opacity 0.15s',
               padding: 0,
             }}
-            onMouseEnter={(e) => { if (hasTrack && !isBuffering) e.currentTarget.style.transform = 'scale(1.08)'; }}
+            onMouseEnter={(e) => { if (hasTrack) e.currentTarget.style.transform = 'scale(1.08)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
             onMouseDown={(e) => { if (hasTrack) e.currentTarget.style.transform = 'scale(0.94)'; }}
             onMouseUp={(e) => { if (hasTrack) e.currentTarget.style.transform = 'scale(1.08)'; }}
@@ -666,30 +706,45 @@ export function PipPlayer({
 
             <div
               style={{ flex: 1, height: 24, display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative' }}
-              onClick={(e) => {
+              onMouseDown={(e) => {
+                e.stopPropagation();
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = e.clientX - rect.left;
-                setVolume(Math.max(0, Math.min(1, x / rect.width)));
+                const v = Math.max(0, Math.min(1, x / rect.width));
+                setDragVolume(v);
               }}
-              onMouseDown={() => setIsDraggingVolume(true)}
               onMouseMove={(e) => {
-                if (!isDraggingVolume) return;
+                if (dragVolume === null) return;
+                e.stopPropagation();
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = e.clientX - rect.left;
-                setVolume(Math.max(0, Math.min(1, x / rect.width)));
+                const v = Math.max(0, Math.min(1, x / rect.width));
+                setDragVolume(v);
               }}
-              onMouseUp={() => setIsDraggingVolume(false)}
-              onMouseLeave={() => setIsDraggingVolume(false)}
+              onMouseUp={(e) => {
+                if (dragVolume !== null) {
+                  e.stopPropagation();
+                  setVolume(dragVolume);
+                  setDragVolume(null);
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (dragVolume !== null) {
+                  e.stopPropagation();
+                  setVolume(dragVolume);
+                  setDragVolume(null);
+                }
+              }}
             >
               <div style={{ height: 3, width: '100%', background: 'rgba(255,255,255,0.15)', borderRadius: 2, overflow: 'hidden', position: 'relative' }}>
-                <div style={{ height: '100%', width: `${volume * 100}%`, background: 'rgba(255,255,255,0.8)', borderRadius: 2, transition: isDraggingVolume ? 'none' : 'width 0.05s linear' }} />
+                <div style={{ height: '100%', width: `${(dragVolume !== null ? dragVolume : volume) * 100}%`, background: 'rgba(255,255,255,0.8)', borderRadius: 2, transition: dragVolume !== null ? 'none' : 'width 0.05s linear' }} />
               </div>
             </div>
           </div>
         </div>
 
         {/* ── Progress bar ── */}
-        <div style={{ width: '100%', maxWidth: '380px', opacity: hasTrack ? 1 : 0.3 }}>
+        <div style={{ width: '100%', maxWidth: '380px', opacity: hasTrack ? 1 : 0.3, position: 'relative', zIndex: 5 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
             <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.38)', letterSpacing: '0.05em', fontVariantNumeric: 'tabular-nums' }}>
               {hasTrack ? currentDisplayTime : '0:00'}
@@ -701,12 +756,35 @@ export function PipPlayer({
           
           {/* Hit area for progress bar */}
           <div 
-            onClick={(e) => {
+            onMouseDown={(e) => {
               if (!hasTrack) return;
+              e.stopPropagation();
               const rect = e.currentTarget.getBoundingClientRect();
               const x = e.clientX - rect.left;
-              const clickedPercent = (x / rect.width) * 100;
-              handleSeek([clickedPercent]);
+              const percent = Math.max(0, Math.min(100, (x / rect.width) * 100));
+              setDragProgress(percent);
+            }}
+            onMouseMove={(e) => {
+              if (!hasTrack || dragProgress === null) return;
+              e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const percent = Math.max(0, Math.min(100, (x / rect.width) * 100));
+              setDragProgress(percent);
+            }}
+            onMouseUp={(e) => {
+              if (dragProgress !== null) {
+                e.stopPropagation();
+                handleSeek([dragProgress]);
+                setDragProgress(null);
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (dragProgress !== null) {
+                e.stopPropagation();
+                handleSeek([dragProgress]);
+                setDragProgress(null);
+              }
             }}
             className="group"
             style={{
@@ -725,14 +803,16 @@ export function PipPlayer({
               borderRadius: 2,
               overflow: 'hidden',
               position: 'relative',
+              pointerEvents: 'none',
             }}>
               {/* Fill */}
               <div style={{
                 height: '100%',
-                width: `${Math.max(0, Math.min(100, hasTrack ? progressPercent : 0))}%`,
+                width: `${Math.max(0, Math.min(100, dragProgress !== null ? dragProgress : (hasTrack ? progressPercent : 0)))}%`,
                 background: '#fff',
                 borderRadius: 2,
-                transition: 'width 0.1s linear',
+                transition: dragProgress !== null ? 'none' : 'width 0.1s linear',
+                pointerEvents: 'none',
               }} />
             </div>
           </div>
@@ -743,7 +823,7 @@ export function PipPlayer({
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
-}
+});
 
 // Shared icon button style helper
 function iconBtn(color: string): React.CSSProperties {

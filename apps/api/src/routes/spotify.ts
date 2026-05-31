@@ -28,8 +28,8 @@ router.get('/trending', async (req, res) => {
     // This is a publicly accessible playlist, not a Spotify editorial featured list
     // The Top 50 - Global is accessible via playlist tracks endpoint
     const playlistId = '37i9dQZEVXbMDoHDwVN2tF';
-    // 2026 Update: Even if playlists allow more, we cap to 10 for consistency and performance
-    const data = await spotifyGet(`/playlists/${playlistId}/tracks?limit=10`);
+    // Fetch full 50 tracks from Top 50 Global playlist
+    const data = await spotifyGet(`/playlists/${playlistId}/tracks?limit=50`);
     res.json(data.items.filter((item: any) => item.track));
   } catch (error: any) {
     // Fallback: use search API for popular tracks
@@ -38,7 +38,7 @@ router.get('/trending', async (req, res) => {
         '[Spotify] Playlist fallback — using search API for trending',
       );
       const data = await spotifyGet(
-        `/search?q=year:2024-2025&type=track&limit=10&market=US`,
+        `/search?q=year:2024-2025&type=track&limit=50&market=US`,
       );
       // Transform to match the {track} shape expected by frontend
       res.json(data.tracks.items.map((track: any) => ({ track })));
@@ -361,13 +361,20 @@ router.get('/playlists/:id', async (req, res) => {
     const data = await fetchFullSpotifyPlaylist(id);
     const allItems = data.tracks?.items || [];
 
+    const filteredTracks = (allItems.map((item: any) => item.track).filter(Boolean) || [])
+      .filter((t: any) => {
+        const hasValidTitle = t.name && typeof t.name === 'string' && t.name.toLowerCase() !== 'unknown' && t.name.toLowerCase() !== 'unknown title';
+        const hasValidDuration = typeof t.duration_ms === 'number' && t.duration_ms > 0;
+        return t.id && hasValidTitle && hasValidDuration;
+      });
+
     const formattedData = {
       id: data.id,
       name: data.name,
       description: data.description,
       artworkUrl: data.images?.[0]?.url || '',
-      trackCount: data.tracks?.total || 0,
-      tracks: allItems.map((item: any) => item.track).filter(Boolean) || [],
+      trackCount: filteredTracks.length,
+      tracks: filteredTracks,
     };
 
     // 3. Save to Redis Cache (Expire after 1 hour = 3600 seconds)

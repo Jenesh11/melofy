@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -7,6 +8,25 @@ import { DonateButton } from '@/components/common/DonateButton';
 
 export function LandingFooter() {
   const [status, setStatus] = useState<'loading' | 'ok' | 'degraded' | 'error'>('loading');
+  const [winDownloadUrl, setWinDownloadUrl] = useState('https://github.com/lazyshrey/melofy/releases/latest/download/Melofy_x64-setup.exe');
+
+  useEffect(() => {
+    const fetchLatestRelease = async () => {
+      try {
+        const res = await fetch('https://api.github.com/repos/lazyshrey/melofy/releases/latest');
+        if (res.ok) {
+          const data = await res.json() as { assets?: { name: string; browser_download_url: string }[] };
+          const exeAsset = data.assets?.find((a) => a.name.endsWith('.exe'));
+          if (exeAsset) {
+            setWinDownloadUrl(exeAsset.browser_download_url);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch latest release:', err);
+      }
+    };
+    void fetchLatestRelease();
+  }, []);
 
   useEffect(() => {
     const checkHealth = async () => {
@@ -15,7 +35,7 @@ export function LandingFooter() {
         if (!res.ok) throw new Error('Health check failed');
         const data = await res.json();
         setStatus(data.status === 'ok' ? 'ok' : 'degraded');
-      } catch (err) {
+      } catch {
         setStatus('error');
       }
     };
@@ -108,15 +128,26 @@ export function LandingFooter() {
           </h4>
           <div className='flex flex-col gap-3 text-sm text-muted-foreground/60'>
             <a
-              href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy_x64.msi'
+              href={winDownloadUrl}
               target='_blank'
               rel='noopener noreferrer'
-              className='hover:text-primary transition-colors'
+              className='hover:text-primary transition-colors font-semibold flex items-center gap-1.5'
             >
-              Windows App (.msi)
+              <span>Windows App (.exe)</span>
+              <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                Recommended
+              </span>
             </a>
             <a
-              href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy.apk'
+              href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy_x64.msi'
+              target='_blank'
+              rel='noopener noreferrer'
+              className='hover:text-primary transition-colors text-xs opacity-75'
+            >
+              Windows Installer (.msi)
+            </a>
+            <a
+              href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy.apk'
               target='_blank'
               rel='noopener noreferrer'
               className='hover:text-primary transition-colors'
@@ -187,7 +218,7 @@ export function LandingFooter() {
             rel="noopener noreferrer"
             className="flex items-center gap-1.5"
           >
-            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-foreground/[0.03] border border-border/50 ${color} transition-colors duration-500 hover:bg-foreground/[0.06] cursor-pointer`}>
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-foreground/3 border border-border/50 ${color} transition-colors duration-500 hover:bg-foreground/6 cursor-pointer`}>
               <Globe className='w-3 h-3 text-current' />
               <span className='text-[10px] font-bold uppercase tracking-wider'>
                 {text}

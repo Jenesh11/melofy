@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @next/next/no-img-element */
 
 import { useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
@@ -102,7 +103,7 @@ export function PlaylistGrid({
 
       const nextContextTracks = [...albumContextTracks];
       if (index >= 0 && index < nextContextTracks.length) {
-        nextContextTracks[index] = resolved;
+        nextContextTracks.splice(index, 1, resolved);
       }
 
       playInContext(resolved, nextContextTracks);

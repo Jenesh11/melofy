@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { useLikedSongs } from '@/hooks/useLikedSongs';
 import { Track as PlayerTrack } from '@/store/usePlayerStore';
-import { toast } from 'sonner';
 
 export function TrackOptionsMenu({
   track,
@@ -33,7 +32,7 @@ export function TrackOptionsMenu({
           <MoreHorizontal className='h-4 w-4' />
         </Button>
       } />
-      <PopoverContent side="bottom" align="end" className="w-56 p-1.5 flex flex-col gap-1 bg-card/95 backdrop-blur-xl border-border rounded-2xl shadow-2xl z-[150]">
+      <PopoverContent side="bottom" align="end" className="w-56 p-1.5 flex flex-col gap-1 bg-card/95 backdrop-blur-xl border-border rounded-2xl shadow-2xl z-150">
         <button
           className='w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted rounded-xl transition-colors'
           onClick={(e) => {
