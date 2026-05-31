@@ -89,6 +89,62 @@ export default function GithubPage() {
           View on GitHub — lazyshrey/melofy
         </a>
 
+        {/* Visual Showcase Section */}
+        <div className='w-full mb-16 p-8 rounded-3xl border border-border/50 bg-card/20 backdrop-blur-sm text-left relative overflow-hidden'>
+          <div className='absolute -right-20 -bottom-20 w-48 h-48 bg-primary/10 blur-[80px] rounded-full pointer-events-none' />
+          <div className='flex flex-col gap-6 relative z-10'>
+            <div className='space-y-2'>
+              <p className='text-xs font-bold uppercase tracking-widest text-primary'>Visual Showcase</p>
+              <h3 className='text-2xl font-bold text-foreground tracking-tight'>
+                Interactive Screenshots & Demos
+              </h3>
+              <p className='text-muted-foreground text-sm font-light leading-relaxed max-w-2xl'>
+                Melofy features a pixel-perfect, premium glassmorphic user interface. Access the official showcase or click a direct link below to view individual feature screenshots in full resolution on our repository.
+              </p>
+            </div>
+
+            {/* Quick Links Grid */}
+            <div className='grid grid-cols-2 sm:grid-cols-4 gap-3 my-2'>
+              {[
+                { label: '🏠 Desktop Dashboard', url: `${GITHUB_URL}/blob/main/.github/screenshots/home.png` },
+                { label: '💿 Now Playing View', url: `${GITHUB_URL}/blob/main/.github/screenshots/nowplaying.png` },
+                { label: '🎬 Immersive Fullscreen', url: `${GITHUB_URL}/blob/main/.github/screenshots/fullscreen.png` },
+                { label: '🎤 Synchronized Lyrics', url: `${GITHUB_URL}/blob/main/.github/screenshots/lyrics_overlay.png` },
+                { label: '📱 Mobile Interface', url: `${GITHUB_URL}/blob/main/.github/screenshots/phone_home.png` },
+                { label: '👾 Discord Rich Presence', url: `${GITHUB_URL}/blob/main/.github/screenshots/discord_presence.png` },
+                { label: '⚡ Instant Search Popover', url: `${GITHUB_URL}/blob/main/.github/screenshots/popover_search.png` },
+                { label: '⚙️ Settings & Customization', url: `${GITHUB_URL}/blob/main/.github/screenshots/setting.png` },
+              ].map((link) => (
+                <a
+                  key={link.label}
+                  href={link.url}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='px-4 py-3.5 rounded-xl bg-muted/20 border border-border/40 hover:bg-muted/40 hover:border-border/80 text-xs font-semibold text-muted-foreground hover:text-foreground transition-all flex items-center justify-between group shadow-sm'
+                >
+                  <span>{link.label}</span>
+                  <span className='opacity-0 group-hover:opacity-100 transition-opacity text-primary ml-1'>↗</span>
+                </a>
+              ))}
+            </div>
+
+            <div className='flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border/20 pt-6 mt-2'>
+              <p className='text-xs text-muted-foreground/80 font-light'>
+                Want the full gallery? Experience the full feature walkthrough with interactive GIFs on GitHub.
+              </p>
+              <a
+                href={`${GITHUB_URL}/blob/main/SCREENSHOTS.md`}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='flex items-center gap-2 px-5 py-2 rounded-full bg-primary text-primary-foreground font-semibold text-xs hover:scale-105 transition-transform shadow-md w-full sm:w-auto justify-center'
+              >
+                <span>View Full Showcase (SCREENSHOTS.md)</span>
+                <span>→</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
         {/* Contribution cards */}
         <div className='w-full mb-16'>
           <h2 className='text-xs font-bold uppercase tracking-widest text-muted-foreground mb-8'>How to Contribute</h2>

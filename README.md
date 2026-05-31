@@ -20,6 +20,9 @@
   </div>
 
   <br />
+  <div align="center">
+    <h3>🖼️ <a href="SCREENSHOTS.md">Explore the Visual Showcase (Screenshots & Interactive GIFs)</a> 🖼️</h3>
+  </div>
   <br />
 </div>
 
