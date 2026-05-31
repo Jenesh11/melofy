@@ -109,7 +109,7 @@ export function LandingFooter() {
           </h4>
           <div className='flex flex-col gap-3 text-sm text-muted-foreground/60'>
             <a
-              href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy_x64.msi'
+              href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy_x64.msi'
               target='_blank'
               rel='noopener noreferrer'
               className='hover:text-primary transition-colors'
@@ -117,7 +117,7 @@ export function LandingFooter() {
               Windows App (.msi)
             </a>
             <a
-              href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy.apk'
+              href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy.apk'
               target='_blank'
               rel='noopener noreferrer'
               className='hover:text-primary transition-colors'

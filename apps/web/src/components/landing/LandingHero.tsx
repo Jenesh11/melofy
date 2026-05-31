@@ -419,7 +419,7 @@ export function LandingHero() {
                 </span>
                 
                 <a
-                  href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy_x64.msi'
+                  href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy_x64.msi'
                   target='_blank'
                   rel='noopener noreferrer'
                   className='group'
@@ -436,7 +436,7 @@ export function LandingHero() {
                 </a>
                 
                 <a
-                  href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy.apk'
+                  href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy.apk'
                   target='_blank'
                   rel='noopener noreferrer'
                   className='group'

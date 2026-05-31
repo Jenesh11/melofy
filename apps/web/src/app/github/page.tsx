@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   description: 'Melofy is open source. Explore the code, contribute, and help shape the future of music streaming.',
 };
 
-const GITHUB_URL = 'https://github.com/ShreyJaiswal1/melofy';
+const GITHUB_URL = 'https://github.com/lazyshrey/melofy';
 
 const contributions = [
   {
@@ -86,7 +86,7 @@ export default function GithubPage() {
           className='mb-16 flex items-center gap-3 px-8 py-4 rounded-full bg-foreground text-background font-bold text-base hover:scale-105 transition-transform shadow-xl'
         >
           <Github className='w-5 h-5' />
-          View on GitHub — ShreyJaiswal1/melofy
+          View on GitHub — lazyshrey/melofy
         </a>
 
         {/* Contribution cards */}

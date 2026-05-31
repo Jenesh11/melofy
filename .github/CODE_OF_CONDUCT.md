@@ -29,7 +29,7 @@ Examples of unacceptable behavior include:
 ## Scope
 
 This Code of Conduct applies within all official Melofy spaces, including:
-* The GitHub repository (`ShreyJaiswal1/melofy`)
+* The GitHub repository (`lazyshrey/melofy`)
 * Pull request reviews, issue discussions, and project boards
 * The **Lazy Devs Discord Server** (`https://discord.gg/ZVCB8EnRX2`)
 * Any official Melofy social media accounts or online events

@@ -139,7 +139,7 @@ export default function HelpPage() {
               Join Discord Server
             </a>
             <a
-              href='https://github.com/ShreyJaiswal1/melofy'
+              href='https://github.com/lazyshrey/melofy'
               target='_blank'
               rel='noopener noreferrer'
               className='inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground font-bold text-sm hover:scale-105 transition-transform shadow-lg shadow-primary/20 w-full sm:w-auto justify-center'

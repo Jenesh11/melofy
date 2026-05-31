@@ -33,8 +33,8 @@ We particularly care about vulnerabilities involving:
 If you believe you have found a security vulnerability in the Melofy codebase, please **do not report it publicly via open GitHub issues or standard Discord channels**.
 
 ### Safe Reporting Channels:
-1. **GitHub Security Advisories (Preferred)**: Navigate to the [Melofy Security Tab](https://github.com/ShreyJaiswal1/melofy/security/advisories) on GitHub and select **"Report a vulnerability"** to draft a private advisory.
-2. **Direct Contact**: Direct message the project creator, **Shrey Jaiswal**, via the [Lazy Devs Discord Server](https://discord.gg/ZVCB8EnRX2) (username: `ShreyJaiswal1`).
+1. **GitHub Security Advisories (Preferred)**: Navigate to the [Melofy Security Tab](https://github.com/lazyshrey/melofy/security/advisories) on GitHub and select **"Report a vulnerability"** to draft a private advisory.
+2. **Direct Contact**: Direct message the project creator, **Shrey Jaiswal**, via the [Lazy Devs Discord Server](https://discord.gg/ZVCB8EnRX2) (username: `lazyshrey`).
 
 ### What to Include:
 To help us triage and patch the issue as fast as possible, please provide:

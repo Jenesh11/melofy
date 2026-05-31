@@ -96,7 +96,7 @@ export default function SettingsPage() {
       }
       setLocalVersion(currentVersion);
 
-      const res = await fetch('https://api.github.com/repos/ShreyJaiswal1/melofy/releases/latest');
+      const res = await fetch('https://api.github.com/repos/lazyshrey/melofy/releases/latest');
       if (!res.ok) throw new Error('GitHub Releases API error');
       
       const release = await res.json();
@@ -464,7 +464,7 @@ export default function SettingsPage() {
                   <p className='text-sm text-muted-foreground'>
                     Enjoy a seamless frameless player with custom keybindings and desktop sync.
                   </p>
-                  <a href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy_x64.msi' target='_blank' rel='noopener noreferrer'>
+                  <a href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy_x64.msi' target='_blank' rel='noopener noreferrer'>
                     <Button className='w-full rounded-full font-bold shadow-xl shadow-primary/20'>
                       Download for Windows
                     </Button>
@@ -482,7 +482,7 @@ export default function SettingsPage() {
                   <p className='text-sm text-muted-foreground'>
                     Take Melofy on the go with our dedicated Android app.
                   </p>
-                  <a href='https://github.com/ShreyJaiswal1/melofy/releases/latest/download/Melofy.apk' target='_blank' rel='noopener noreferrer'>
+                  <a href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy.apk' target='_blank' rel='noopener noreferrer'>
                     <Button className='w-full rounded-full font-bold shadow-xl shadow-primary/20'>
                       Download for Android
                     </Button>
