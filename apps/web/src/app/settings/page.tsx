@@ -122,7 +122,8 @@ export default function SettingsPage() {
     let downloadUrl = latestRelease.html_url; // fallback to GitHub Release web page
     
     if (isTauri) {
-      const winAsset = latestRelease.assets?.find((a) => a.name.endsWith('.msi'));
+      const exeAsset = latestRelease.assets?.find((a) => a.name.endsWith('.exe'));
+      const winAsset = exeAsset || latestRelease.assets?.find((a) => a.name.endsWith('.msi'));
       if (winAsset) {
         downloadUrl = winAsset.browser_download_url;
       }
@@ -197,6 +198,9 @@ export default function SettingsPage() {
     { id: 'lavender', name: 'Lavender', color: '#a78bfa' },
     { id: 'rose', name: 'Rose', color: '#f43f5e' },
   ];
+
+  const exeAsset = latestRelease?.assets?.find((a) => a.name.endsWith('.exe'));
+  const exeUrl = exeAsset?.browser_download_url || 'https://github.com/lazyshrey/melofy/releases/latest/download/Melofy_x64-setup.exe';
 
   if (!user) return null;
 
@@ -456,19 +460,30 @@ export default function SettingsPage() {
 
               {/* Desktop App */}
               {!isTauri && (
-                <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] flex flex-col gap-4'>
+                <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] flex flex-col gap-4 relative overflow-hidden group'>
+                  <div className='absolute -bottom-12 -right-12 h-32 w-32 bg-primary/5 blur-[50px] rounded-full' />
                   <div className='flex items-center gap-2 mb-2'>
                     <Laptop className='h-5 w-5 text-primary' />
                     <h3 className='font-bold text-foreground text-lg'>Desktop App</h3>
                   </div>
-                  <p className='text-sm text-muted-foreground'>
+                  <p className='text-sm text-muted-foreground leading-relaxed'>
                     Enjoy a seamless frameless player with custom keybindings and desktop sync.
                   </p>
-                  <a href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy_x64.msi' target='_blank' rel='noopener noreferrer'>
-                    <Button className='w-full rounded-full font-bold shadow-xl shadow-primary/20'>
-                      Download for Windows
-                    </Button>
-                  </a>
+                  <div className='flex flex-col gap-2.5 mt-2 relative z-10'>
+                    <a href={exeUrl} target='_blank' rel='noopener noreferrer'>
+                      <Button className='w-full rounded-full font-bold shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-transform'>
+                        Download for Windows (.exe)
+                      </Button>
+                    </a>
+                    <a 
+                      href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy_x64.msi' 
+                      target='_blank' 
+                      rel='noopener noreferrer'
+                      className='text-center text-xs text-muted-foreground hover:text-primary transition-colors font-medium'
+                    >
+                      Need MSI? Download Windows Installer (.msi)
+                    </a>
+                  </div>
                 </Card>
               )}
 

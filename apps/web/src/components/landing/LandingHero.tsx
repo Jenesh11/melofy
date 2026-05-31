@@ -352,6 +352,7 @@ export function LandingHero() {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isNative, setIsNative] = useState(false);
   const [isTauri, setIsTauri] = useState(false);
+  const [winDownloadUrl, setWinDownloadUrl] = useState('https://github.com/lazyshrey/melofy/releases/latest/download/Melofy_x64-setup.exe');
 
   useEffect(() => {
     const isCapacitorNative = typeof window !== 'undefined' && (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
@@ -362,6 +363,22 @@ export function LandingHero() {
     if (isTauriEnv) {
       setTimeout(() => setIsTauri(true), 0);
     }
+
+    const fetchLatestRelease = async () => {
+      try {
+        const res = await fetch('https://api.github.com/repos/lazyshrey/melofy/releases/latest');
+        if (res.ok) {
+          const data = await res.json() as { assets?: { name: string; browser_download_url: string }[] };
+          const exeAsset = data.assets?.find((a) => a.name.endsWith('.exe'));
+          if (exeAsset) {
+            setWinDownloadUrl(exeAsset.browser_download_url);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch latest release from GitHub:', err);
+      }
+    };
+    void fetchLatestRelease();
   }, []);
   return (
     <section className='relative min-h-screen flex items-center justify-center py-40 px-6 overflow-hidden'>
@@ -419,11 +436,11 @@ export function LandingHero() {
                 </span>
                 
                 <a
-                  href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy_x64.msi'
+                  href={winDownloadUrl}
                   target='_blank'
                   rel='noopener noreferrer'
                   className='group'
-                  title='Download for Windows'
+                  title='Download for Windows (.exe)'
                 >
                   <Button
                     variant='outline'
