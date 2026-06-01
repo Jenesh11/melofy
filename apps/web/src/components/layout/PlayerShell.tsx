@@ -34,7 +34,7 @@ export function PlayerShell() {
 
   const { isOpen: isLyricsOpen, toggle: toggleLyricsPanel } = useLyricsPanelStore();
 
-  const playback = useAudioPlayback();
+  const playback = useAudioPlayback(streamSrc);
   const { user } = useAuth();
   const { isLiked, toggleLike } = useLikedSongs();
 
@@ -259,7 +259,7 @@ export function PlayerShell() {
             seekTrigger: (state.seekTrigger || 0) + 1,
           }));
         }}
-        autoPlay={playback.isPlaying}
+        autoPlay={!Capacitor.isNativePlatform() && playback.isPlaying}
         onError={(e) => {
           if (!playback.currentTrack?.url) return;
           const error = e.currentTarget.error;

@@ -15,6 +15,9 @@ interface MediaSessionProps {
   setLocalTime: (time: number) => void;
 }
 
+import { NativePlayer } from '@/lib/capacitor/NativePlayer';
+import { usePlayerStore } from '@/store/usePlayerStore';
+
 export function useMediaSession({
   audioRef,
   currentTrack,
@@ -105,22 +108,37 @@ export function useMediaSession({
         handleSkipNext();
       }],
       ['seekbackward', (details) => {
-        if (audioRef.current) {
-          const skipTime = details.seekOffset || 10;
+        const skipTime = details.seekOffset || 10;
+        if (isNative) {
+          // Note: To be totally robust we'd need to fetch current time, but we can assume a store read
+          // Actually, we can use the JS track store progress / 1000.
+          const { progress } = usePlayerStore.getState();
+          const newTime = Math.max((progress / 1000) - skipTime, 0);
+          NativePlayer.seekTo({ time: newTime }).catch(console.error);
+        } else if (audioRef.current) {
           const newTime = Math.max(audioRef.current.currentTime - skipTime, 0);
           audioRef.current.currentTime = newTime;
         }
       }],
       ['seekforward', (details) => {
-        if (audioRef.current) {
-          const skipTime = details.seekOffset || 10;
-          const newTime = Math.min(audioRef.current.currentTime + skipTime, audioRef.current.duration);
+        const skipTime = details.seekOffset || 10;
+        const duration = currentTrack?.duration ? currentTrack.duration / 1000 : 0;
+        if (isNative) {
+          const { progress } = usePlayerStore.getState();
+          const newTime = Math.min((progress / 1000) + skipTime, duration);
+          NativePlayer.seekTo({ time: newTime }).catch(console.error);
+        } else if (audioRef.current) {
+          const newTime = Math.min(audioRef.current.currentTime + skipTime, audioRef.current.duration || duration);
           audioRef.current.currentTime = newTime;
         }
       }],
       ['seekto', (details) => {
-        if (audioRef.current && details.seekTime != null) {
-          audioRef.current.currentTime = details.seekTime;
+        if (details.seekTime != null) {
+          if (isNative) {
+            NativePlayer.seekTo({ time: details.seekTime }).catch(console.error);
+          } else if (audioRef.current) {
+            audioRef.current.currentTime = details.seekTime;
+          }
         }
       }],
     ];

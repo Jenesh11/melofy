@@ -16,8 +16,9 @@ import { useMediaSession } from './useMediaSession';
 import { usePlayerSync } from './usePlayerSync';
 import { usePartyEvents } from './usePartyEvents';
 import { useTrackDiscovery } from './useTrackDiscovery';
+import { NativePlayer } from '@/lib/capacitor/NativePlayer';
 
-export function useAudioPlayback() {
+export function useAudioPlayback(streamSrc?: string) {
   // Store selectors
   const {
     currentTrack,
@@ -132,12 +133,57 @@ export function useAudioPlayback() {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (isPlaying) {
-      audio.play().catch(console.error);
+
+    if (Capacitor.isNativePlatform() && streamSrc) {
+      if (isPlaying) {
+        NativePlayer.play({ url: streamSrc }).catch(console.error);
+      } else {
+        NativePlayer.pause().catch(console.error);
+      }
     } else {
-      audio.pause();
+      if (isPlaying) {
+        audio.play().catch(console.error);
+      } else {
+        audio.pause();
+      }
     }
-  }, [isPlaying]);
+  }, [isPlaying, streamSrc]);
+
+  // Native Player Event Listener
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    
+    let timeupdateListener: any = null;
+    let endedListener: any = null;
+
+    NativePlayer.addListener('timeupdate', (state) => {
+      if (!isDraggingSlider) {
+        setCurrentTime(state.currentTime);
+      }
+      // If duration comes in from native player, update store if needed
+      if (state.duration > 0) {
+        const track = usePlayerStore.getState().currentTrack;
+        if (track && Math.abs(track.duration - state.duration * 1000) > 1000) {
+           usePlayerStore.setState({
+             currentTrack: { ...track, duration: Math.floor(state.duration * 1000) }
+           });
+        }
+      }
+    }).then(handle => { timeupdateListener = handle; });
+
+    NativePlayer.addListener('ended', () => {
+      handleTrackEnd();
+    }).then(handle => { endedListener = handle; });
+    
+    return () => {
+      if (timeupdateListener) {
+        timeupdateListener.remove();
+      }
+      if (endedListener) {
+        endedListener.remove();
+      }
+    };
+  }, [setCurrentTime, isDraggingSlider, handleTrackEnd]);
 
   // Volume sync
   useEffect(() => {
@@ -186,7 +232,13 @@ export function useAudioPlayback() {
     if (!canControlPlayback()) return;
 
     const time = (seekPosition / 100) * (currentTrack.duration / 1000);
-    audioRef.current.currentTime = time;
+    
+    if (Capacitor.isNativePlatform()) {
+      NativePlayer.seekTo({ time }).catch(console.error);
+    } else {
+      audioRef.current.currentTime = time;
+    }
+    
     if (socket) socket.emit('playback_state', { type: 'seek', time });
 
     // Immediate sync
