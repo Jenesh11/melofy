@@ -61,6 +61,13 @@ export function useAudioPlayback(streamSrc?: string) {
   const [isDraggingSlider, setIsDraggingSlider] = useState(false);
   const [sliderValue, setSliderValue] = useState(0);
 
+  const getCurrentPlaybackTime = useCallback(() => {
+    if (Capacitor.isNativePlatform()) {
+      return usePlayerStore.getState().progress / 1000;
+    }
+    return audioRef.current?.currentTime || usePlayerStore.getState().progress / 1000 || 0;
+  }, []);
+
   // Helper to sync time to both local state and store
   const setCurrentTime = useCallback((time: number) => {
     setLocalTime(time);
@@ -76,14 +83,20 @@ export function useAudioPlayback(streamSrc?: string) {
   // Handlers for controls
   const handleTogglePlay = useCallback(() => {
     if (!canControlPlayback()) return;
+    const state = usePlayerStore.getState();
+    const time = getCurrentPlaybackTime();
     if (isPlaying) {
       pause();
-      if (socket) socket.emit('playback_state', { type: 'pause', time: audioRef.current?.currentTime || 0 });
+      if (socket && state.partyId) {
+        socket.emit('playback_state', { type: 'pause', time, reason: 'playback_toggled', sentAt: Date.now() });
+      }
     } else {
       resume();
-      if (socket) socket.emit('playback_state', { type: 'resume', time: audioRef.current?.currentTime || 0 });
+      if (socket && state.partyId) {
+        socket.emit('playback_state', { type: 'resume', time, reason: 'playback_toggled', sentAt: Date.now() });
+      }
     }
-  }, [isPlaying, pause, resume, socket, canControlPlayback]);
+  }, [isPlaying, pause, resume, socket, canControlPlayback, getCurrentPlaybackTime]);
 
   const handleSkipNext = useCallback(async () => {
     if (!canControlPlayback()) return;
@@ -266,18 +279,22 @@ export function useAudioPlayback(streamSrc?: string) {
 
   const handleSeek = useCallback((value: number[]) => {
     const seekPosition = value[0];
-    if (seekPosition === undefined || !audioRef.current || !currentTrack) return;
+    if (seekPosition === undefined || !currentTrack) return;
     if (!canControlPlayback()) return;
 
     const time = (seekPosition / 100) * (currentTrack.duration / 1000);
-    
+
     if (Capacitor.isNativePlatform()) {
       NativePlayer.seekTo({ time }).catch(console.error);
-    } else {
+    } else if (audioRef.current) {
       audioRef.current.currentTime = time;
     }
-    
-    if (socket) socket.emit('playback_state', { type: 'seek', time });
+
+    usePlayerStore.setState({ progress: Math.floor(time * 1000) });
+
+    if (socket && usePlayerStore.getState().partyId) {
+      socket.emit('playback_state', { type: 'seek', time, reason: 'manual_seek', sentAt: Date.now() });
+    }
 
     // Immediate sync
     syncStateToServer();

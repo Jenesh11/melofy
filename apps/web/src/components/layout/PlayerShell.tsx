@@ -219,6 +219,14 @@ export function PlayerShell() {
         src={Capacitor.isNativePlatform() ? undefined : streamSrc}
         onLoadedData={(e) => {
           e.currentTarget.volume = Capacitor.isNativePlatform() ? 1 : playback.volume;
+          const pendingProgressSeconds = usePlayerStore.getState().progress / 1000;
+          if (
+            !Capacitor.isNativePlatform() &&
+            pendingProgressSeconds > 0 &&
+            e.currentTarget.currentTime < 0.5
+          ) {
+            e.currentTarget.currentTime = pendingProgressSeconds;
+          }
         }}
         onDurationChange={(e) => {
           const audio = e.currentTarget;

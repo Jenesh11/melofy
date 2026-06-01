@@ -3,6 +3,45 @@ import { Server as SocketIOServer, Socket as SocketIOSocket } from 'socket.io';
 import { Redis } from '@upstash/redis';
 
 const hostDisconnectTimers = new Map<string, NodeJS.Timeout>();
+const PARTY_TTL_SECONDS = 4 * 60 * 60;
+const eventRateLimits = new Map<string, { count: number; windowStartedAt: number }>();
+
+const RATE_LIMITS = {
+  playbackState: { maxEvents: 12, windowMs: 5000 },
+  syncState: { maxEvents: 6, windowMs: 10000 },
+} as const;
+
+function isRateLimited(key: string, limit: { maxEvents: number; windowMs: number }) {
+  const now = Date.now();
+  const bucket = eventRateLimits.get(key);
+
+  if (!bucket || now - bucket.windowStartedAt > limit.windowMs) {
+    eventRateLimits.set(key, { count: 1, windowStartedAt: now });
+    return false;
+  }
+
+  bucket.count += 1;
+  return bucket.count > limit.maxEvents;
+}
+
+function getRateLimitKey(socket: SocketIOSocket, eventName: 'playback_state' | 'sync_state') {
+  return `${socket.data.partyId || 'no-party'}:${socket.data.userId || 'anonymous'}:${eventName}`;
+}
+
+function getLivePartyState(partyData: any) {
+  const currentTime = Number.isFinite(partyData.currentTime) ? partyData.currentTime : 0;
+  const updatedAt = Number.isFinite(partyData.stateUpdatedAt) ? partyData.stateUpdatedAt : Date.now();
+  const elapsedSeconds = partyData.isPlaying ? Math.max(0, (Date.now() - updatedAt) / 1000) : 0;
+  const durationSeconds = Number.isFinite(partyData.currentTrack?.duration)
+    ? partyData.currentTrack.duration / 1000
+    : Number.POSITIVE_INFINITY;
+
+  return {
+    ...partyData,
+    currentTime: Math.min(currentTime + elapsedSeconds, durationSeconds),
+    stateUpdatedAt: Date.now(),
+  };
+}
 
 export function registerJamHandlers(
   io: SocketIOServer,
@@ -26,7 +65,7 @@ export function registerJamHandlers(
         isPlaying: false,
         listenersCanControl: false,
         listeners: [],
-      }), { ex: 4 * 60 * 60 }); 
+      }), { ex: PARTY_TTL_SECONDS });
 
       socket.rooms.forEach((room) => {
         if (room !== socket.id) socket.leave(room);
@@ -53,7 +92,7 @@ export function registerJamHandlers(
       if (partyDataStr) {
         const partyData = typeof partyDataStr === 'string' ? JSON.parse(partyDataStr) : partyDataStr;
         partyData.listenersCanControl = !!data.canControl;
-        await redis.set(roomId, JSON.stringify(partyData), { ex: 4 * 60 * 60 });
+        await redis.set(roomId, JSON.stringify(partyData), { ex: PARTY_TTL_SECONDS });
         io.to(roomId).emit('listener_control_updated', { canControl: partyData.listenersCanControl });
       }
     } catch (error) {
@@ -68,10 +107,11 @@ export function registerJamHandlers(
       const partyDataStr = await redis.get<string | object>(roomId);
       if (!partyDataStr) return callback?.({ ok: false, error: 'Not found' });
       const partyData = typeof partyDataStr === 'string' ? JSON.parse(partyDataStr) : partyDataStr;
+      const liveState = getLivePartyState(partyData);
       callback?.({ 
         ok: true, 
-        hostName: partyData.hostName,
-        currentTrack: partyData.currentTrack
+        hostName: liveState.hostName,
+        currentTrack: liveState.currentTrack
       });
     } catch (e) {
       callback?.({ ok: false, error: 'Error' });
@@ -113,16 +153,16 @@ export function registerJamHandlers(
           hostDisconnectTimers.delete(partyId.toUpperCase());
           console.log(`[JamSync] Host rejoined party ${partyId}. Grace period cancelled.`);
         }
-        callback?.({ ok: true, initialState: partyData, isHost: true });
+        callback?.({ ok: true, initialState: getLivePartyState(partyData), isHost: true });
       } else {
         console.log(`Socket ${socket.id} joined party ${roomId} as listener`);
         if (!partyData.listeners) partyData.listeners = [];
         const isNewListener = !partyData.listeners.find((l: any) => l.userId === userId);
         if (isNewListener) {
           partyData.listeners.push({ userId, username });
-          await redis.set(roomId, JSON.stringify(partyData), { ex: 4 * 60 * 60 });
+          await redis.set(roomId, JSON.stringify(partyData), { ex: PARTY_TTL_SECONDS });
         }
-        callback?.({ ok: true, initialState: partyData, isHost: false });
+        callback?.({ ok: true, initialState: getLivePartyState(partyData), isHost: false });
         
         if (isNewListener) {
           socket.to(roomId).emit('listener_joined', { username });
@@ -152,7 +192,7 @@ export function registerJamHandlers(
           const partyData = typeof partyDataStr === 'string' ? JSON.parse(partyDataStr) : partyDataStr;
           if (partyData.listeners) {
             partyData.listeners = partyData.listeners.filter((l: any) => l.userId !== userId);
-            await redis.set(roomId, JSON.stringify(partyData), { ex: 4 * 60 * 60 });
+            await redis.set(roomId, JSON.stringify(partyData), { ex: PARTY_TTL_SECONDS });
             io.to(roomId).emit('listeners_update', { listeners: partyData.listeners });
           }
         }
@@ -187,6 +227,11 @@ export function registerJamHandlers(
 
   socket.on('playback_state', async (data) => {
     if (socket.data.roomId && socket.data.partyId) {
+      if (isRateLimited(getRateLimitKey(socket, 'playback_state'), RATE_LIMITS.playbackState)) {
+        console.warn(`[JamSync] Rate limited playback_state from ${userId} in party ${socket.data.partyId}`);
+        return;
+      }
+
       const roomId = `party:${socket.data.partyId}`;
       let partyData: any = null;
 
@@ -205,36 +250,84 @@ export function registerJamHandlers(
       if (!socket.data.isPartyHost && !partyData.listenersCanControl) {
         return;
       }
+
+      if (data.type === 'seek' && !Number.isFinite(data.time)) {
+        return;
+      }
       
       socket.to(socket.data.roomId).emit('playback_state', data);
       
       if (data.type === 'play_track' && data.track) {
         partyData.currentTrack = data.track;
         partyData.isPlaying = true;
-        partyData.currentTime = 0;
+        partyData.currentTime = Number.isFinite(data.time) ? Math.max(0, data.time) : 0;
         partyData.stateUpdatedAt = Date.now();
       } else if (data.type === 'pause') {
         partyData.isPlaying = false;
-        partyData.currentTime = data.time ?? partyData.currentTime;
+        partyData.currentTime = Number.isFinite(data.time) ? Math.max(0, data.time) : partyData.currentTime;
         partyData.stateUpdatedAt = Date.now();
       } else if (data.type === 'resume') {
         partyData.isPlaying = true;
-        partyData.currentTime = data.time ?? partyData.currentTime;
+        partyData.currentTime = Number.isFinite(data.time) ? Math.max(0, data.time) : partyData.currentTime;
         partyData.stateUpdatedAt = Date.now();
       } else if (data.type === 'seek') {
-        partyData.currentTime = data.time;
-        partyData.stateUpdatedAt = Date.now();
-      } else if (data.type === 'sync') {
-        partyData.currentTime = data.time;
-        partyData.isPlaying = data.isPlaying ?? partyData.isPlaying;
+        partyData.currentTime = Math.max(0, data.time);
         partyData.stateUpdatedAt = Date.now();
       }
 
       try {
-        await redis.set(roomId, JSON.stringify(partyData), { ex: 4 * 60 * 60 });
+        await redis.set(roomId, JSON.stringify(partyData), { ex: PARTY_TTL_SECONDS });
       } catch (err) {
         console.error('Error updating party state in Redis:', err);
       }
+    }
+  });
+
+  socket.on('sync_state', async (data) => {
+    if (!socket.data.roomId || !socket.data.partyId || !socket.data.isPartyHost) {
+      return;
+    }
+
+    if (isRateLimited(getRateLimitKey(socket, 'sync_state'), RATE_LIMITS.syncState)) {
+      console.warn(`[JamSync] Rate limited sync_state from host ${userId} in party ${socket.data.partyId}`);
+      return;
+    }
+
+    if (!Number.isFinite(data?.time)) {
+      return;
+    }
+
+    const roomId = `party:${socket.data.partyId}`;
+    let partyData: any = null;
+
+    try {
+      const partyDataStr = await redis.get<string | object>(roomId);
+      if (partyDataStr) {
+        partyData = typeof partyDataStr === 'string' ? JSON.parse(partyDataStr) : partyDataStr;
+      }
+    } catch (err) {
+      console.error('Error fetching party state for sync in Redis:', err);
+      return;
+    }
+
+    if (!partyData) return;
+
+    const syncState = {
+      ...data,
+      time: Math.max(0, data.time),
+    };
+
+    socket.to(socket.data.roomId).emit('sync_state', syncState);
+
+    if (syncState.track) partyData.currentTrack = syncState.track;
+    partyData.currentTime = syncState.time;
+    partyData.isPlaying = syncState.isPlaying ?? partyData.isPlaying;
+    partyData.stateUpdatedAt = Date.now();
+
+    try {
+      await redis.set(roomId, JSON.stringify(partyData), { ex: PARTY_TTL_SECONDS });
+    } catch (err) {
+      console.error('Error updating party sync state in Redis:', err);
     }
   });
 
@@ -266,7 +359,7 @@ export function registerJamHandlers(
         const partyData = typeof partyDataStr === 'string' ? JSON.parse(partyDataStr) : partyDataStr;
         if (partyData.listeners) {
           partyData.listeners = partyData.listeners.filter((l: any) => l.userId !== userId);
-          await redis.set(roomId, JSON.stringify(partyData), { ex: 4 * 60 * 60 });
+          await redis.set(roomId, JSON.stringify(partyData), { ex: PARTY_TTL_SECONDS });
           io.to(roomId).emit('listeners_update', { listeners: partyData.listeners });
         }
       }

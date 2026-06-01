@@ -20,6 +20,7 @@ interface JoinPartyResponse {
   initialState?: {
     listenersCanControl?: boolean;
     currentTrack?: Track;
+    currentTime?: number;
     isPlaying?: boolean;
   };
   error?: string;
@@ -91,6 +92,9 @@ export default function ListenJoinPage() {
           }
           if (state.currentTrack) {
             usePlayerStore.getState().play(state.currentTrack, true);
+            if (typeof state.currentTime === 'number') {
+              usePlayerStore.setState({ progress: Math.floor(Math.max(0, state.currentTime) * 1000) });
+            }
             if (state.isPlaying) {
               setTimeout(() => {
                 usePlayerStore.getState().resume(true);

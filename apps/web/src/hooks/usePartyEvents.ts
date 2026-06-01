@@ -2,12 +2,38 @@ import { useEffect, useRef, useCallback } from 'react';
 import { Socket } from 'socket.io-client';
 import { usePlayerStore, Track, PartyListener } from '@/store/usePlayerStore';
 import { toast } from 'sonner';
+import { Capacitor } from '@capacitor/core';
+import { NativePlayer } from '@/lib/capacitor/NativePlayer';
+
+const SYNC_RULES = {
+  heartbeatIntervalMs: 4000,
+  minEmitIntervalMs: 1200,
+  hardSeekDriftSec: 2.5,
+  softCorrectionDriftSec: 0.75,
+  settledDriftSec: 0.25,
+  correctionRateDelta: 0.04,
+} as const;
+
+type SyncReason =
+  | 'host_heartbeat'
+  | 'listener_joined'
+  | 'host_started'
+  | 'track_changed'
+  | 'rejoin';
 
 interface RemotePlaybackState {
-  type: 'play_track' | 'pause' | 'resume' | 'seek' | 'sync';
+  type: 'play_track' | 'pause' | 'resume' | 'seek';
   track?: Track;
   time?: number;
+}
+
+interface RemoteSyncState {
+  track?: Track;
+  time: number;
   isPlaying?: boolean;
+  sentAt?: number;
+  reason?: SyncReason;
+  seq?: number;
 }
 
 interface PartyEventsProps {
@@ -26,6 +52,7 @@ interface JoinPartyResponse {
   initialState?: {
     hostName?: string;
     currentTrack?: Track | null;
+    currentTime?: number;
     isPlaying?: boolean;
     listenersCanControl?: boolean;
     listeners?: PartyListener[];
@@ -45,90 +72,141 @@ export function usePartyEvents({
   const lastReceivedTrackRef = useRef<string | null>(null);
   const prevPartyIdRef = useRef<string | null>(null);
   const pendingSyncTimeRef = useRef<number | null>(null);
+  const lastSyncEmitAtRef = useRef(0);
+  const syncSequenceRef = useRef(0);
 
-  // Incoming socket events
+  const getPlaybackSnapshot = useCallback(() => {
+    const audio = audioRef.current;
+    const state = usePlayerStore.getState();
+    const isNative = Capacitor.isNativePlatform();
+    const time = isNative ? state.progress / 1000 : audio?.currentTime ?? state.progress / 1000;
+    const paused = isNative ? !state.isPlaying : audio?.paused ?? !state.isPlaying;
+
+    return {
+      time: Number.isFinite(time) && time >= 0 ? time : 0,
+      isPlaying: !paused,
+      track: state.currentTrack,
+    };
+  }, [audioRef]);
+
+  const emitHostSync = useCallback((reason: SyncReason, force = false) => {
+    const state = usePlayerStore.getState();
+    if (!socket || !state.partyId || !state.isPartyHost) return;
+
+    const now = Date.now();
+    if (!force && now - lastSyncEmitAtRef.current < SYNC_RULES.minEmitIntervalMs) {
+      return;
+    }
+
+    const snapshot = getPlaybackSnapshot();
+    lastSyncEmitAtRef.current = now;
+    syncSequenceRef.current += 1;
+
+    socket.emit('sync_state', {
+      time: snapshot.time,
+      isPlaying: snapshot.isPlaying,
+      track: snapshot.track || undefined,
+      sentAt: now,
+      reason,
+      seq: syncSequenceRef.current,
+    } satisfies RemoteSyncState);
+  }, [getPlaybackSnapshot, socket]);
+
+  const applyRemoteTime = useCallback((time: number) => {
+    const safeTime = Number.isFinite(time) && time >= 0 ? time : 0;
+    usePlayerStore.setState({ progress: Math.floor(safeTime * 1000) });
+
+    if (Capacitor.isNativePlatform()) {
+      NativePlayer.seekTo({ time: safeTime }).catch(console.error);
+      return true;
+    }
+
+    const audio = audioRef.current;
+    if (!audio) return false;
+    if (audio.readyState >= 1) {
+      audio.currentTime = safeTime;
+      return true;
+    }
+
+    pendingSyncTimeRef.current = safeTime;
+    return false;
+  }, [audioRef]);
+
   useEffect(() => {
     if (!socket) return;
 
     const handlePlaybackState = (data: RemotePlaybackState) => {
       const audio = audioRef.current;
-      if (!audio) return;
+      if (!audio && !Capacitor.isNativePlatform()) return;
 
       if (data.type === 'play_track' && data.track) {
         lastReceivedTrackRef.current = data.track.id;
         usePlayerStore.getState().play(data.track, true);
-        if (audio) audio.playbackRate = 1.0; // Reset any drift correction from previous track
+        if (audio) audio.playbackRate = 1.0;
         if (typeof data.time === 'number') {
-          if (audio.readyState >= 1) {
-            audio.currentTime = data.time;
-          } else {
-            pendingSyncTimeRef.current = data.time;
-          }
+          applyRemoteTime(data.time);
         }
       } else if (data.type === 'pause') {
         usePlayerStore.getState().pause(true);
         if (typeof data.time === 'number') {
-          if (audio.readyState >= 1) {
-            audio.currentTime = data.time;
-          } else {
-            pendingSyncTimeRef.current = data.time;
-          }
+          applyRemoteTime(data.time);
         }
       } else if (data.type === 'resume') {
         usePlayerStore.getState().resume(true);
         if (typeof data.time === 'number') {
-          if (audio.readyState >= 1) {
-            audio.currentTime = data.time;
-          } else {
-            pendingSyncTimeRef.current = data.time;
-          }
+          applyRemoteTime(data.time);
         }
       } else if (data.type === 'seek' && typeof data.time === 'number') {
-        if (audio.readyState >= 1) {
-          audio.currentTime = data.time;
-        } else {
-          pendingSyncTimeRef.current = data.time;
-        }
-      } else if (data.type === 'sync' && typeof data.time === 'number') {
-        const activeTrack = usePlayerStore.getState().currentTrack;
-        // Auto-heal track desync if host's track is different
-        if (data.track && (!activeTrack || activeTrack.id !== data.track.id)) {
-          console.log(`[JamSync] Auto-healing track desync. Loading host track: ${data.track.title}`);
-          lastReceivedTrackRef.current = data.track.id;
-          usePlayerStore.getState().play(data.track, true);
-        }
+        applyRemoteTime(data.time);
+      }
+    };
 
-        if (audio.readyState >= 1) {
-          const signedDrift = data.time - audio.currentTime; // positive = listener behind host
-          const absDrift = Math.abs(signedDrift);
+    const handleSyncState = (data: RemoteSyncState) => {
+      const audio = audioRef.current;
+      if ((!audio && !Capacitor.isNativePlatform()) || typeof data.time !== 'number') return;
 
-          if (absDrift > 3.0) {
-            // Severe desync — hard seek is unavoidable
-            console.log(`[JamSync] Hard re-align: drift ${absDrift.toFixed(2)}s`);
-            audio.currentTime = data.time;
-            audio.playbackRate = 1.0;
-          } else if (absDrift > 1.0) {
-            // Moderate drift — gradual correction via playback rate (inaudible at 3%)
-            const newRate = signedDrift > 0 ? 1.03 : 0.97;
-            if (audio.playbackRate !== newRate) {
-              console.log(`[JamSync] Gradual correction: drift ${absDrift.toFixed(2)}s, rate → ${newRate}`);
-              audio.playbackRate = newRate;
-            }
-          } else {
-            // Within acceptable range — ensure normal speed
-            if (audio.playbackRate !== 1.0) {
-              console.log(`[JamSync] Drift resolved (${absDrift.toFixed(2)}s), rate → 1.0`);
-              audio.playbackRate = 1.0;
-            }
+      const activeTrack = usePlayerStore.getState().currentTrack;
+      if (data.track && (!activeTrack || activeTrack.id !== data.track.id)) {
+        console.log(`[JamSync] Auto-healing track desync. Loading host track: ${data.track.title}`);
+        lastReceivedTrackRef.current = data.track.id;
+        usePlayerStore.getState().play(data.track, true);
+      }
+
+      const localTime = Capacitor.isNativePlatform()
+        ? usePlayerStore.getState().progress / 1000
+        : audio?.currentTime ?? 0;
+      const signedDrift = data.time - localTime;
+      const absDrift = Math.abs(signedDrift);
+
+      if (Capacitor.isNativePlatform()) {
+        if (absDrift > SYNC_RULES.softCorrectionDriftSec) {
+          applyRemoteTime(data.time);
+        }
+      } else if (audio && audio.readyState >= 1) {
+        if (absDrift > SYNC_RULES.hardSeekDriftSec) {
+          console.log(`[JamSync] Hard re-align: drift ${absDrift.toFixed(2)}s`);
+          applyRemoteTime(data.time);
+          audio.playbackRate = 1.0;
+        } else if (absDrift > SYNC_RULES.softCorrectionDriftSec) {
+          const newRate = signedDrift > 0
+            ? 1 + SYNC_RULES.correctionRateDelta
+            : 1 - SYNC_RULES.correctionRateDelta;
+          if (audio.playbackRate !== newRate) {
+            console.log(`[JamSync] Gradual correction: drift ${absDrift.toFixed(2)}s, rate -> ${newRate}`);
+            audio.playbackRate = newRate;
           }
-        } else {
-          pendingSyncTimeRef.current = data.time;
+        } else if (absDrift <= SYNC_RULES.settledDriftSec && audio.playbackRate !== 1.0) {
+          console.log(`[JamSync] Drift resolved (${absDrift.toFixed(2)}s), rate -> 1.0`);
+          audio.playbackRate = 1.0;
         }
-        if (data.isPlaying && audio.paused) {
-          usePlayerStore.getState().resume(true);
-        } else if (!data.isPlaying && !audio.paused) {
-          usePlayerStore.getState().pause(true);
-        }
+      } else {
+        pendingSyncTimeRef.current = data.time;
+      }
+
+      if (data.isPlaying) {
+        usePlayerStore.getState().resume(true);
+      } else if (data.isPlaying === false) {
+        usePlayerStore.getState().pause(true);
       }
     };
 
@@ -140,17 +218,7 @@ export function usePartyEvents({
 
     const handleListenerJoined = (data: { username: string }) => {
       toast.success(`${data.username} joined the session`);
-      
-      // Host immediately broadcasts a sync state to align the joining user instantly
-      const freshTrack = usePlayerStore.getState().currentTrack;
-      if (socket && usePlayerStore.getState().isPartyHost && audioRef.current) {
-        socket.emit('playback_state', {
-          type: 'sync',
-          time: audioRef.current.currentTime || 0,
-          isPlaying: !audioRef.current.paused,
-          track: freshTrack || undefined,
-        });
-      }
+      emitHostSync('listener_joined', true);
     };
 
     const handleListenerLeft = (data: { username: string }) =>
@@ -158,12 +226,13 @@ export function usePartyEvents({
 
     const handlePartyEnded = () => {
       const audio = audioRef.current;
-      if (audio) audio.playbackRate = 1.0; // Restore normal playback speed
+      if (audio) audio.playbackRate = 1.0;
       usePlayerStore.getState().clearParty();
       toast.info('The session has ended.');
     };
 
     socket.on('playback_state', handlePlaybackState);
+    socket.on('sync_state', handleSyncState);
     socket.on('listener_control_updated', handleListenerControl);
     socket.on('listeners_update', handleListenersUpdate);
     socket.on('listener_joined', handleListenerJoined);
@@ -172,15 +241,15 @@ export function usePartyEvents({
 
     return () => {
       socket.off('playback_state', handlePlaybackState);
+      socket.off('sync_state', handleSyncState);
       socket.off('listener_control_updated', handleListenerControl);
       socket.off('listeners_update', handleListenersUpdate);
       socket.off('listener_joined', handleListenerJoined);
       socket.off('listener_left', handleListenerLeft);
       socket.off('party_ended', handlePartyEnded);
     };
-  }, [socket, audioRef]);
+  }, [socket, audioRef, applyRemoteTime, emitHostSync]);
 
-  // Handle seeking once audio metadata has finished loading (HAVE_METADATA readyState)
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -188,7 +257,7 @@ export function usePartyEvents({
     const applyPendingSync = () => {
       if (pendingSyncTimeRef.current !== null) {
         console.log(`[JamSync] Applying pending start time: ${pendingSyncTimeRef.current}s`);
-        audio.currentTime = pendingSyncTimeRef.current;
+        applyRemoteTime(pendingSyncTimeRef.current);
         pendingSyncTimeRef.current = null;
       }
     };
@@ -200,55 +269,50 @@ export function usePartyEvents({
       audio.removeEventListener('loadedmetadata', applyPendingSync);
       audio.removeEventListener('canplay', applyPendingSync);
     };
-  }, [audioRef, currentTrack]);
+  }, [audioRef, currentTrack, applyRemoteTime]);
 
-  // Outgoing socket events
   useEffect(() => {
-    const audio = audioRef.current;
     if (socket && currentTrack) {
       if (lastReceivedTrackRef.current === currentTrack.id) {
         lastReceivedTrackRef.current = null;
         return;
       }
 
-      // Guard: If we are in a party but don't have control permissions, don't emit anything!
       const state = usePlayerStore.getState();
+      if (!state.partyId) return;
+
       const canControl = state.isPartyHost || state.listenersCanControl;
-      if (state.partyId && !canControl) {
-        return;
-      }
+      if (!canControl) return;
 
       socket.emit('playback_state', {
         type: 'play_track',
         track: currentTrack,
-        time: audio?.currentTime || 0,
+        time: getPlaybackSnapshot().time,
       });
-    }
-  }, [currentTrack, socket, audioRef]);
 
-  // Host initial sync
+      if (state.isPartyHost) {
+        emitHostSync('track_changed', true);
+      }
+    }
+  }, [currentTrack, socket, getPlaybackSnapshot, emitHostSync]);
+
   const partyId = usePlayerStore((state) => state.partyId);
   const isPartyHost = usePlayerStore((state) => state.isPartyHost);
 
   useEffect(() => {
-    const audio = audioRef.current;
     if (isPartyHost && partyId && partyId !== prevPartyIdRef.current && socket && currentTrack) {
       prevPartyIdRef.current = partyId;
       socket.emit('playback_state', {
         type: 'play_track',
         track: currentTrack,
-        time: audio?.currentTime || 0,
+        time: getPlaybackSnapshot().time,
       });
       if (isPlaying) {
-        socket.emit('playback_state', {
-          type: 'resume',
-          time: audio?.currentTime || 0,
-        });
+        emitHostSync('host_started', true);
       }
     }
-  }, [isPartyHost, partyId, socket, currentTrack, isPlaying, audioRef]);
+  }, [isPartyHost, partyId, socket, currentTrack, isPlaying, getPlaybackSnapshot, emitHostSync]);
 
-  // Rejoin party helper
   const rejoinParty = useCallback(() => {
     if (!socket || !partyId || !isHydrated) return;
 
@@ -271,14 +335,25 @@ export function usePartyEvents({
         if (response.initialState.listeners) {
           usePlayerStore.getState().setPartyListeners(response.initialState.listeners);
         }
+        if (!response.isHost && response.initialState.currentTrack) {
+          lastReceivedTrackRef.current = response.initialState.currentTrack.id;
+          usePlayerStore.getState().play(response.initialState.currentTrack, true);
+          if (typeof response.initialState.currentTime === 'number') {
+            applyRemoteTime(response.initialState.currentTime);
+          }
+          if (response.initialState.isPlaying) {
+            usePlayerStore.getState().resume(true);
+          } else {
+            usePlayerStore.getState().pause(true);
+          }
+        }
       } else {
         console.warn('[JamSync] Rejoin rejected, clearing party state:', response?.error);
         usePlayerStore.getState().clearParty();
       }
     });
-  }, [socket, partyId, isHydrated]);
+  }, [socket, partyId, isHydrated, applyRemoteTime]);
 
-  // Handle rejoining on socket connection/reconnection events
   useEffect(() => {
     if (!socket || !partyId || !isHydrated) return;
 
@@ -288,8 +363,7 @@ export function usePartyEvents({
     };
 
     socket.on('connect', handleConnect);
-    
-    // If socket is already connected when this effect runs, trigger rejoin immediately
+
     if (socket.connected) {
       rejoinParty();
     }
@@ -299,7 +373,6 @@ export function usePartyEvents({
     };
   }, [socket, partyId, isHydrated, rejoinParty]);
 
-  // Automatically notify server when leaving a party or unmounting
   useEffect(() => {
     const activePartyId = usePlayerStore.getState().partyId;
     return () => {
@@ -310,24 +383,19 @@ export function usePartyEvents({
     };
   }, [socket, partyId]);
 
-  // Heartbeat sync (periodically align listeners to host timeline)
   useEffect(() => {
     if (!userUid || !isHydrated || !isPlaying) return;
     const intervalId = setInterval(() => {
-      if (!audioRef.current || audioRef.current.paused) return;
-      // Only persist to database when NOT in a party session (party state lives in Redis)
+      const snapshot = getPlaybackSnapshot();
+      if (!snapshot.isPlaying) return;
+
       if (!usePlayerStore.getState().partyId) {
         syncStateToServer();
       }
-      if (socket && usePlayerStore.getState().isPartyHost) {
-        socket.emit('playback_state', {
-          type: 'sync',
-          time: audioRef.current.currentTime || 0,
-          isPlaying: true,
-          track: currentTrack || undefined,
-        });
-      }
-    }, 5000); // 5s heartbeat — sufficient with 3s drift tolerance, avoids over-correction
+
+      emitHostSync('host_heartbeat');
+    }, SYNC_RULES.heartbeatIntervalMs);
+
     return () => clearInterval(intervalId);
-  }, [userUid, isHydrated, isPlaying, syncStateToServer, socket, audioRef, currentTrack]);
+  }, [userUid, isHydrated, isPlaying, syncStateToServer, getPlaybackSnapshot, emitHostSync]);
 }
