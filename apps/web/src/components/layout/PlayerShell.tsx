@@ -216,7 +216,7 @@ export function PlayerShell() {
     <>
       <audio
         ref={playback.audioRef}
-        src={streamSrc}
+        src={Capacitor.isNativePlatform() ? undefined : streamSrc}
         onLoadedData={(e) => {
           e.currentTarget.volume = Capacitor.isNativePlatform() ? 1 : playback.volume;
         }}
@@ -244,21 +244,37 @@ export function PlayerShell() {
             }
           }
         }}
-        onEnded={playback.handleTrackEnd}
-        onWaiting={() => playback.setIsBuffering(true)}
+        onEnded={() => {
+          if (!Capacitor.isNativePlatform()) playback.handleTrackEnd();
+        }}
+        onWaiting={() => {
+          if (!Capacitor.isNativePlatform()) playback.setIsBuffering(true);
+        }}
         onCanPlay={(e) => {
-          playback.setIsBuffering(false);
-          if (playback.isPlaying) {
-            e.currentTarget.play().catch(() => {});
+          if (!Capacitor.isNativePlatform()) {
+            playback.setIsBuffering(false);
+            if (playback.isPlaying) {
+              e.currentTarget.play().catch(() => {});
+            }
           }
         }}
-        onLoadStart={() => playback.setIsBuffering(true)}
-        onPlaying={() => playback.setIsBuffering(false)}
-        onTimeUpdate={(e) => playback.setCurrentTime(e.currentTarget.currentTime)}
+        onLoadStart={() => {
+          if (!Capacitor.isNativePlatform()) playback.setIsBuffering(true);
+        }}
+        onPlaying={() => {
+          if (!Capacitor.isNativePlatform()) playback.setIsBuffering(false);
+        }}
+        onTimeUpdate={(e) => {
+          if (!Capacitor.isNativePlatform() && !playback.isDraggingSlider) {
+            playback.setCurrentTime(e.currentTarget.currentTime);
+          }
+        }}
         onSeeked={() => {
-          usePlayerStore.setState((state) => ({
-            seekTrigger: (state.seekTrigger || 0) + 1,
-          }));
+          if (!Capacitor.isNativePlatform()) {
+            usePlayerStore.setState((state) => ({
+              seekTrigger: (state.seekTrigger || 0) + 1,
+            }));
+          }
         }}
         autoPlay={!Capacitor.isNativePlatform() && playback.isPlaying}
         onError={(e) => {

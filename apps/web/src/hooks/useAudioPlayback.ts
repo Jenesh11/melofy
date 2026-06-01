@@ -134,9 +134,13 @@ export function useAudioPlayback(streamSrc?: string) {
     const audio = audioRef.current;
     if (!audio) return;
 
-    if (Capacitor.isNativePlatform() && streamSrc) {
-      if (isPlaying) {
-        NativePlayer.play({ url: streamSrc }).catch(console.error);
+    if (Capacitor.isNativePlatform()) {
+      if (streamSrc) {
+        if (isPlaying) {
+          NativePlayer.play({ url: streamSrc }).catch(console.error);
+        } else {
+          NativePlayer.pause().catch(console.error);
+        }
       } else {
         NativePlayer.pause().catch(console.error);
       }
