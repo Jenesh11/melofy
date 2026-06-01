@@ -6,16 +6,16 @@
   "packageManager": "npm@10.8.2",
   "author": {
     "name": "Shrey Jaiswal",
-    "url": "https://github.com/ShreyJaiswal1"
+    "url": "https://github.com/lazyshrey"
   },
   "license": "ISC",
-  "homepage": "https://github.com/ShreyJaiswal1/melofy#readme",
+  "homepage": "https://github.com/lazyshrey/melofy#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ShreyJaiswal1/melofy.git"
+    "url": "git+https://github.com/lazyshrey/melofy.git"
   },
   "bugs": {
-    "url": "https://github.com/ShreyJaiswal1/melofy/issues"
+    "url": "https://github.com/lazyshrey/melofy/issues"
   },
   "workspaces": [
     "apps/*",
