@@ -74,7 +74,7 @@ export default function SettingsPage() {
   const checkForUpdates = useCallback(async () => {
     setUpdateState('checking');
     try {
-      let currentVersion = '1.0.4'; // fallback
+      let currentVersion = '1.0.5'; // fallback
       const isTauriEnv = typeof window !== 'undefined' && (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== undefined;
       const isCapacitorNative = typeof window !== 'undefined' && (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
 
