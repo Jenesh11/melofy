@@ -8,11 +8,12 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.media.AudioAttributes;
-import android.media.AudioFocusRequest;
-import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
+import android.util.Log;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
@@ -24,8 +25,7 @@ import androidx.core.app.NotificationCompat;
  *   - The user switches to another app
  *   - The user goes to the home screen
  *
- * Also manages Android AudioFocus so the OS knows Melofy is actively
- * playing audio (preventing it from being silenced by other audio events).
+ * (Does not request AudioFocus, allowing Chromium to manage it natively).
  *
  * Android 14+ requires foregroundServiceType="mediaPlayback" (declared in
  * AndroidManifest.xml) to start this as a foreground service.
@@ -37,18 +37,23 @@ public class MusicService extends Service {
 
     // WakeLock — prevents CPU from sleeping while audio is active
     private PowerManager.WakeLock wakeLock;
+    private WifiManager.WifiLock wifiLock;
 
-    // AudioFocus — tells Android this app is playing media
-    private AudioManager        audioManager;
-    private AudioFocusRequest   audioFocusRequest; // API 26+
-    private AudioManager.OnAudioFocusChangeListener audioFocusListener;
+    private static MusicService instance;
+    private MediaPlayer mediaPlayer;
+    private String currentUrl;
+
+    public static MusicService getInstance() {
+        return instance;
+    }
 
     @Override
     public void onCreate() {
         super.onCreate();
+        instance = this;
         createNotificationChannel();
         acquireWakeLock();
-        setupAudioFocus();
+        setupMediaPlayer();
     }
 
     @Override
@@ -56,8 +61,7 @@ public class MusicService extends Service {
         Notification notification = buildForegroundNotification();
         startForeground(NOTIF_ID, notification);
 
-        // Request audio focus so Android knows we are actively playing music.
-        requestAudioFocus();
+
 
         // START_STICKY: if the OS kills this service, restart it automatically
         // (the WebView / audio element will resume from the React store state).
@@ -80,9 +84,13 @@ public class MusicService extends Service {
 
     @Override
     public void onDestroy() {
-        abandonAudioFocus();
+        if (mediaPlayer != null) {
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
         releaseWakeLock();
         stopForeground(true);
+        instance = null;
         super.onDestroy();
     }
 
@@ -105,6 +113,12 @@ public class MusicService extends Service {
             );
             wakeLock.acquire(3 * 60 * 60 * 1000L); // max 3 hours
         }
+
+        WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        if (wm != null && (wifiLock == null || !wifiLock.isHeld())) {
+            wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "melofy:MusicWifiLock");
+            wifiLock.acquire();
+        }
     }
 
     private void releaseWakeLock() {
@@ -115,62 +129,83 @@ public class MusicService extends Service {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // AudioFocus
+    // Native MediaPlayer
     // ─────────────────────────────────────────────────────────────────────────
 
-    private void setupAudioFocus() {
-        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-
-        audioFocusListener = focusChange -> {
-            // We intentionally do NOT pause here — the WebView audio element
-            // manages its own state. This listener just keeps the focus request
-            // alive so Android doesn't silently kill audio without a reason.
-        };
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            AudioAttributes audioAttributes = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_MEDIA)
+    private void setupMediaPlayer() {
+        mediaPlayer = new MediaPlayer();
+        mediaPlayer.setWakeMode(getApplicationContext(), PowerManager.PARTIAL_WAKE_LOCK);
+        mediaPlayer.setAudioAttributes(
+            new AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                .build();
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .build()
+        );
+        mediaPlayer.setOnPreparedListener(mp -> {
+            mp.start();
+            // Notify plugin if needed? We will just rely on the timer pulling isPlaying.
+        });
+        mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+            Log.e("MusicService", "MediaPlayer error: " + what + ", " + extra);
+            return false;
+        });
+        mediaPlayer.setOnCompletionListener(mp -> {
+            // Reached end of track
+            notifyPlaybackEnded();
+        });
+    }
 
-            audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                .setAudioAttributes(audioAttributes)
-                .setAcceptsDelayedFocusGain(true)
-                .setOnAudioFocusChangeListener(audioFocusListener)
-                .build();
+    private void notifyPlaybackEnded() {
+        if (NativePlayerPlugin.getInstance() != null) {
+            NativePlayerPlugin.getInstance().notifyEnded();
         }
     }
 
-    private void requestAudioFocus() {
-        if (audioManager == null) return;
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (audioFocusRequest != null) {
-                audioManager.requestAudioFocus(audioFocusRequest);
+    public void playUrl(String url) {
+        if (mediaPlayer == null) return;
+        try {
+            if (url.equals(currentUrl)) {
+                mediaPlayer.start();
+                return;
             }
-        } else {
-            //noinspection deprecation
-            audioManager.requestAudioFocus(
-                audioFocusListener,
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN
-            );
+            mediaPlayer.reset();
+            mediaPlayer.setDataSource(url);
+            mediaPlayer.prepareAsync();
+            currentUrl = url;
+        } catch (Exception e) {
+            Log.e("MusicService", "Failed to play URL: " + url, e);
         }
     }
 
-    private void abandonAudioFocus() {
-        if (audioManager == null) return;
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (audioFocusRequest != null) {
-                audioManager.abandonAudioFocusRequest(audioFocusRequest);
-            }
-        } else {
-            //noinspection deprecation
-            audioManager.abandonAudioFocus(audioFocusListener);
+    public void resumePlayback() {
+        if (mediaPlayer != null && !mediaPlayer.isPlaying()) {
+            mediaPlayer.start();
         }
     }
 
+    public void pausePlayback() {
+        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+            mediaPlayer.pause();
+        }
+    }
+
+    public void seekTo(int positionMs) {
+        if (mediaPlayer != null) {
+            mediaPlayer.seekTo(positionMs);
+        }
+    }
+
+    public boolean isPlaying() {
+        return mediaPlayer != null && mediaPlayer.isPlaying();
+    }
+
+    public int getCurrentPosition() {
+        return mediaPlayer != null ? mediaPlayer.getCurrentPosition() : 0;
+    }
+
+    public int getDuration() {
+        return mediaPlayer != null ? mediaPlayer.getDuration() : 0;
+    }
     // ─────────────────────────────────────────────────────────────────────────
     // Notification
     // ─────────────────────────────────────────────────────────────────────────

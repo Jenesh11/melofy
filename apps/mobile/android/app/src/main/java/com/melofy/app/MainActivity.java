@@ -61,8 +61,25 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
         // Register plugins BEFORE super.onCreate() so they are available
         // to the WebView bridge immediately.
         registerPlugin(SocialLoginPlugin.class);
+        registerPlugin(NativePlayerPlugin.class);
 
         super.onCreate(savedInstanceState);
+
+        // Configure the WebView for background media playback
+        if (bridge != null) {
+            WebView webView = bridge.getWebView();
+            if (webView != null) {
+                android.webkit.WebSettings settings = webView.getSettings();
+                settings.setMediaPlaybackRequiresUserGesture(false);
+                
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    webView.setRendererPriorityPolicy(
+                        WebView.RENDERER_PRIORITY_IMPORTANT,
+                        false
+                    );
+                }
+            }
+        }
 
         // Start the background audio foreground service.
         startMusicService();
