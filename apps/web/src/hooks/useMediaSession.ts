@@ -34,6 +34,10 @@ export function useMediaSession({
       const isNative = Capacitor.isNativePlatform();
 
       // ── Native: Capgo plugin for Android notification controls ─────────
+      // IMPORTANT: Always set metadata BEFORE playback state. When
+      // setPlaybackState('playing') is called, the plugin starts the
+      // foreground service. If metadata hasn't been set yet, the
+      // notification will be empty and Android may kill the service.
       if (isNative) {
         if (currentTrack) {
           await MediaSession.setMetadata({
@@ -48,10 +52,14 @@ export function useMediaSession({
               }
             ],
           });
+          await MediaSession.setPlaybackState({
+            playbackState: isPlaying ? 'playing' : 'paused'
+          });
+        } else {
+          await MediaSession.setPlaybackState({
+            playbackState: 'none'
+          });
         }
-        await MediaSession.setPlaybackState({
-          playbackState: isPlaying ? 'playing' : 'paused'
-        });
       }
 
       // ── Web API: ALWAYS set navigator.mediaSession ────────────────────
