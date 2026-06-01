@@ -153,35 +153,41 @@ export function useAudioPlayback(streamSrc?: string) {
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     
-    let timeupdateListener: any = null;
-    let endedListener: any = null;
+    let timeupdateHandle: any = null;
+    let endedHandle: any = null;
+    let isCancelled = false;
 
-    NativePlayer.addListener('timeupdate', (state) => {
-      if (!isDraggingSlider) {
-        setCurrentTime(state.currentTime);
-      }
-      // If duration comes in from native player, update store if needed
-      if (state.duration > 0) {
-        const track = usePlayerStore.getState().currentTrack;
-        if (track && Math.abs(track.duration - state.duration * 1000) > 1000) {
-           usePlayerStore.setState({
-             currentTrack: { ...track, duration: Math.floor(state.duration * 1000) }
-           });
+    const setupListeners = async () => {
+      timeupdateHandle = await NativePlayer.addListener('timeupdate', (state) => {
+        if (!isDraggingSlider) {
+          setCurrentTime(state.currentTime);
         }
-      }
-    }).then(handle => { timeupdateListener = handle; });
+        if (state.duration > 0) {
+          const track = usePlayerStore.getState().currentTrack;
+          if (track && Math.abs(track.duration - state.duration * 1000) > 1000) {
+             usePlayerStore.setState({
+               currentTrack: { ...track, duration: Math.floor(state.duration * 1000) }
+             });
+          }
+        }
+      });
 
-    NativePlayer.addListener('ended', () => {
-      handleTrackEnd();
-    }).then(handle => { endedListener = handle; });
+      endedHandle = await NativePlayer.addListener('ended', () => {
+        handleTrackEnd();
+      });
+
+      if (isCancelled) {
+        if (timeupdateHandle) timeupdateHandle.remove();
+        if (endedHandle) endedHandle.remove();
+      }
+    };
+
+    setupListeners();
     
     return () => {
-      if (timeupdateListener) {
-        timeupdateListener.remove();
-      }
-      if (endedListener) {
-        endedListener.remove();
-      }
+      isCancelled = true;
+      if (timeupdateHandle) timeupdateHandle.remove();
+      if (endedHandle) endedHandle.remove();
     };
   }, [setCurrentTime, isDraggingSlider, handleTrackEnd]);
 

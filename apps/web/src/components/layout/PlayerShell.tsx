@@ -171,7 +171,8 @@ export function PlayerShell() {
           ticket: ticketData.ticket,
           url: encodedTrack,
         });
-        setStreamSrc(`/api/stream?${params.toString()}`);
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+        setStreamSrc(`${baseUrl}/api/stream?${params.toString()}`);
       } catch (error) {
         if (!cancelled) {
           setStreamSrc(undefined);
