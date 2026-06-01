@@ -15,6 +15,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Restart service after device reboot (optional) -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Ask the user to exempt Melofy from battery optimization so the OS
+         does not kill background audio on aggressive power-saving devices. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:allowBackup="true"
@@ -41,10 +44,15 @@
 
         <!-- ── Music Foreground Service ────────────────────────────────────
              Keeps audio alive when the app is in the background / screen off.
-             The WebView MediaSession feeds the system notification automatically
-             via Chrome WebView's built-in media integration.
+             stopWithTask="false" ensures the service is NOT killed when the
+             user swipes the app away from Recents — MusicService.onTaskRemoved
+             handles restart logic itself.
         ─────────────────────────────────────────────────────────────────── -->
-        <service android:name=".MusicService" android:foregroundServiceType="mediaPlayback" android:exported="false" />
+        <service
+            android:name=".MusicService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="false"
+            android:stopWithTask="false" />
 
         <!-- ── File Provider (required by Capacitor) ─────────────────────── -->
         <provider

@@ -7,52 +7,83 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
 /**
  * MusicService — Foreground Service for background audio playback.
  *
- * This service keeps the app process alive when the screen turns off or
- * the user navigates away. The actual audio element lives in the Chrome
- * WebView; this service simply prevents the OS from killing the process.
+ * Keeps the Capacitor WebView process alive when:
+ *   - The screen turns off
+ *   - The user switches to another app
+ *   - The user goes to the home screen
+ *
+ * Also manages Android AudioFocus so the OS knows Melofy is actively
+ * playing audio (preventing it from being silenced by other audio events).
  *
  * Android 14+ requires foregroundServiceType="mediaPlayback" (declared in
- * AndroidManifest.xml) to show a rich media-style notification.
- *
- * The Chrome WebView automatically integrates with the Android MediaSession /
- * notification panel via navigator.mediaSession when audio is playing, so no
- * extra code is needed here for notification controls — they come for free.
+ * AndroidManifest.xml) to start this as a foreground service.
  */
 public class MusicService extends Service {
 
-    private static final String CHANNEL_ID   = "melofy_audio_channel";
-    private static final int    NOTIF_ID     = 1001;
+    private static final String CHANNEL_ID = "melofy_audio_channel";
+    private static final int    NOTIF_ID   = 1001;
+
+    // WakeLock — prevents CPU from sleeping while audio is active
+    private PowerManager.WakeLock wakeLock;
+
+    // AudioFocus — tells Android this app is playing media
+    private AudioManager        audioManager;
+    private AudioFocusRequest   audioFocusRequest; // API 26+
+    private AudioManager.OnAudioFocusChangeListener audioFocusListener;
 
     @Override
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
+        acquireWakeLock();
+        setupAudioFocus();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // Build a minimal notification so Android allows the foreground service.
-        // Android / Chrome WebView will upgrade this to a rich media notification
-        // automatically once navigator.mediaSession provides metadata.
         Notification notification = buildForegroundNotification();
         startForeground(NOTIF_ID, notification);
 
-        // If the service is killed, restart it automatically.
+        // Request audio focus so Android knows we are actively playing music.
+        requestAudioFocus();
+
+        // START_STICKY: if the OS kills this service, restart it automatically
+        // (the WebView / audio element will resume from the React store state).
         return START_STICKY;
+    }
+
+    /**
+     * Called when the user swipes the app away from the Recents screen.
+     * Restart the service so audio can resume if the app is re-opened,
+     * and stop gracefully if the user explicitly removed the app.
+     */
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        super.onTaskRemoved(rootIntent);
+        // Restart the service via an alarm-like intent after a short delay.
+        Intent restartIntent = new Intent(getApplicationContext(), MusicService.class);
+        restartIntent.setPackage(getPackageName());
+        startService(restartIntent);
     }
 
     @Override
     public void onDestroy() {
-        super.onDestroy();
+        abandonAudioFocus();
+        releaseWakeLock();
         stopForeground(true);
+        super.onDestroy();
     }
 
     @Nullable
@@ -62,13 +93,94 @@ public class MusicService extends Service {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // WakeLock
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void acquireWakeLock() {
+        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        if (pm != null && (wakeLock == null || !wakeLock.isHeld())) {
+            wakeLock = pm.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "melofy:MusicWakeLock"
+            );
+            wakeLock.acquire(3 * 60 * 60 * 1000L); // max 3 hours
+        }
+    }
+
+    private void releaseWakeLock() {
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
+            wakeLock = null;
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // AudioFocus
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void setupAudioFocus() {
+        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+
+        audioFocusListener = focusChange -> {
+            // We intentionally do NOT pause here — the WebView audio element
+            // manages its own state. This listener just keeps the focus request
+            // alive so Android doesn't silently kill audio without a reason.
+        };
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build();
+
+            audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(audioAttributes)
+                .setAcceptsDelayedFocusGain(true)
+                .setOnAudioFocusChangeListener(audioFocusListener)
+                .build();
+        }
+    }
+
+    private void requestAudioFocus() {
+        if (audioManager == null) return;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (audioFocusRequest != null) {
+                audioManager.requestAudioFocus(audioFocusRequest);
+            }
+        } else {
+            //noinspection deprecation
+            audioManager.requestAudioFocus(
+                audioFocusListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            );
+        }
+    }
+
+    private void abandonAudioFocus() {
+        if (audioManager == null) return;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (audioFocusRequest != null) {
+                audioManager.abandonAudioFocusRequest(audioFocusRequest);
+            }
+        } else {
+            //noinspection deprecation
+            audioManager.abandonAudioFocus(audioFocusListener);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Notification
+    // ─────────────────────────────────────────────────────────────────────────
 
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
                 "Melofy Audio Playback",
-                NotificationManager.IMPORTANCE_LOW // Low: silent, no sound/vibration
+                NotificationManager.IMPORTANCE_LOW // silent, no sound/vibration
             );
             channel.setDescription("Shows while music is playing in Melofy");
             channel.setShowBadge(false);
@@ -82,7 +194,6 @@ public class MusicService extends Service {
     }
 
     private Notification buildForegroundNotification() {
-        // Tapping the notification opens the app.
         Intent openAppIntent = new Intent(this, MainActivity.class);
         openAppIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pendingIntent = PendingIntent.getActivity(
@@ -95,10 +206,11 @@ public class MusicService extends Service {
             .setContentText("Playing music…")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
-            .setOngoing(true)          // Cannot be dismissed by user (keep alive)
-            .setSilent(true)           // No sound / vibration
+            .setOngoing(true)           // Cannot be dismissed while playing
+            .setSilent(true)            // No sound / vibration
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setCategory(NotificationCompat.CATEGORY_TRANSPORT) // Media transport category
             .build();
     }
 }

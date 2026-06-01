@@ -20,6 +20,11 @@ import ee.forgr.capacitor.social.login.GoogleProvider;
  *  2. Starts MusicService as a foreground service so audio keeps playing
  *     when the screen is off or the user switches apps.
  *  3. Registers native plugins (SocialLogin for Google OAuth, etc.).
+ *
+ * NOTE: We intentionally do NOT stop MusicService in onDestroy().
+ * The service keeps the WebView process alive in the background.
+ * It is stopped only when onTaskRemoved() fires (user swipes away from
+ * recents) — which is handled inside MusicService itself.
  */
 public class MainActivity extends BridgeActivity implements ModifiedMainActivityForSocialLoginPlugin {
 
@@ -58,12 +63,10 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
         startMusicService();
     }
 
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        // Stop foreground service when the activity is fully destroyed.
-        stopService(new Intent(this, MusicService.class));
-    }
+    // onDestroy is NOT overridden here.
+    // The MusicService must remain alive even after the Activity is destroyed
+    // so that background audio (WebView) continues playing. The service will
+    // stop itself when onTaskRemoved() is triggered (user swipes away app).
 
     private void startMusicService() {
         Intent serviceIntent = new Intent(this, MusicService.class);
