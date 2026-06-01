@@ -31,10 +31,13 @@ public class NativePlayerPlugin extends Plugin {
     @PluginMethod
     public void play(PluginCall call) {
         String url = call.getString("url");
+        Double timeInSeconds = call.getDouble("time");
+        int timeMs = timeInSeconds != null ? (int) (timeInSeconds * 1000) : -1;
+        
         MusicService service = MusicService.getInstance();
         
         if (service != null && url != null) {
-            service.playUrl(url);
+            service.playUrl(url, timeMs);
             call.resolve();
         } else if (service != null) {
             service.resumePlayback();
@@ -93,6 +96,12 @@ public class NativePlayerPlugin extends Plugin {
 
     public void notifyEnded() {
         notifyListeners("ended", new JSObject());
+    }
+
+    public void notifyBuffering(boolean isBuffering) {
+        JSObject ret = new JSObject();
+        ret.put("isBuffering", isBuffering);
+        notifyListeners("buffering", ret);
     }
 
     @Override

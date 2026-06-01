@@ -2,7 +2,7 @@ import { registerPlugin } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 
 export interface NativePlayerPlugin {
-  play(options: { url: string }): Promise<void>;
+  play(options: { url: string; time?: number }): Promise<void>;
   pause(): Promise<void>;
   seekTo(options: { time: number }): Promise<void>;
   addListener(
@@ -12,6 +12,10 @@ export interface NativePlayerPlugin {
   addListener(
     eventName: 'ended',
     listenerFunc: () => void
+  ): Promise<PluginListenerHandle> & PluginListenerHandle;
+  addListener(
+    eventName: 'buffering',
+    listenerFunc: (state: { isBuffering: boolean }) => void
   ): Promise<PluginListenerHandle> & PluginListenerHandle;
 }
 

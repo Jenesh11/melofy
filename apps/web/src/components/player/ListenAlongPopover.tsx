@@ -9,7 +9,7 @@ import { usePlayerStore, Track } from '@/store/usePlayerStore';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 
-export function ListenAlongPopover() {
+export function ListenAlongPopover({ usePortal = true }: { usePortal?: boolean }) {
   const { socket, isConnected } = useSocket();
   const partyId = usePlayerStore((state) => state.partyId);
   const hostName = usePlayerStore((state) => state.hostName);
@@ -148,7 +148,7 @@ export function ListenAlongPopover() {
       >
         <Users className='h-5 w-5' />
       </PopoverTrigger>
-      <PopoverContent className='w-80 border-border/50 bg-background/95 backdrop-blur-xl' align='end' sideOffset={20}>
+      <PopoverContent usePortal={usePortal} className='w-80 border-border/50 bg-background/95 backdrop-blur-xl' align='end' sideOffset={20}>
         <div className='flex flex-col space-y-4'>
           <div className='flex items-center space-x-2'>
             <Users className='h-4 w-4 text-primary' />

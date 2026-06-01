@@ -130,6 +130,8 @@ export function useAudioPlayback(streamSrc?: string) {
   });
 
   // Core Play/Pause Effect for the Ref
+  const lastPlayedSrc = useRef<string | null>(null);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -137,7 +139,11 @@ export function useAudioPlayback(streamSrc?: string) {
     if (Capacitor.isNativePlatform()) {
       if (streamSrc) {
         if (isPlaying) {
-          NativePlayer.play({ url: streamSrc }).catch(console.error);
+          const isNewTrack = streamSrc !== lastPlayedSrc.current;
+          const timeToPass = isNewTrack ? (usePlayerStore.getState().progress / 1000) : undefined;
+          lastPlayedSrc.current = streamSrc;
+          
+          NativePlayer.play({ url: streamSrc, time: timeToPass }).catch(console.error);
         } else {
           NativePlayer.pause().catch(console.error);
         }
@@ -159,6 +165,7 @@ export function useAudioPlayback(streamSrc?: string) {
     
     let timeupdateHandle: any = null;
     let endedHandle: any = null;
+    let bufferingHandle: any = null;
     let isCancelled = false;
 
     const setupListeners = async () => {
@@ -166,9 +173,23 @@ export function useAudioPlayback(streamSrc?: string) {
         if (!isDraggingSlider) {
           setCurrentTime(state.currentTime);
         }
+        
+        // Native MediaSession sync
+        import('@capgo/capacitor-media-session').then(({ MediaSession }) => {
+          const track = usePlayerStore.getState().currentTrack;
+          const storeDuration = track ? track.duration / 1000 : 0;
+          const dur = state.duration > 0 ? state.duration : storeDuration;
+          if (dur > 0) {
+            MediaSession.setPositionState({
+              duration: dur,
+              position: state.currentTime,
+              playbackRate: 1,
+            }).catch(() => {});
+          }
+        });
         if (state.duration > 0) {
           const track = usePlayerStore.getState().currentTrack;
-          if (track && Math.abs(track.duration - state.duration * 1000) > 1000) {
+          if (track && (isNaN(track.duration) || Math.abs(track.duration - state.duration * 1000) > 1000)) {
              usePlayerStore.setState({
                currentTrack: { ...track, duration: Math.floor(state.duration * 1000) }
              });
@@ -180,9 +201,14 @@ export function useAudioPlayback(streamSrc?: string) {
         handleTrackEnd();
       });
 
+      bufferingHandle = await NativePlayer.addListener('buffering', (state) => {
+        setIsBuffering(state.isBuffering);
+      });
+      
       if (isCancelled) {
         if (timeupdateHandle) timeupdateHandle.remove();
         if (endedHandle) endedHandle.remove();
+        if (bufferingHandle) bufferingHandle.remove();
       }
     };
 
@@ -192,8 +218,9 @@ export function useAudioPlayback(streamSrc?: string) {
       isCancelled = true;
       if (timeupdateHandle) timeupdateHandle.remove();
       if (endedHandle) endedHandle.remove();
+      if (bufferingHandle) bufferingHandle.remove();
     };
-  }, [setCurrentTime, isDraggingSlider, handleTrackEnd]);
+  }, [setCurrentTime, isDraggingSlider, handleTrackEnd, setIsBuffering]);
 
   // Volume sync
   useEffect(() => {
@@ -221,7 +248,8 @@ export function useAudioPlayback(streamSrc?: string) {
   }, [handleTogglePlay]);
 
   // UI Support Helpers
-  const formatTime = (ms: number) => {
+  const formatTime = (ms: number | undefined | null) => {
+    if (ms == null || isNaN(ms) || ms < 0) return '0:00';
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;

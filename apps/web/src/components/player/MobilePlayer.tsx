@@ -24,7 +24,7 @@ import { usePlayerStore, Track } from '@/store/usePlayerStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import { SyncedLyrics } from '@/components/ui/SyncedLyrics';
-import { ListenAlongPopover } from './ListenAlongPopover';
+import { ListenAlongDrawer } from './ListenAlongDrawer';
 import { Drawer } from 'vaul';
 
 interface MobilePlayerProps {
@@ -103,13 +103,12 @@ export function MobilePlayer({
     <Drawer.Root 
       open={isExpanded} 
       onOpenChange={(open) => !open && setIsExpanded(false)}
-      shouldScaleBackground={true}
     >
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-100" />
-        <Drawer.Content className='md:hidden fixed inset-0 z-101 bg-black text-white flex flex-col overflow-hidden outline-none'>
+        <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" />
+        <Drawer.Content className="md:hidden fixed bottom-0 left-0 right-0 top-12 z-[101] bg-zinc-950 border-t border-white/10 rounded-t-[2rem] text-white flex flex-col overflow-hidden outline-none">
           <Drawer.Title className="sr-only">Now Playing</Drawer.Title>
-          <div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-white/20 mt-4 mb-2 z-110" />
+          <div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-white/20 mt-4 mb-2 z-[110]" />
       {/* Background Essence */}
       <AnimatePresence mode='wait'>
         {currentTrack && (
@@ -149,7 +148,7 @@ export function MobilePlayer({
             Now Playing
           </div>
           <div className='flex items-center gap-1'>
-            <ListenAlongPopover />
+            <ListenAlongDrawer />
           </div>
         </div>
 
@@ -340,7 +339,7 @@ export function MobilePlayer({
       </div>
 
       {/* Lyrics Drawer */}
-      <Drawer.Root 
+      <Drawer.NestedRoot 
         open={showLyrics} 
         onOpenChange={setShowLyrics}
       >
@@ -378,10 +377,10 @@ export function MobilePlayer({
             </div>
           </Drawer.Content>
         </Drawer.Portal>
-      </Drawer.Root>
+      </Drawer.NestedRoot>
 
       {/* Queue Drawer */}
-      <Drawer.Root 
+      <Drawer.NestedRoot 
         open={showQueue} 
         onOpenChange={setShowQueue}
       >
@@ -476,7 +475,7 @@ export function MobilePlayer({
             )}
           </Drawer.Content>
         </Drawer.Portal>
-      </Drawer.Root>
+      </Drawer.NestedRoot>
 
       {/* Subtle overlay texture */}
       <div className='absolute inset-0 pointer-events-none opacity-[0.03] bg-[url("https://www.transparenttextures.com/patterns/p6.png")] mix-blend-overlay z-0' />

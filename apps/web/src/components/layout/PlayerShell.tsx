@@ -228,7 +228,7 @@ export function PlayerShell() {
             if (
               actualDurationMs > 0 &&
               isFinite(actualDurationMs) &&
-              Math.abs(track.duration - actualDurationMs) > 1000
+              (isNaN(track.duration) || Math.abs(track.duration - actualDurationMs) > 1000)
             ) {
               usePlayerStore.setState((state) => {
                 if (state.currentTrack && state.currentTrack.id === track.id) {

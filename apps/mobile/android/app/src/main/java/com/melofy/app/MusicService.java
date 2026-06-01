@@ -42,6 +42,7 @@ public class MusicService extends Service {
     private static MusicService instance;
     private MediaPlayer mediaPlayer;
     private String currentUrl;
+    private int pendingSeekMs = -1;
 
     public static MusicService getInstance() {
         return instance;
@@ -142,13 +143,27 @@ public class MusicService extends Service {
                 .build()
         );
         mediaPlayer.setOnPreparedListener(mp -> {
+            if (pendingSeekMs > 0) {
+                mp.seekTo(pendingSeekMs);
+            }
             mp.start();
-            // Notify plugin if needed? We will just rely on the timer pulling isPlaying.
+            notifyBuffering(false);
+            pendingSeekMs = -1;
         });
         mediaPlayer.setOnErrorListener((mp, what, extra) -> {
-            Log.e("MusicService", "MediaPlayer error: " + what + ", " + extra);
+            Log.e("MusicService", "MediaPlayer error: " + what + " " + extra);
             return false;
         });
+        
+        mediaPlayer.setOnInfoListener((mp, what, extra) -> {
+            if (what == MediaPlayer.MEDIA_INFO_BUFFERING_START) {
+                notifyBuffering(true);
+            } else if (what == MediaPlayer.MEDIA_INFO_BUFFERING_END) {
+                notifyBuffering(false);
+            }
+            return false;
+        });
+
         mediaPlayer.setOnCompletionListener(mp -> {
             // Reached end of track
             notifyPlaybackEnded();
@@ -161,13 +176,24 @@ public class MusicService extends Service {
         }
     }
 
-    public void playUrl(String url) {
+    private void notifyBuffering(boolean isBuffering) {
+        if (NativePlayerPlugin.getInstance() != null) {
+            NativePlayerPlugin.getInstance().notifyBuffering(isBuffering);
+        }
+    }
+
+    public void playUrl(String url, int timeMs) {
         if (mediaPlayer == null) return;
         try {
             if (url.equals(currentUrl)) {
+                if (timeMs >= 0) {
+                     mediaPlayer.seekTo(timeMs);
+                }
                 mediaPlayer.start();
                 return;
             }
+            notifyBuffering(true);
+            pendingSeekMs = timeMs;
             mediaPlayer.reset();
             mediaPlayer.setDataSource(url);
             mediaPlayer.prepareAsync();
