@@ -33,6 +33,7 @@ export function useMediaSession({
     const setupMediaSession = async () => {
       const isNative = Capacitor.isNativePlatform();
 
+      // ── Native: Capgo plugin for Android notification controls ─────────
       if (isNative) {
         if (currentTrack) {
           await MediaSession.setMetadata({
@@ -51,10 +52,13 @@ export function useMediaSession({
         await MediaSession.setPlaybackState({
           playbackState: isPlaying ? 'playing' : 'paused'
         });
+      }
 
-      } else {
-        if (!('mediaSession' in navigator)) return;
-        
+      // ── Web API: ALWAYS set navigator.mediaSession ────────────────────
+      // Chrome WebView uses this (not the native MediaSessionCompat) to
+      // decide whether to pause <audio> elements when the page goes to
+      // background. Without this, Chrome kills audio on home-screen.
+      if ('mediaSession' in navigator) {
         if (currentTrack) {
           navigator.mediaSession.metadata = new MediaMetadata({
             title: currentTrack.title,
@@ -115,15 +119,18 @@ export function useMediaSession({
 
     type CapgoMediaSessionAction = 'play' | 'pause' | 'seekbackward' | 'seekforward' | 'previoustrack' | 'nexttrack' | 'seekto' | 'stop';
 
+    // Native: Capgo plugin for notification controls
     if (isNative) {
       for (const [action, handler] of actionHandlers) {
         MediaSession.setActionHandler({ action: action as CapgoMediaSessionAction }, handler);
       }
-    } else {
-      if (!('mediaSession' in navigator)) return;
+    }
+
+    // Web API: ALWAYS register handlers so Chrome WebView knows this is
+    // an active media session (required for background audio policy).
+    if ('mediaSession' in navigator) {
       for (const [action, handler] of actionHandlers) {
         try {
-          // Cast the string to the native MediaSessionAction type
           navigator.mediaSession.setActionHandler(action as globalThis.MediaSessionAction, handler);
         } catch {}
       }
@@ -134,8 +141,8 @@ export function useMediaSession({
         for (const [action] of actionHandlers) {
           MediaSession.setActionHandler({ action: action as CapgoMediaSessionAction }, null).catch(() => {});
         }
-      } else {
-        if (!('mediaSession' in navigator)) return;
+      }
+      if ('mediaSession' in navigator) {
         for (const [action] of actionHandlers) {
           try {
             navigator.mediaSession.setActionHandler(action as globalThis.MediaSessionAction, null);
@@ -163,12 +170,16 @@ export function useMediaSession({
             playbackRate: audio.playbackRate,
             position: audio.currentTime,
           });
-        } else if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
-          navigator.mediaSession.setPositionState({
-            duration,
-            playbackRate: audio.playbackRate,
-            position: audio.currentTime,
-          });
+        }
+        // Always update Web API position so Chrome keeps the session alive
+        if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
+          try {
+            navigator.mediaSession.setPositionState({
+              duration,
+              playbackRate: audio.playbackRate,
+              position: audio.currentTime,
+            });
+          } catch {}
         }
       }
     };
@@ -187,7 +198,8 @@ export function useMediaSession({
     const onPlay = () => {
       if (isNative) {
         MediaSession.setPlaybackState({ playbackState: 'playing' });
-      } else if ('mediaSession' in navigator) {
+      }
+      if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'playing';
       }
     };
@@ -195,7 +207,8 @@ export function useMediaSession({
     const onPause = () => {
       if (isNative) {
         MediaSession.setPlaybackState({ playbackState: 'paused' });
-      } else if ('mediaSession' in navigator) {
+      }
+      if ('mediaSession' in navigator) {
         navigator.mediaSession.playbackState = 'paused';
       }
     };

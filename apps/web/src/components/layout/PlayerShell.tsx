@@ -13,6 +13,7 @@ import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
 import { useLikedSongs } from '@/hooks/useLikedSongs';
 import { useLyricsPanelStore } from '@/store/useLyricsPanelStore';
 import { usePlayerStore, type Track } from '@/store/usePlayerStore';
+import { Capacitor } from '@capacitor/core';
 
 interface PipState {
   currentTrack: Track | null;
@@ -216,7 +217,7 @@ export function PlayerShell() {
         ref={playback.audioRef}
         src={streamSrc}
         onLoadedData={(e) => {
-          e.currentTarget.volume = playback.volume;
+          e.currentTarget.volume = Capacitor.isNativePlatform() ? 1 : playback.volume;
         }}
         onDurationChange={(e) => {
           const audio = e.currentTarget;
