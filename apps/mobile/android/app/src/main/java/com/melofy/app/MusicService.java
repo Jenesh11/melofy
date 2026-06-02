@@ -42,7 +42,14 @@ public class MusicService extends Service {
     private static MusicService instance;
     private MediaPlayer mediaPlayer;
     private String currentUrl;
+    private String currentTrackId;
     private int pendingSeekMs = -1;
+
+    // Pre-armed "next" track. JS pushes this while the WebView is alive so the
+    // service can advance on its own (native auto-advance) even if Android /
+    // an OEM ROM later freezes or kills the WebView renderer process.
+    private String nextUrl;
+    private String nextTrackId;
 
     public static MusicService getInstance() {
         return instance;
@@ -165,8 +172,21 @@ public class MusicService extends Service {
         });
 
         mediaPlayer.setOnCompletionListener(mp -> {
-            // Reached end of track
-            notifyPlaybackEnded();
+            // Reached end of track. If JS pre-armed a next track, advance to it
+            // natively so playback continues even when the WebView is frozen or
+            // its renderer has been killed. Otherwise notify JS so it can decide
+            // (queue empty → autoplay recommendations, stop, etc.).
+            if (nextUrl != null) {
+                String advancedId = nextTrackId;
+                String url = nextUrl;
+                // Consume the armed track so we don't loop on it if JS is dead.
+                nextUrl = null;
+                nextTrackId = null;
+                playUrl(url, advancedId, 0);
+                notifyAdvanced(advancedId);
+            } else {
+                notifyPlaybackEnded();
+            }
         });
     }
 
@@ -176,20 +196,35 @@ public class MusicService extends Service {
         }
     }
 
+    private void notifyAdvanced(String trackId) {
+        if (NativePlayerPlugin.getInstance() != null) {
+            NativePlayerPlugin.getInstance().notifyAdvanced(trackId);
+        }
+    }
+
     private void notifyBuffering(boolean isBuffering) {
         if (NativePlayerPlugin.getInstance() != null) {
             NativePlayerPlugin.getInstance().notifyBuffering(isBuffering);
         }
     }
 
-    public void playUrl(String url, int timeMs) {
+    public void playUrl(String url, String trackId, int timeMs) {
         if (mediaPlayer == null) return;
         try {
-            if (url.equals(currentUrl)) {
-                if (timeMs >= 0) {
-                     mediaPlayer.seekTo(timeMs);
+            // Same logical track (matched by stable id, not URL — the URL carries
+            // a single-use ticket that rotates every call). Don't reload; just
+            // resume and honour an explicit seek so we never interrupt audio
+            // that's already playing the right track. This is what lets JS
+            // re-issue play() with a fresh ticket after a native auto-advance
+            // or a state reconcile without restarting the song.
+            boolean sameTrack = trackId != null && trackId.equals(currentTrackId);
+            if (sameTrack) {
+                if (timeMs > 500) {
+                    mediaPlayer.seekTo(timeMs);
                 }
-                mediaPlayer.start();
+                if (!mediaPlayer.isPlaying()) {
+                    mediaPlayer.start();
+                }
                 return;
             }
             notifyBuffering(true);
@@ -198,9 +233,23 @@ public class MusicService extends Service {
             mediaPlayer.setDataSource(url);
             mediaPlayer.prepareAsync();
             currentUrl = url;
+            currentTrackId = trackId;
         } catch (Exception e) {
             Log.e("MusicService", "Failed to play URL: " + url, e);
         }
+    }
+
+    /**
+     * Pre-arm (or clear) the next track. Called by JS whenever the queue head
+     * changes so the service can auto-advance without the WebView.
+     */
+    public void setNext(String url, String trackId) {
+        this.nextUrl = url;
+        this.nextTrackId = trackId;
+    }
+
+    public String getCurrentTrackId() {
+        return currentTrackId;
     }
 
     public void resumePlayback() {
@@ -222,15 +271,30 @@ public class MusicService extends Service {
     }
 
     public boolean isPlaying() {
-        return mediaPlayer != null && mediaPlayer.isPlaying();
+        try {
+            return mediaPlayer != null && mediaPlayer.isPlaying();
+        } catch (IllegalStateException e) {
+            return false;
+        }
     }
 
     public int getCurrentPosition() {
-        return mediaPlayer != null ? mediaPlayer.getCurrentPosition() : 0;
+        // getCurrentPosition/getDuration throw IllegalStateException when the
+        // player is idle/unprepared (e.g. fresh start). Guard so getState() is
+        // always safe to call.
+        try {
+            return mediaPlayer != null ? mediaPlayer.getCurrentPosition() : 0;
+        } catch (IllegalStateException e) {
+            return 0;
+        }
     }
 
     public int getDuration() {
-        return mediaPlayer != null ? mediaPlayer.getDuration() : 0;
+        try {
+            return mediaPlayer != null ? mediaPlayer.getDuration() : 0;
+        } catch (IllegalStateException e) {
+            return 0;
+        }
     }
     // ─────────────────────────────────────────────────────────────────────────
     // Notification

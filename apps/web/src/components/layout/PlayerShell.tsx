@@ -9,7 +9,7 @@ import { PipPlayer } from '@/components/player/PipPlayer';
 import { useAudioPlayback } from '@/hooks/useAudioPlayback';
 import { useDocPip } from '@/hooks/usePip';
 import { useAuth } from '@/lib/firebase/auth-context';
-import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
+import { buildStreamUrl } from '@/lib/streamUrl';
 import { useLikedSongs } from '@/hooks/useLikedSongs';
 import { useLyricsPanelStore } from '@/store/useLyricsPanelStore';
 import { usePlayerStore, type Track } from '@/store/usePlayerStore';
@@ -148,31 +148,9 @@ export function PlayerShell() {
       }
 
       try {
-        const authHeaders = await getFirebaseAuthHeaders(user);
-        const ticketRes = await fetch('/api/stream-ticket', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...authHeaders,
-          },
-          body: JSON.stringify({ url: encodedTrack }),
-        });
-        if (!ticketRes.ok) {
-          throw new Error(`Failed to create stream ticket (${ticketRes.status})`);
-        }
-
-        const ticketData = (await ticketRes.json()) as { ticket?: string };
-        if (!ticketData.ticket) {
-          throw new Error('Missing stream ticket');
-        }
-
+        const url = await buildStreamUrl(encodedTrack, user);
         if (cancelled) return;
-        const params = new URLSearchParams({
-          ticket: ticketData.ticket,
-          url: encodedTrack,
-        });
-        const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-        setStreamSrc(`${baseUrl}/api/stream?${params.toString()}`);
+        setStreamSrc(url ?? undefined);
       } catch (error) {
         if (!cancelled) {
           setStreamSrc(undefined);

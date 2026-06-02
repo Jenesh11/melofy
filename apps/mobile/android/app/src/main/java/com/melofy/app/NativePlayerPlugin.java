@@ -31,13 +31,14 @@ public class NativePlayerPlugin extends Plugin {
     @PluginMethod
     public void play(PluginCall call) {
         String url = call.getString("url");
+        String trackId = call.getString("trackId");
         Double timeInSeconds = call.getDouble("time");
         int timeMs = timeInSeconds != null ? (int) (timeInSeconds * 1000) : -1;
-        
+
         MusicService service = MusicService.getInstance();
-        
+
         if (service != null && url != null) {
-            service.playUrl(url, timeMs);
+            service.playUrl(url, trackId, timeMs);
             call.resolve();
         } else if (service != null) {
             service.resumePlayback();
@@ -45,6 +46,46 @@ public class NativePlayerPlugin extends Plugin {
         } else {
             call.reject("MusicService is not running");
         }
+    }
+
+    /**
+     * Pre-arm the next track (or clear it when url is null/missing) so the
+     * service can auto-advance natively without the WebView.
+     */
+    @PluginMethod
+    public void setNext(PluginCall call) {
+        MusicService service = MusicService.getInstance();
+        if (service == null) {
+            call.reject("MusicService is not running");
+            return;
+        }
+        String url = call.getString("url");
+        String trackId = call.getString("trackId");
+        service.setNext(url, trackId);
+        call.resolve();
+    }
+
+    /**
+     * Snapshot of native playback state. JS calls this on startup / app-resume
+     * to reconcile its store after the renderer was frozen or killed (during
+     * which the service may have auto-advanced one or more tracks).
+     */
+    @PluginMethod
+    public void getState(PluginCall call) {
+        MusicService service = MusicService.getInstance();
+        JSObject ret = new JSObject();
+        if (service != null) {
+            ret.put("trackId", service.getCurrentTrackId());
+            ret.put("currentTime", service.getCurrentPosition() / 1000.0);
+            ret.put("duration", service.getDuration() / 1000.0);
+            ret.put("isPlaying", service.isPlaying());
+        } else {
+            ret.put("trackId", (String) null);
+            ret.put("currentTime", 0);
+            ret.put("duration", 0);
+            ret.put("isPlaying", false);
+        }
+        call.resolve(ret);
     }
 
     @PluginMethod
@@ -96,6 +137,12 @@ public class NativePlayerPlugin extends Plugin {
 
     public void notifyEnded() {
         notifyListeners("ended", new JSObject());
+    }
+
+    public void notifyAdvanced(String trackId) {
+        JSObject ret = new JSObject();
+        ret.put("trackId", trackId);
+        notifyListeners("advanced", ret);
     }
 
     public void notifyBuffering(boolean isBuffering) {

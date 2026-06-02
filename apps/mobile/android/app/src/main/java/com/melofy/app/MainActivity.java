@@ -1,8 +1,12 @@
 package com.melofy.app;
 
+import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.util.Log;
 import android.webkit.WebView;
 
@@ -83,6 +87,28 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
 
         // Start the background audio foreground service.
         startMusicService();
+
+        // Ask the OS to exempt Melofy from battery optimization. On aggressive
+        // OEM ROMs (Xiaomi/Samsung/Oppo/etc.) this is what stops the system
+        // from freezing/killing the app (and its WebView renderer) shortly
+        // after it is sent to Recents/background. Only prompts if not already
+        // exempt, so the dialog appears at most once.
+        requestBatteryOptimizationExemption();
+    }
+
+    private void requestBatteryOptimizationExemption() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+        try {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            String pkg = getPackageName();
+            if (pm != null && !pm.isIgnoringBatteryOptimizations(pkg)) {
+                Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                intent.setData(Uri.parse("package:" + pkg));
+                startActivity(intent);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Unable to request battery optimization exemption", e);
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
