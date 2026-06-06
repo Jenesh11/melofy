@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { createPortal } from 'react-dom';
 import { MobilePlayer } from '@/components/player/MobilePlayer';
@@ -31,11 +31,33 @@ interface PipState {
 export function PlayerShell() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [streamSrc, setStreamSrc] = useState<string | undefined>(undefined);
+  const [streamSrcIssuedAt, setStreamSrcIssuedAt] = useState(0);
+  const audioErrorRetryRef = useRef<{ trackId: string | null; attempts: number }>({
+    trackId: null,
+    attempts: 0,
+  });
 
   const { isOpen: isLyricsOpen, toggle: toggleLyricsPanel } = useLyricsPanelStore();
 
-  const playback = useAudioPlayback(streamSrc);
   const { user } = useAuth();
+  const refreshStreamSrc = useCallback(async () => {
+    const encodedTrack = usePlayerStore.getState().currentTrack?.url;
+    if (!encodedTrack || !user) {
+      setStreamSrc(undefined);
+      setStreamSrcIssuedAt(0);
+      return null;
+    }
+
+    const url = await buildStreamUrl(encodedTrack, user);
+    setStreamSrc(url ?? undefined);
+    setStreamSrcIssuedAt(url ? Date.now() : 0);
+    return url;
+  }, [user]);
+
+  const playback = useAudioPlayback(streamSrc, {
+    refreshStreamSrc,
+    streamSrcIssuedAt,
+  });
   const { isLiked, toggleLike } = useLikedSongs();
 
   const pip = useDocPip(playback.currentTrack, playback.isPlaying);
@@ -143,7 +165,10 @@ export function PlayerShell() {
     const buildStreamSrc = async () => {
       const encodedTrack = playback.currentTrack?.url;
       if (!encodedTrack || !user) {
-        if (!cancelled) setStreamSrc(undefined);
+        if (!cancelled) {
+          setStreamSrc(undefined);
+          setStreamSrcIssuedAt(0);
+        }
         return;
       }
 
@@ -151,9 +176,11 @@ export function PlayerShell() {
         const url = await buildStreamUrl(encodedTrack, user);
         if (cancelled) return;
         setStreamSrc(url ?? undefined);
+        setStreamSrcIssuedAt(url ? Date.now() : 0);
       } catch (error) {
         if (!cancelled) {
           setStreamSrc(undefined);
+          setStreamSrcIssuedAt(0);
           console.error('[PlayerShell] Failed to prepare stream URL:', error);
           const trackTitle = playback.currentTrack?.title || 'Unknown Track';
           toast.error(`Failed to stream "${trackTitle}". Skipping...`);
@@ -168,6 +195,13 @@ export function PlayerShell() {
       cancelled = true;
     };
   }, [playback.currentTrack?.url, playback.currentTrack?.title, user]);
+
+  useEffect(() => {
+    audioErrorRetryRef.current = {
+      trackId: playback.currentTrack?.id ?? null,
+      attempts: 0,
+    };
+  }, [playback.currentTrack?.id]);
 
   const sharedProps = playback.currentTrack ? {
     currentTrack: playback.currentTrack,
@@ -248,7 +282,13 @@ export function PlayerShell() {
           if (!Capacitor.isNativePlatform()) playback.setIsBuffering(true);
         }}
         onPlaying={() => {
-          if (!Capacitor.isNativePlatform()) playback.setIsBuffering(false);
+          if (!Capacitor.isNativePlatform()) {
+            playback.setIsBuffering(false);
+            audioErrorRetryRef.current = {
+              trackId: playback.currentTrack?.id ?? null,
+              attempts: 0,
+            };
+          }
         }}
         onTimeUpdate={(e) => {
           if (!Capacitor.isNativePlatform() && !playback.isDraggingSlider) {
@@ -267,6 +307,49 @@ export function PlayerShell() {
           if (!playback.currentTrack?.url) return;
           const error = e.currentTarget.error;
           console.error('[PlayerShell] Audio error:', error);
+          const trackId = playback.currentTrack.id;
+          const retry = audioErrorRetryRef.current;
+
+          if (
+            !Capacitor.isNativePlatform() &&
+            retry.trackId === trackId &&
+            retry.attempts < 1
+          ) {
+            retry.attempts += 1;
+            playback.setIsBuffering(true);
+            const audio = e.currentTarget;
+            void refreshStreamSrc()
+              .then((freshSrc) => {
+                const latestState = usePlayerStore.getState();
+                if (!freshSrc || latestState.currentTrack?.id !== trackId) return;
+
+                const resumeAt = latestState.progress / 1000;
+                if (audio.src !== freshSrc) {
+                  audio.src = freshSrc;
+                }
+                const restoreResumeTime = () => {
+                  if (resumeAt > 0 && audio.currentTime < 0.5) {
+                    audio.currentTime = resumeAt;
+                  }
+                };
+                if (audio.readyState >= 1) {
+                  restoreResumeTime();
+                } else {
+                  audio.addEventListener('loadedmetadata', restoreResumeTime, { once: true });
+                }
+                if (latestState.isPlaying) {
+                  audio.play().catch(console.error);
+                }
+              })
+              .catch((refreshError) => {
+                console.error('[PlayerShell] Failed to refresh stream after audio error:', refreshError);
+              })
+              .finally(() => {
+                playback.setIsBuffering(false);
+              });
+            return;
+          }
+
           const trackTitle = playback.currentTrack?.title || 'Unknown Track';
           if (error?.code === 4) {
             toast.error(`Track "${trackTitle}" is currently unavailable or unsupported. Skipping...`);

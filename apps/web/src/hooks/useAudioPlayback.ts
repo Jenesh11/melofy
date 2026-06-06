@@ -19,7 +19,14 @@ import { usePartyEvents } from './usePartyEvents';
 import { useTrackDiscovery } from './useTrackDiscovery';
 import { NativePlayer } from '@/lib/capacitor/NativePlayer';
 
-export function useAudioPlayback(streamSrc?: string) {
+const STREAM_URL_REFRESH_AFTER_MS = 4 * 60 * 1000;
+
+interface AudioPlaybackOptions {
+  refreshStreamSrc?: () => Promise<string | null>;
+  streamSrcIssuedAt?: number;
+}
+
+export function useAudioPlayback(streamSrc?: string, options: AudioPlaybackOptions = {}) {
   // Store selectors
   const {
     currentTrack,
@@ -82,6 +89,7 @@ export function useAudioPlayback(streamSrc?: string) {
 
   // 2. Track resolution & Autoplay
   const { isBuffering, setIsBuffering, triggerAutoplay } = useTrackDiscovery();
+  const { refreshStreamSrc, streamSrcIssuedAt = 0 } = options;
 
   // Handlers for controls
   const handleTogglePlay = useCallback(() => {
@@ -251,6 +259,7 @@ export function useAudioPlayback(streamSrc?: string) {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    let cancelled = false;
 
     if (Capacitor.isNativePlatform()) {
       if (streamSrc) {
@@ -269,12 +278,39 @@ export function useAudioPlayback(streamSrc?: string) {
       }
     } else {
       if (isPlaying) {
-        audio.play().catch(console.error);
+        const play = async () => {
+          let playableSrc = streamSrc;
+          const streamAgeMs = streamSrcIssuedAt ? Date.now() - streamSrcIssuedAt : Infinity;
+          if (refreshStreamSrc && (!playableSrc || streamAgeMs > STREAM_URL_REFRESH_AFTER_MS)) {
+            try {
+              setIsBuffering(true);
+              playableSrc = await refreshStreamSrc() || undefined;
+              if (cancelled) return;
+              if (playableSrc && audio.src !== playableSrc) {
+                audio.src = playableSrc;
+              }
+            } catch (error) {
+              if (!cancelled) {
+                console.error('[useAudioPlayback] Failed to refresh stream before resume:', error);
+                setIsBuffering(false);
+              }
+              return;
+            }
+          }
+
+          audio.play().catch(console.error);
+        };
+
+        void play();
       } else {
         audio.pause();
       }
     }
-  }, [isPlaying, streamSrc]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isPlaying, streamSrc, streamSrcIssuedAt, refreshStreamSrc, setIsBuffering]);
 
   // Native Player Event Listener
   useEffect(() => {
