@@ -33,6 +33,11 @@ export function AppWrapper({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
+      // Disable custom context menu entirely on the Picture-in-Picture (PIP) page
+      if (window.location.pathname === '/pip') {
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
       setContextMenu({ x: e.clientX, y: e.clientY });
     };
@@ -96,18 +101,37 @@ export function AppWrapper({ children }: { children: React.ReactNode }) {
     if (icon) icon.style.color = '';
   };
 
+  // Adjust context menu coordinates to keep the menu fully within the viewport
+  const adjustedCoords = (() => {
+    if (!contextMenu) return null;
+    const menuWidth = 165;
+    const menuHeight = 200;
+    let left = contextMenu.x;
+    let top = contextMenu.y;
+
+    if (typeof window !== 'undefined') {
+      if (left + menuWidth > window.innerWidth) {
+        left = Math.max(10, window.innerWidth - menuWidth - 10);
+      }
+      if (top + menuHeight > window.innerHeight) {
+        top = Math.max(10, window.innerHeight - menuHeight - 10);
+      }
+    }
+    return { x: left, y: top };
+  })();
+
   return (
     <ThemeProvider>
       <OfflineScreen />
       <LikedSongsSync />
       <AppContent>{children}</AppContent>
 
-      {contextMenu && (
+      {adjustedCoords && (
         <div
           style={{
             position: 'fixed',
-            top: contextMenu.y,
-            left: contextMenu.x,
+            top: adjustedCoords.y,
+            left: adjustedCoords.x,
             zIndex: 99999,
             background: 'rgba(23, 23, 27, 0.85)',
             backdropFilter: 'blur(16px)',

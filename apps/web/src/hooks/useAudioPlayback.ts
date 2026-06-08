@@ -24,6 +24,7 @@ const STREAM_URL_REFRESH_AFTER_MS = 4 * 60 * 1000;
 interface AudioPlaybackOptions {
   refreshStreamSrc?: () => Promise<string | null>;
   streamSrcIssuedAt?: number;
+  streamTrackId?: string | null;
 }
 
 export function useAudioPlayback(streamSrc?: string, options: AudioPlaybackOptions = {}) {
@@ -89,7 +90,7 @@ export function useAudioPlayback(streamSrc?: string, options: AudioPlaybackOptio
 
   // 2. Track resolution & Autoplay
   const { isBuffering, setIsBuffering, triggerAutoplay } = useTrackDiscovery();
-  const { refreshStreamSrc, streamSrcIssuedAt = 0 } = options;
+  const { refreshStreamSrc, streamSrcIssuedAt = 0, streamTrackId } = options;
 
   // Handlers for controls
   const handleTogglePlay = useCallback(() => {
@@ -255,14 +256,17 @@ export function useAudioPlayback(streamSrc?: string, options: AudioPlaybackOptio
 
   // Core Play/Pause Effect for the Ref
   const lastPlayedSrc = useRef<string | null>(null);
+  const currentTrackId = currentTrack?.id;
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     let cancelled = false;
 
+    const isSourceMatching = !!(currentTrackId && streamTrackId === currentTrackId);
+
     if (Capacitor.isNativePlatform()) {
-      if (streamSrc) {
+      if (streamSrc && isSourceMatching) {
         if (isPlaying) {
           const isNewTrack = streamSrc !== lastPlayedSrc.current;
           const timeToPass = isNewTrack ? (usePlayerStore.getState().progress / 1000) : undefined;
@@ -277,7 +281,7 @@ export function useAudioPlayback(streamSrc?: string, options: AudioPlaybackOptio
         NativePlayer.pause().catch(console.error);
       }
     } else {
-      if (isPlaying) {
+      if (isPlaying && isSourceMatching) {
         const play = async () => {
           let playableSrc = streamSrc;
           const streamAgeMs = streamSrcIssuedAt ? Date.now() - streamSrcIssuedAt : Infinity;
@@ -310,7 +314,7 @@ export function useAudioPlayback(streamSrc?: string, options: AudioPlaybackOptio
     return () => {
       cancelled = true;
     };
-  }, [isPlaying, streamSrc, streamSrcIssuedAt, refreshStreamSrc, setIsBuffering]);
+  }, [isPlaying, streamSrc, streamSrcIssuedAt, refreshStreamSrc, setIsBuffering, currentTrackId, streamTrackId]);
 
   // Native Player Event Listener
   useEffect(() => {

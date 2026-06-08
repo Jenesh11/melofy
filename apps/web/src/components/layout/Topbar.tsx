@@ -227,6 +227,7 @@ export function Topbar() {
                               src={track.info.artworkUrl}
                               alt={track.info.title || 'Track'}
                               fill
+                              sizes="40px"
                               className='object-cover'
                             />
                           ) : (

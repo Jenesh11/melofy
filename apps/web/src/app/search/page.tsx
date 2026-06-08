@@ -390,6 +390,7 @@ export default function SearchPage() {
                       src={item.image}
                       alt={item.term}
                       fill
+                      sizes="208px"
                       className='object-cover brightness-50 group-hover:brightness-65 group-hover:scale-110 transition-all duration-700'
                     />
                   ) : (
@@ -448,6 +449,7 @@ export default function SearchPage() {
                     src={cat.image} 
                     alt={cat.label} 
                     fill 
+                    sizes="(max-width: 768px) 50vw, 33vw"
                     className='object-cover opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700'
                   />
                   <div className='absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent transition-opacity duration-500 group-hover:from-black/90' />

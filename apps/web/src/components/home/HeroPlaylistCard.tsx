@@ -65,18 +65,16 @@ export function HeroPlaylistCard({
         delay: index * 0.07,
         ease: [0.22, 1, 0.36, 1],
       }}
-      // Use fluid viewport-relative width on mobile so the card doesn't overflow
-      // or feel cramped. Max-width keeps it bounded on larger screens.
-      className='relative group shrink-0 w-[82vw] max-w-[300px] md:max-w-none md:w-[500px] h-[220px] md:h-[300px] rounded-[2.5rem] md:rounded-[3rem] overflow-hidden border border-white/5 hover:border-white/20 transition-all duration-700 bg-black snap-start cursor-pointer shadow-2xl block'
+      className='relative group shrink-0 w-[82vw] max-w-[320px] md:max-w-none md:w-[500px] h-[220px] md:h-[300px] rounded-[2rem] md:rounded-[2.5rem] overflow-hidden border border-white/10 transition-all duration-500 bg-zinc-900/30 dark:bg-black/20 backdrop-blur-xl snap-start cursor-pointer shadow-2xl block'
       onClick={() => router.push(`/playlist/${playlist.id}`)}
     >
-      {/* Cinematic Blurred Background 'Essence' */}
-      <div className='absolute inset-0 opacity-40 group-hover:opacity-60 transition-opacity duration-700 blur-[80px] scale-150 saturate-200'>
+      {/* Background: Subtle Blurred cover art inside the card */}
+      <div className='absolute inset-0 opacity-35 group-hover:opacity-45 transition-opacity duration-700 blur-[40px] scale-110 saturate-150 z-0 pointer-events-none'>
         {playlist.images?.[0]?.url && (
           <Image
             src={playlist.images[0].url}
             fill
-            sizes='(max-width: 768px) 82vw, 500px'
+            sizes="(max-width: 768px) 320px, 500px"
             className='object-cover'
             alt=''
             priority={index < 2}
@@ -85,58 +83,75 @@ export function HeroPlaylistCard({
       </div>
 
       {/* Dark gradient overlay for text readability */}
-      <div className='absolute inset-0 bg-linear-to-t from-black via-transparent to-black/20 z-0' />
+      <div className='absolute inset-0 bg-linear-to-b from-black/5 via-black/15 to-black/30 z-5' />
 
-      <div className='absolute inset-0 p-5 md:p-10 flex flex-col justify-between z-10'>
-        <div className='flex justify-between items-start'>
-          <div className='flex flex-col gap-1 pr-3 min-w-0'>
-            <span className='px-2.5 py-1 bg-white/10 backdrop-blur-lg text-white/80 text-[9px] md:text-[10px] font-bold rounded-full uppercase tracking-[0.2em] border border-white/10 w-fit shrink-0'>
-              Playlist
-            </span>
-            <h2 className='text-xl md:text-4xl font-black text-white mt-2 md:mt-4 leading-tight tracking-tight drop-shadow-lg group-hover:text-primary transition-colors truncate'>
-              {playlist.name || 'Untitled Playlist'}
-            </h2>
-          </div>
+      {/* Main split content */}
+      <div className='absolute inset-0 p-4 md:p-6 flex gap-4 md:gap-6 items-center z-10'>
+        {/* Left Side: Artwork Container with Hover Gloss Sweep Shine */}
+        <div className='relative shrink-0 w-24 h-24 md:w-[185px] md:h-[185px] rounded-2xl md:rounded-[1.75rem] overflow-hidden shadow-2xl border border-white/10 group-hover:scale-[1.02] transition-transform duration-500 ease-out'>
+          {playlist.images?.[0]?.url ? (
+            <Image
+              src={playlist.images[0].url}
+              fill
+              sizes='(max-width: 768px) 96px, 185px'
+              className='object-cover'
+              alt={playlist.name || ''}
+              priority={index < 2}
+            />
+          ) : (
+            <div className='w-full h-full bg-linear-to-br from-zinc-800 to-zinc-900 flex items-center justify-center'>
+              <span className='text-zinc-500 font-bold text-xs'>No Cover</span>
+            </div>
+          )}
 
-          {/* Play Button */}
-          <div className='relative z-20 shrink-0'>
-            <div className='absolute -inset-4 bg-primary/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none' />
-            <Button
-              size='icon'
-              className='h-10 w-10 md:h-14 md:w-14 rounded-full bg-primary text-primary-foreground shadow-2xl scale-90 group-hover:scale-110 transition-all duration-500 border-none relative z-20'
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onPlay(playlist);
-              }}
-            >
-              <Play className='h-4 w-4 md:h-6 md:w-6 fill-black' />
-            </Button>
-          </div>
+          {/* Elegant gloss shine sweep effect on hover */}
+          <div className='absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out z-10 pointer-events-none' />
         </div>
 
-        <div className='flex flex-col gap-1.5 md:gap-2 pointer-events-none'>
-          <p className='text-zinc-400 text-xs md:text-sm line-clamp-2 font-medium max-w-[240px] md:max-w-[280px] leading-relaxed'>
-            {decodedDescription ||
-              'Expertly curated for your favorite vibes and moments.'}
-          </p>
-          <div className='flex items-center gap-2 md:gap-3 mt-2 md:mt-4'>
-            <div className='bg-white/10 backdrop-blur-md px-2.5 py-1 md:px-3 rounded-full border border-white/10'>
-              <span className='text-[9px] md:text-[10px] text-white/90 font-black uppercase tracking-[0.15em]'>
-                {playlist.tracks?.total || 50} TRACKS
-              </span>
+        {/* Right Side: Text details */}
+        <div className='flex-1 flex flex-col justify-between h-full min-w-0 py-2 md:py-4'>
+          {/* Top part: Title */}
+          <div className='min-w-0'>
+            <h2 className='text-base md:text-2xl font-black text-white mt-1 md:mt-2.5 leading-tight tracking-tight drop-shadow-md group-hover:text-primary transition-colors line-clamp-2'>
+              {playlist.name || 'Untitled Playlist'}
+            </h2>
+            <p className='text-zinc-300 text-[10px] md:text-xs line-clamp-2 md:line-clamp-3 mt-1.5 md:mt-2.5 font-medium leading-relaxed'>
+              {decodedDescription ||
+                'Expertly curated for your favorite vibes and moments.'}
+            </p>
+          </div>
+
+          {/* Bottom part: Metadata & Play button */}
+          <div className='flex items-center justify-between gap-2 mt-2 mb-1 md:mb-2'>
+            <div className='flex items-center gap-1.5 md:gap-2.5 text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-zinc-400 min-w-0'>
+              <span className='text-white font-black shrink-0'>{playlist.tracks?.total || 50} Tracks</span>
+              {playlist.owner?.display_name && (
+                <>
+                  <span className='text-zinc-600 font-normal select-none'>•</span>
+                  <span className='truncate max-w-[80px] md:max-w-[130px]'>
+                    By {playlist.owner.display_name}
+                  </span>
+                </>
+              )}
             </div>
-            {playlist.owner?.display_name && (
-              <span className='text-[9px] md:text-[10px] text-zinc-400 font-bold uppercase tracking-widest truncate'>
-                By {playlist.owner.display_name}
-              </span>
-            )}
+
+            {/* Play Button */}
+            <div className='relative shrink-0'>
+              <Button
+                size='icon'
+                className='h-8 w-8 md:h-11 md:w-11 rounded-full bg-primary text-primary-foreground shadow-xl scale-95 group-hover:scale-105 active:scale-95 transition-all duration-300 border-none relative z-10'
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onPlay(playlist);
+                }}
+              >
+                <Play className='h-3.5 w-3.5 md:h-5 md:w-5 fill-primary-foreground translate-x-px' />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Hover Light Effect */}
-      <div className='absolute inset-0 bg-linear-to-tr from-white/5 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-1000 pointer-events-none rounded-[2.5rem]' />
     </motion.div>
   );
 }

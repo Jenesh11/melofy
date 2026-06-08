@@ -31,6 +31,7 @@ interface PipState {
 export function PlayerShell() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [streamSrc, setStreamSrc] = useState<string | undefined>(undefined);
+  const [streamTrackId, setStreamTrackId] = useState<string | null>(null);
   const [streamSrcIssuedAt, setStreamSrcIssuedAt] = useState(0);
   const audioErrorRetryRef = useRef<{ trackId: string | null; attempts: number }>({
     trackId: null,
@@ -44,12 +45,14 @@ export function PlayerShell() {
     const encodedTrack = usePlayerStore.getState().currentTrack?.url;
     if (!encodedTrack || !user) {
       setStreamSrc(undefined);
+      setStreamTrackId(null);
       setStreamSrcIssuedAt(0);
       return null;
     }
 
     const url = await buildStreamUrl(encodedTrack, user);
     setStreamSrc(url ?? undefined);
+    setStreamTrackId(usePlayerStore.getState().currentTrack?.id ?? null);
     setStreamSrcIssuedAt(url ? Date.now() : 0);
     return url;
   }, [user]);
@@ -57,6 +60,7 @@ export function PlayerShell() {
   const playback = useAudioPlayback(streamSrc, {
     refreshStreamSrc,
     streamSrcIssuedAt,
+    streamTrackId,
   });
   const { isLiked, toggleLike } = useLikedSongs();
 
@@ -167,6 +171,7 @@ export function PlayerShell() {
       if (!encodedTrack || !user) {
         if (!cancelled) {
           setStreamSrc(undefined);
+          setStreamTrackId(null);
           setStreamSrcIssuedAt(0);
         }
         return;
@@ -176,10 +181,12 @@ export function PlayerShell() {
         const url = await buildStreamUrl(encodedTrack, user);
         if (cancelled) return;
         setStreamSrc(url ?? undefined);
+        setStreamTrackId(playback.currentTrack?.id ?? null);
         setStreamSrcIssuedAt(url ? Date.now() : 0);
       } catch (error) {
         if (!cancelled) {
           setStreamSrc(undefined);
+          setStreamTrackId(null);
           setStreamSrcIssuedAt(0);
           console.error('[PlayerShell] Failed to prepare stream URL:', error);
           const trackTitle = playback.currentTrack?.title || 'Unknown Track';
@@ -228,7 +235,7 @@ export function PlayerShell() {
     <>
       <audio
         ref={playback.audioRef}
-        src={Capacitor.isNativePlatform() ? undefined : streamSrc}
+        src={Capacitor.isNativePlatform() ? undefined : (streamTrackId === playback.currentTrack?.id ? streamSrc : undefined)}
         onLoadedData={(e) => {
           e.currentTarget.volume = Capacitor.isNativePlatform() ? 1 : playback.volume;
           const pendingProgressSeconds = usePlayerStore.getState().progress / 1000;

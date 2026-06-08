@@ -259,11 +259,7 @@ export default function PlaylistPage() {
   }, [addPlaylist, id, isSpotifySource, playlist, removePlaylist, saved]);
 
   if (isLoading) {
-    return (
-      <div className='flex items-center justify-center min-h-[60vh] w-full'>
-        <Loader2 className='h-10 w-10 text-primary animate-spin' />
-      </div>
-    );
+    return <PlaylistPageSkeleton />;
   }
 
   if (!playlist) {
@@ -284,10 +280,15 @@ export default function PlaylistPage() {
   }
 
   const bgImageUrl = playlist.artworkUrl || playlist.images?.[0]?.url || '';
+  const isLikedSongs = (playlist as CustomPlaylistData).isLikedSongs || playlist.name === 'Liked Songs';
 
   return (
     <div className='flex flex-col min-h-full overflow-x-hidden custom-scrollbar p-4 md:p-8 pb-32 md:pb-8 relative'>
-      {bgImageUrl && (
+      {isLikedSongs ? (
+        <div
+          className='absolute top-0 left-0 right-0 h-[50vh] opacity-25 blur-[120px] pointer-events-none z-10 bg-linear-to-br from-indigo-500 via-purple-500 to-pink-500'
+        />
+      ) : bgImageUrl ? (
         <div
           className='absolute top-0 left-0 right-0 h-[50vh] opacity-30 blur-[120px] pointer-events-none z-10'
           style={{
@@ -296,7 +297,7 @@ export default function PlaylistPage() {
             backgroundPosition: 'center',
           }}
         />
-      )}
+      ) : null}
       <header className='flex flex-col md:flex-row items-center md:items-end gap-6 mb-8 mt-4'>
         <div className='h-48 w-48 md:h-60 md:w-60 rounded-[2.5rem] bg-muted shadow-2xl shrink-0 overflow-hidden z-10 relative'>
           {(playlist as CustomPlaylistData).isLikedSongs || playlist.name === 'Liked Songs' ? (
@@ -380,6 +381,110 @@ export default function PlaylistPage() {
       </div>
 
       <TrackList tracks={trackItems} />
+    </div>
+  );
+}
+
+function PlaylistPageSkeleton() {
+  return (
+    <div className='flex flex-col min-h-full overflow-x-hidden p-4 md:p-8 pb-32 md:pb-8 relative animate-pulse'>
+      {/* Header Skeleton */}
+      <header className='flex flex-col md:flex-row items-center md:items-end gap-6 mb-8 mt-4'>
+        {/* Cover Art Skeleton */}
+        <div className='h-48 w-48 md:h-60 md:w-60 rounded-[2.5rem] bg-zinc-200 dark:bg-zinc-800/60 shadow-2xl shrink-0' />
+
+        {/* Metadata Details Skeleton */}
+        <div className='flex flex-col gap-2 w-full md:w-auto md:min-w-[300px]'>
+          {/* Subtitle / tag */}
+          <div className='h-3.5 w-24 bg-zinc-200 dark:bg-zinc-800/60 rounded' />
+          
+          {/* Title */}
+          <div className='h-12 md:h-16 w-3/4 md:w-[450px] bg-zinc-200 dark:bg-zinc-800/60 rounded-2xl my-2' />
+          
+          {/* Description */}
+          <div className='h-4 w-5/6 md:w-[350px] bg-zinc-200 dark:bg-zinc-800/60 rounded' />
+          
+          {/* Bottom stats row */}
+          <div className='flex items-center gap-1.5 mt-2'>
+            <div className='h-4 w-16 bg-zinc-200 dark:bg-zinc-800/60 rounded' />
+            <span className='text-zinc-300 dark:text-zinc-700'>&middot;</span>
+            <div className='h-4 w-28 bg-zinc-200 dark:bg-zinc-800/60 rounded' />
+          </div>
+        </div>
+      </header>
+
+      {/* Action Bar Skeleton */}
+      <div className='flex items-center gap-6 mb-8'>
+        {/* Play Button Skeleton */}
+        <div className='h-14 w-14 rounded-full bg-zinc-200 dark:bg-zinc-800/60 shadow-lg' />
+        {/* Heart/Like Button Skeleton */}
+        <div className='h-12 w-12 rounded-full bg-zinc-200 dark:bg-zinc-800/60' />
+      </div>
+
+      {/* Track List Skeleton */}
+      <div className='flex flex-col gap-1'>
+        {/* Header Column Mock */}
+        <div className='grid grid-cols-[2rem_1fr_auto_5rem] md:grid-cols-[2rem_1fr_minmax(0,200px)_auto_5rem] gap-4 px-4 py-2 border-b border-border text-muted-foreground text-[10px] font-bold tracking-wider uppercase mb-2'>
+          <span className='text-center'>#</span>
+          <span>Title</span>
+          <span className='hidden md:block'>Album</span>
+          <span className='flex items-center justify-end'>
+            <svg
+              xmlns='http://www.w3.org/2000/svg'
+              width='12'
+              height='12'
+              viewBox='0 0 24 24'
+              fill='none'
+              stroke='currentColor'
+              strokeWidth='2'
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              className='text-muted-foreground'
+            >
+              <circle cx='12' cy='12' r='10' />
+              <polyline points='12 6 12 12 16 14' />
+            </svg>
+          </span>
+          <span></span>
+        </div>
+
+        {/* 8 Mock Track Rows */}
+        {Array.from({ length: 8 }).map((_, index) => (
+          <div
+            key={index}
+            className='grid grid-cols-[2rem_1fr_auto_5rem] md:grid-cols-[2rem_1fr_minmax(0,200px)_auto_5rem] gap-4 px-4 py-3 rounded-xl items-center'
+          >
+            {/* Number */}
+            <span className='text-center text-sm font-medium text-muted-foreground/30 tabular-nums'>
+              {index + 1}
+            </span>
+
+            {/* Title & Artist */}
+            <div className='flex items-center gap-3 min-w-0'>
+              <div className='h-10 w-10 rounded-lg bg-zinc-200 dark:bg-zinc-800/60 shrink-0' />
+              <div className='flex flex-col gap-1.5 min-w-0'>
+                <div className='h-4 w-40 md:w-60 bg-zinc-200 dark:bg-zinc-800/60 rounded' />
+                <div className='h-3 w-24 md:w-36 bg-zinc-200 dark:bg-zinc-800/60 rounded' />
+              </div>
+            </div>
+
+            {/* Album */}
+            <span className='hidden md:block'>
+              <div className='h-4 w-32 bg-zinc-200 dark:bg-zinc-800/60 rounded' />
+            </span>
+
+            {/* Duration */}
+            <span className='flex justify-end items-center'>
+              <div className='h-4 w-8 bg-zinc-200 dark:bg-zinc-800/60 rounded' />
+            </span>
+
+            {/* Actions spacing */}
+            <div className='flex items-center justify-end gap-1 opacity-0'>
+              <div className='h-8 w-8 rounded-full bg-zinc-200 dark:bg-zinc-800/60' />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

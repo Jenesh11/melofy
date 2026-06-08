@@ -15,6 +15,7 @@ import {
   Heart,
   ListMusic,
   Trash2,
+  GripVertical,
 } from 'lucide-react';
 import { useLikedSongs } from '@/hooks/useLikedSongs';
 import { Button } from '@/components/ui/button';
@@ -76,6 +77,39 @@ export function MobilePlayer({
   const queue = usePlayerStore((state) => state.queue);
   const playFromQueue = usePlayerStore((state) => state.playFromQueue);
   const setQueue = usePlayerStore((state) => state.setQueue);
+
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (dropIndex: number) => {
+    if (draggedIndex === null || draggedIndex === dropIndex) return;
+
+    const updatedQueue = [...queue];
+    const [draggedItem] = updatedQueue.splice(draggedIndex, 1);
+    updatedQueue.splice(dropIndex, 0, draggedItem);
+    
+    setQueue(updatedQueue);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
 
   useEffect(() => {
     const handleHardwareBack = (e: Event) => {
@@ -414,18 +448,30 @@ export function MobilePlayer({
                 queue.map((track, i) => (
                   <div
                     key={`${track.id}-${i}`}
+                    draggable
+                    onDragStart={() => handleDragStart(i)}
+                    onDragOver={(e) => handleDragOver(e, i)}
+                    onDragLeave={handleDragLeave}
+                    onDragEnd={handleDragEnd}
+                    onDrop={() => handleDrop(i)}
                     onClick={() => {
                       playFromQueue(i);
                       setShowQueue(false);
                     }}
-                    className='flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors group cursor-pointer'
+                    className={`flex items-center gap-2.5 p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors group cursor-pointer border-t-2 relative ${
+                      dragOverIndex === i && draggedIndex !== i ? 'border-primary' : 'border-transparent'
+                    } ${draggedIndex === i ? 'opacity-40' : ''}`}
                   >
+                    <div className='flex items-center shrink-0 opacity-40 hover:opacity-100 transition-opacity duration-150 cursor-grab active:cursor-grabbing text-white mr-0.5'>
+                      <GripVertical className='h-4 w-4' />
+                    </div>
                     <div className='h-12 w-12 shrink-0 rounded-lg overflow-hidden relative bg-white/10 flex items-center justify-center'>
                       {track.artworkUrl ? (
                         <Image
                           src={track.artworkUrl}
                           alt={track.title}
                           fill
+                          sizes="48px"
                           className='object-cover'
                         />
                       ) : (

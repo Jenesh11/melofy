@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ListMusic, Play, Trash2 } from 'lucide-react';
+import { ListMusic, Play, Trash2, GripVertical } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -13,6 +13,9 @@ export function QueuePopover() {
   const playFromQueue = usePlayerStore((state) => state.playFromQueue);
   const setQueue = usePlayerStore((state) => state.setQueue);
 
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
   const handlePlayFromQueue = (index: number) => {
     playFromQueue(index);
   };
@@ -22,6 +25,36 @@ export function QueuePopover() {
     const newQueue = [...queue];
     newQueue.splice(index, 1);
     setQueue(newQueue);
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (dropIndex: number) => {
+    if (draggedIndex === null || draggedIndex === dropIndex) return;
+
+    const updatedQueue = [...queue];
+    const [draggedItem] = updatedQueue.splice(draggedIndex, 1);
+    updatedQueue.splice(dropIndex, 0, draggedItem);
+    
+    setQueue(updatedQueue);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
   };
 
   return (
@@ -57,15 +90,27 @@ export function QueuePopover() {
               queue.map((track, i) => (
                 <div
                   key={`${track.id}-${i}`}
+                  draggable
+                  onDragStart={() => handleDragStart(i)}
+                  onDragOver={(e) => handleDragOver(e, i)}
+                  onDragLeave={handleDragLeave}
+                  onDragEnd={handleDragEnd}
+                  onDrop={() => handleDrop(i)}
                   onClick={() => handlePlayFromQueue(i)}
-                  className='flex items-center gap-3 p-2 hover:bg-muted/50 rounded-md transition-colors group cursor-pointer'
+                  className={`flex items-center gap-2.5 p-2 hover:bg-muted/50 rounded-md transition-colors group cursor-pointer border-t-2 relative ${
+                    dragOverIndex === i && draggedIndex !== i ? 'border-primary' : 'border-transparent'
+                  } ${draggedIndex === i ? 'opacity-40' : ''}`}
                 >
+                  <div className='flex items-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 cursor-grab active:cursor-grabbing text-muted-foreground mr-0.5'>
+                    <GripVertical className='h-3.5 w-3.5' />
+                  </div>
                   <div className='h-10 w-10 shrink-0 rounded-md overflow-hidden relative bg-muted flex items-center justify-center'>
                     {track.artworkUrl ? (
                       <Image
                         src={track.artworkUrl}
                         alt={track.title}
                         fill
+                        sizes="40px"
                         className='object-cover'
                       />
                     ) : (

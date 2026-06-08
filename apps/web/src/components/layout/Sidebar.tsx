@@ -116,19 +116,22 @@ export function Sidebar() {
 
   return (
     <div className={cn(
-      'flex h-full flex-col bg-sidebar/40 backdrop-blur-xl border-r border-sidebar-border text-sidebar-foreground overflow-hidden transition-[width] duration-300 ease-in-out select-none',
-      isCollapsed ? 'w-18 items-center p-3' : 'w-64 p-4'
+      'flex h-full flex-col bg-sidebar/40 backdrop-blur-xl border-r border-sidebar-border text-sidebar-foreground overflow-hidden transition-[width,padding] duration-300 ease-in-out select-none',
+      isCollapsed ? 'w-20 px-3 py-4' : 'w-64 p-4'
     )}>
       {/* Brand Header & Toggle */}
       <div className={cn(
-        'flex items-center justify-between pb-8 pt-2 w-full',
-        isCollapsed ? 'flex-col gap-4 px-0' : 'px-2'
+        'flex w-full shrink-0 overflow-hidden items-center justify-between h-14 transition-[padding,gap] duration-300 ease-in-out px-2 pt-2 pb-4',
+        isCollapsed && 'gap-0'
       )}>
         {activeCollectionId ? (
           <Link
             href={`/playlist/${activeCollectionId}`}
             className={cn(
-              'flex items-center gap-2 transition-opacity duration-200 cursor-pointer hover:opacity-80 active:scale-95',
+              'flex min-w-0 items-center transition-[max-width,opacity,transform,gap] duration-300 ease-in-out cursor-pointer hover:opacity-80 active:scale-95 overflow-hidden',
+              isCollapsed
+                ? 'max-w-0 opacity-0 pointer-events-none gap-0'
+                : 'max-w-[180px] opacity-100 gap-2',
             )}
           >
             <div className='h-8 w-8 overflow-hidden flex items-center justify-center shrink-0 shadow-lg shadow-primary/20 rounded-lg relative'>
@@ -140,14 +143,24 @@ export function Sidebar() {
                 className='h-full w-full object-contain'
               />
             </div>
-            {!isCollapsed && (
-              <h1 className='text-xl font-bold tracking-tight bg-linear-to-br from-foreground to-foreground/60 bg-clip-text text-transparent'>
-                Melofy
-              </h1>
-            )}
+            <h1
+              className={cn(
+                'overflow-hidden whitespace-nowrap text-xl font-bold tracking-tight bg-linear-to-br from-foreground to-foreground/60 bg-clip-text text-transparent transition-[max-width,opacity,transform] duration-300 ease-in-out',
+                isCollapsed ? 'max-w-0 opacity-0 -translate-x-2' : 'max-w-28 opacity-100 translate-x-0',
+              )}
+            >
+              Melofy
+            </h1>
           </Link>
         ) : (
-          <div className='flex items-center gap-2 cursor-default'>
+          <div
+            className={cn(
+              'flex min-w-0 items-center cursor-default transition-[max-width,opacity,transform,gap] duration-300 ease-in-out overflow-hidden',
+              isCollapsed
+                ? 'max-w-0 opacity-0 pointer-events-none gap-0'
+                : 'max-w-[180px] opacity-100 gap-2',
+            )}
+          >
             <div className='h-8 w-8 overflow-hidden flex items-center justify-center shrink-0 shadow-lg shadow-primary/20 rounded-lg relative'>
               <Image
                 src='/logo.png'
@@ -157,11 +170,14 @@ export function Sidebar() {
                 className='h-full w-full object-contain'
               />
             </div>
-            {!isCollapsed && (
-              <h1 className='text-xl font-bold tracking-tight bg-linear-to-br from-foreground to-foreground/60 bg-clip-text text-transparent'>
-                Melofy
-              </h1>
-            )}
+            <h1
+              className={cn(
+                'overflow-hidden whitespace-nowrap text-xl font-bold tracking-tight bg-linear-to-br from-foreground to-foreground/60 bg-clip-text text-transparent transition-[max-width,opacity,transform] duration-300 ease-in-out',
+                isCollapsed ? 'max-w-0 opacity-0 -translate-x-2' : 'max-w-28 opacity-100 translate-x-0',
+              )}
+            >
+              Melofy
+            </h1>
           </div>
         )}
 
@@ -169,7 +185,10 @@ export function Sidebar() {
           variant='ghost'
           size='icon'
           onClick={toggleSidebar}
-          className='h-8 w-8 text-zinc-400 hover:text-white rounded-lg transition-transform hover:scale-105 active:scale-95 shrink-0'
+          className={cn(
+            'h-8 w-8 text-zinc-400 hover:text-white rounded-lg transition-all duration-300 hover:scale-105 active:scale-95 shrink-0',
+            isCollapsed ? 'mr-4' : 'mr-0'
+          )}
           title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
         >
           {isCollapsed ? <ChevronRight className='h-4 w-4' /> : <ChevronLeft className='h-4 w-4' />}
@@ -177,13 +196,13 @@ export function Sidebar() {
       </div>
 
       {/* Navigation Routes */}
-      <div className='flex flex-col gap-1.5 w-full items-center shrink-0'>
+      <div className='flex flex-col gap-1.5 w-full shrink-0'>
         {routes.map((route) => (
-          <Link key={route.href} href={route.href} className='w-full flex justify-center'>
+          <Link key={route.href} href={route.href} className='w-full'>
             <div
               className={cn(
-                'flex items-center rounded-md text-sm font-medium transition-colors duration-200 group/item cursor-pointer',
-                isCollapsed ? 'justify-center w-10 h-10 p-0' : 'gap-4 px-3 py-2 w-full',
+                'flex items-center rounded-md text-sm font-medium transition-[padding,gap,colors] duration-300 ease-in-out group/item cursor-pointer w-full h-10',
+                isCollapsed ? 'px-[18px] gap-0' : 'px-3.5 gap-4',
                 route.active
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                   : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
@@ -191,11 +210,12 @@ export function Sidebar() {
               title={isCollapsed ? route.label : undefined}
             >
               <route.icon className='h-5 w-5 shrink-0 transition-transform group-hover/item:scale-105' />
-              {!isCollapsed && (
-                <span className='truncate font-medium'>
-                  {route.label}
-                </span>
-              )}
+              <span className={cn(
+                'truncate font-medium transition-[max-width,opacity] duration-300 ease-in-out overflow-hidden',
+                isCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-40 opacity-100',
+              )}>
+                {route.label}
+              </span>
             </div>
           </Link>
         ))}
@@ -203,18 +223,23 @@ export function Sidebar() {
 
       {/* Playlists Section */}
       <div className='mt-8 flex flex-col gap-1 flex-1 overflow-hidden w-full'>
-        {isCollapsed ? (
-          <div className='w-8 h-px bg-white/10 my-3 shrink-0' />
-        ) : (
-          <p className='px-3 text-xs font-semibold tracking-wider text-sidebar-foreground/40 mb-2 uppercase shrink-0'>
+        <div className='h-6 overflow-hidden shrink-0 relative w-full flex items-center px-3'>
+          <span className={cn(
+            'text-xs font-semibold tracking-wider text-sidebar-foreground/40 uppercase transition-[max-width,opacity] duration-300 ease-in-out whitespace-nowrap overflow-hidden',
+            isCollapsed ? 'opacity-0 max-w-0 pointer-events-none' : 'opacity-100 max-w-full'
+          )}>
             Playlists
-          </p>
-        )}
+          </span>
+          <div className={cn(
+            'h-px bg-white/10 transition-all duration-300 absolute left-1/2 -translate-x-1/2',
+            isCollapsed ? 'w-8 opacity-100' : 'w-0 opacity-0'
+          )} />
+        </div>
         <div className={cn(
-          'flex flex-col gap-1 overflow-y-auto custom-scrollbar sidebar-scrollbar w-full items-center',
-          isCollapsed ? 'pr-0' : 'pr-2'
+          'flex flex-col gap-1 overflow-y-auto custom-scrollbar sidebar-scrollbar w-full',
+          isCollapsed ? 'pr-0 scrollbar-none' : 'pr-2'
         )}>
-          <div className='mt-2 flex flex-col gap-1.5 w-full items-center'>
+          <div className='mt-2 flex flex-col gap-1.5 w-full'>
             {allPlaylists.map((playlist) => {
               const isLocalReference = savedPlaylistIds.has(
                 playlist.id as string,
@@ -222,12 +247,12 @@ export function Sidebar() {
 
               return (
                 <ContextMenu key={playlist.id}>
-                  <ContextMenuTrigger className='w-full flex justify-center'>
-                    <Link href={`/playlist/${playlist.id}`} className='w-full flex justify-center'>
+                  <ContextMenuTrigger className='w-full'>
+                    <Link href={`/playlist/${playlist.id}`} className='w-full'>
                       <div
                         className={cn(
-                          'flex items-center rounded-md text-sm transition-colors duration-200 group/playlist cursor-pointer',
-                          isCollapsed ? 'justify-center w-10 h-10 p-0' : 'gap-3 px-3 py-2 w-full',
+                          'flex items-center rounded-md text-sm transition-[padding,gap,colors] duration-300 ease-in-out group/playlist cursor-pointer w-full h-10 px-3',
+                          isCollapsed ? 'gap-0' : 'gap-3',
                           pathname === `/playlist/${playlist.id}`
                             ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                             : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
@@ -259,37 +284,38 @@ export function Sidebar() {
                             <ListMusic className='h-4 w-4 text-muted-foreground group-hover/playlist:text-primary transition-colors' />
                           )}
                         </div>
-                        {!isCollapsed && (
-                          editingId === playlist.id ? (
-                            <Input
-                              autoFocus
-                              value={editingName}
-                              onChange={(e) => setEditingName(e.target.value)}
-                              onBlur={() => setEditingId(null)}
-                              onKeyDown={async (e) => {
-                                if (e.key === 'Enter') {
-                                  if (
-                                    editingName.trim() !== '' &&
-                                    editingName.trim() !== playlist.name
-                                  ) {
-                                    await renamePlaylist(
-                                      playlist.id!,
-                                      editingName.trim(),
-                                    );
-                                  }
-                                  setEditingId(null);
-                                } else if (e.key === 'Escape') {
-                                  setEditingId(null);
+                        {!isCollapsed && editingId === playlist.id ? (
+                          <Input
+                            autoFocus
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            onBlur={() => setEditingId(null)}
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter') {
+                                if (
+                                  editingName.trim() !== '' &&
+                                  editingName.trim() !== playlist.name
+                                ) {
+                                  await renamePlaylist(
+                                    playlist.id!,
+                                    editingName.trim(),
+                                  );
                                 }
-                              }}
-                              className='h-7 py-0 px-2 text-sm bg-sidebar-accent/50 border-primary/50 focus-visible:ring-0 focus-visible:ring-offset-0'
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          ) : (
-                            <span className='truncate group-hover/playlist:text-primary transition-colors font-medium'>
-                              {playlist.name}
-                            </span>
-                          )
+                                setEditingId(null);
+                              } else if (e.key === 'Escape') {
+                                setEditingId(null);
+                              }
+                            }}
+                            className='h-7 py-0 px-2 text-sm bg-sidebar-accent/50 border-primary/50 focus-visible:ring-0 focus-visible:ring-offset-0'
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <span className={cn(
+                            'truncate group-hover/playlist:text-primary transition-[max-width,opacity,colors] duration-300 ease-in-out overflow-hidden font-medium',
+                            isCollapsed ? 'max-w-0 opacity-0 pointer-events-none' : 'max-w-40 opacity-100',
+                          )}>
+                            {playlist.name}
+                          </span>
                         )}
                       </div>
                     </Link>

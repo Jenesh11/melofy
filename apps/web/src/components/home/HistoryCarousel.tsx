@@ -85,20 +85,20 @@ export function HistoryCarousel({
                     {currentTrack?.title === track.title && isPlaying ? (
                       <div className='flex items-center justify-center gap-0.5 h-4'>
                         <div
-                          className='w-1 h-3 bg-black animate-bounce'
+                          className='w-1 h-3 bg-primary-foreground animate-bounce'
                           style={{ animationDelay: '0ms' }}
                         />
                         <div
-                          className='w-1 h-5 bg-black animate-bounce'
+                          className='w-1 h-5 bg-primary-foreground animate-bounce'
                           style={{ animationDelay: '100ms' }}
                         />
                         <div
-                          className='w-1 h-3 bg-black animate-bounce'
+                          className='w-1 h-3 bg-primary-foreground animate-bounce'
                           style={{ animationDelay: '200ms' }}
                         />
                       </div>
                     ) : (
-                      <Play className='h-5 w-5 fill-black translate-x-0.5' />
+                      <Play className='h-5 w-5 fill-primary-foreground translate-x-0.5' />
                     )}
                   </div>
                 </div>

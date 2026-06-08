@@ -25,16 +25,18 @@ interface HomeStore {
   newReleases: SpotifyCollectionSummary[];
   recommendations: SpotifyTrackLike[];
   mixes: SpotifyCollectionSummary[];
-  popularPlaylists: SpotifyCollectionSummary[];
+  editorsPicks: SpotifyCollectionSummary[];
   discoveryMixes: SpotifyCollectionSummary[];
+  featuredPlaylists: SpotifyCollectionSummary[];
   hasFetched: boolean;
 
   setTrending: (data: SpotifyTrendingItem[]) => void;
   setNewReleases: (data: SpotifyCollectionSummary[]) => void;
   setRecommendations: (data: SpotifyTrackLike[]) => void;
   setMixes: (data: SpotifyCollectionSummary[]) => void;
-  setPopularPlaylists: (data: SpotifyCollectionSummary[]) => void;
+  setEditorsPicks: (data: SpotifyCollectionSummary[]) => void;
   setDiscoveryMixes: (data: SpotifyCollectionSummary[]) => void;
+  setFeaturedPlaylists: (data: SpotifyCollectionSummary[]) => void;
   setHasFetched: (status: boolean) => void;
 }
 
@@ -43,15 +45,17 @@ export const useHomeStore = create<HomeStore>((set) => ({
   newReleases: [],
   recommendations: [],
   mixes: [],
-  popularPlaylists: [],
+  editorsPicks: [],
   discoveryMixes: [],
+  featuredPlaylists: [],
   hasFetched: false,
 
   setTrending: (data) => set({ trending: data }),
   setNewReleases: (data) => set({ newReleases: data }),
   setRecommendations: (data) => set({ recommendations: data }),
   setMixes: (data) => set({ mixes: data }),
-  setPopularPlaylists: (data) => set({ popularPlaylists: data }),
+  setEditorsPicks: (data) => set({ editorsPicks: data }),
   setDiscoveryMixes: (data) => set({ discoveryMixes: data }),
+  setFeaturedPlaylists: (data) => set({ featuredPlaylists: data }),
   setHasFetched: (status) => set({ hasFetched: status }),
 }));
