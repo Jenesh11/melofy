@@ -12,6 +12,7 @@ const SYNC_RULES = {
   softCorrectionDriftSec: 0.75,
   settledDriftSec: 0.25,
   correctionRateDelta: 0.04,
+  maxClockProjectionSec: 5,
 } as const;
 
 type SyncReason =
@@ -25,6 +26,8 @@ interface RemotePlaybackState {
   type: 'play_track' | 'pause' | 'resume' | 'seek';
   track?: Track;
   time?: number;
+  sentAt?: number;
+  serverSentAt?: number;
 }
 
 interface RemoteSyncState {
@@ -34,6 +37,7 @@ interface RemoteSyncState {
   sentAt?: number;
   reason?: SyncReason;
   seq?: number;
+  serverSentAt?: number;
 }
 
 interface PartyEventsProps {
@@ -75,6 +79,34 @@ export function usePartyEvents({
   const lastSyncEmitAtRef = useRef(0);
   const syncSequenceRef = useRef(0);
 
+  const getSafeTime = useCallback((time: unknown) => {
+    return typeof time === 'number' && Number.isFinite(time) && time >= 0 ? time : 0;
+  }, []);
+
+  const resetPartySyncState = useCallback(() => {
+    lastReceivedTrackRef.current = null;
+    pendingSyncTimeRef.current = null;
+    lastSyncEmitAtRef.current = 0;
+    syncSequenceRef.current = 0;
+  }, []);
+
+  const getProjectedRemoteTime = useCallback((data: RemotePlaybackState | RemoteSyncState) => {
+    const baseTime = getSafeTime(data.time);
+    const shouldProject = 'isPlaying' in data
+      ? data.isPlaying !== false
+      : 'type' in data && (data.type === 'play_track' || data.type === 'resume');
+    const timestamp = data.serverSentAt || data.sentAt;
+    if (!shouldProject || !timestamp || !Number.isFinite(timestamp)) {
+      return baseTime;
+    }
+
+    const elapsedSeconds = Math.max(
+      0,
+      Math.min((Date.now() - timestamp) / 1000, SYNC_RULES.maxClockProjectionSec),
+    );
+    return baseTime + elapsedSeconds;
+  }, [getSafeTime]);
+
   const getPlaybackSnapshot = useCallback(() => {
     const audio = audioRef.current;
     const state = usePlayerStore.getState();
@@ -89,7 +121,7 @@ export function usePartyEvents({
     };
   }, [audioRef]);
 
-  const emitHostSync = useCallback((reason: SyncReason, force = false) => {
+  const emitHostSync = useCallback((reason: SyncReason, force = false, timeOverride?: number) => {
     const state = usePlayerStore.getState();
     if (!socket || !state.partyId || !state.isPartyHost) return;
 
@@ -103,14 +135,14 @@ export function usePartyEvents({
     syncSequenceRef.current += 1;
 
     socket.emit('sync_state', {
-      time: snapshot.time,
+      time: typeof timeOverride === 'number' ? getSafeTime(timeOverride) : snapshot.time,
       isPlaying: snapshot.isPlaying,
       track: snapshot.track || undefined,
       sentAt: now,
       reason,
       seq: syncSequenceRef.current,
     } satisfies RemoteSyncState);
-  }, [getPlaybackSnapshot, socket]);
+  }, [getPlaybackSnapshot, getSafeTime, socket]);
 
   const applyRemoteTime = useCallback((time: number) => {
     const safeTime = Number.isFinite(time) && time >= 0 ? time : 0;
@@ -143,21 +175,19 @@ export function usePartyEvents({
         lastReceivedTrackRef.current = data.track.id;
         usePlayerStore.getState().play(data.track, true);
         if (audio) audio.playbackRate = 1.0;
-        if (typeof data.time === 'number') {
-          applyRemoteTime(data.time);
-        }
+        applyRemoteTime(getProjectedRemoteTime(data));
       } else if (data.type === 'pause') {
         usePlayerStore.getState().pause(true);
         if (typeof data.time === 'number') {
-          applyRemoteTime(data.time);
+          applyRemoteTime(getProjectedRemoteTime(data));
         }
       } else if (data.type === 'resume') {
         usePlayerStore.getState().resume(true);
         if (typeof data.time === 'number') {
-          applyRemoteTime(data.time);
+          applyRemoteTime(getProjectedRemoteTime(data));
         }
       } else if (data.type === 'seek' && typeof data.time === 'number') {
-        applyRemoteTime(data.time);
+        applyRemoteTime(getProjectedRemoteTime(data));
       }
     };
 
@@ -172,20 +202,21 @@ export function usePartyEvents({
         usePlayerStore.getState().play(data.track, true);
       }
 
+      const remoteTime = getProjectedRemoteTime(data);
       const localTime = Capacitor.isNativePlatform()
         ? usePlayerStore.getState().progress / 1000
         : audio?.currentTime ?? 0;
-      const signedDrift = data.time - localTime;
+      const signedDrift = remoteTime - localTime;
       const absDrift = Math.abs(signedDrift);
 
       if (Capacitor.isNativePlatform()) {
         if (absDrift > SYNC_RULES.softCorrectionDriftSec) {
-          applyRemoteTime(data.time);
+          applyRemoteTime(remoteTime);
         }
       } else if (audio && audio.readyState >= 1) {
         if (absDrift > SYNC_RULES.hardSeekDriftSec) {
           console.log(`[JamSync] Hard re-align: drift ${absDrift.toFixed(2)}s`);
-          applyRemoteTime(data.time);
+          applyRemoteTime(remoteTime);
           audio.playbackRate = 1.0;
         } else if (absDrift > SYNC_RULES.softCorrectionDriftSec) {
           const newRate = signedDrift > 0
@@ -200,7 +231,7 @@ export function usePartyEvents({
           audio.playbackRate = 1.0;
         }
       } else {
-        pendingSyncTimeRef.current = data.time;
+        pendingSyncTimeRef.current = remoteTime;
       }
 
       if (data.isPlaying) {
@@ -227,6 +258,7 @@ export function usePartyEvents({
     const handlePartyEnded = () => {
       const audio = audioRef.current;
       if (audio) audio.playbackRate = 1.0;
+      resetPartySyncState();
       usePlayerStore.getState().clearParty();
       toast.info('The session has ended.');
     };
@@ -248,7 +280,7 @@ export function usePartyEvents({
       socket.off('listener_left', handleListenerLeft);
       socket.off('party_ended', handlePartyEnded);
     };
-  }, [socket, audioRef, applyRemoteTime, emitHostSync]);
+  }, [socket, audioRef, applyRemoteTime, getProjectedRemoteTime, emitHostSync, resetPartySyncState]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -284,17 +316,19 @@ export function usePartyEvents({
       const canControl = state.isPartyHost || state.listenersCanControl;
       if (!canControl) return;
 
-      socket.emit('playback_state', {
-        type: 'play_track',
-        track: currentTrack,
-        time: getPlaybackSnapshot().time,
-      });
-
       if (state.isPartyHost) {
-        emitHostSync('track_changed', true);
+        emitHostSync('track_changed', true, 0);
+      } else if (state.listenersCanControl) {
+        socket.emit('playback_state', {
+          type: 'play_track',
+          track: currentTrack,
+          time: 0,
+          reason: 'track_changed',
+          sentAt: Date.now(),
+        });
       }
     }
-  }, [currentTrack, socket, getPlaybackSnapshot, emitHostSync]);
+  }, [currentTrack, socket, emitHostSync]);
 
   const partyId = usePlayerStore((state) => state.partyId);
   const isPartyHost = usePlayerStore((state) => state.isPartyHost);
@@ -302,16 +336,9 @@ export function usePartyEvents({
   useEffect(() => {
     if (isPartyHost && partyId && partyId !== prevPartyIdRef.current && socket && currentTrack) {
       prevPartyIdRef.current = partyId;
-      socket.emit('playback_state', {
-        type: 'play_track',
-        track: currentTrack,
-        time: getPlaybackSnapshot().time,
-      });
-      if (isPlaying) {
-        emitHostSync('host_started', true);
-      }
+      emitHostSync('host_started', true);
     }
-  }, [isPartyHost, partyId, socket, currentTrack, isPlaying, getPlaybackSnapshot, emitHostSync]);
+  }, [isPartyHost, partyId, socket, currentTrack, emitHostSync]);
 
   const rejoinParty = useCallback(() => {
     if (!socket || !partyId || !isHydrated) return;
@@ -321,6 +348,7 @@ export function usePartyEvents({
     const timeout = setTimeout(() => {
       if (!isHandled) {
         console.warn('[JamSync] Rejoin timed out, clearing party state.');
+        resetPartySyncState();
         usePlayerStore.getState().clearParty();
       }
     }, 5000);
@@ -349,10 +377,11 @@ export function usePartyEvents({
         }
       } else {
         console.warn('[JamSync] Rejoin rejected, clearing party state:', response?.error);
+        resetPartySyncState();
         usePlayerStore.getState().clearParty();
       }
     });
-  }, [socket, partyId, isHydrated, applyRemoteTime]);
+  }, [socket, partyId, isHydrated, applyRemoteTime, resetPartySyncState]);
 
   useEffect(() => {
     if (!socket || !partyId || !isHydrated) return;
@@ -374,14 +403,11 @@ export function usePartyEvents({
   }, [socket, partyId, isHydrated, rejoinParty]);
 
   useEffect(() => {
-    const activePartyId = usePlayerStore.getState().partyId;
-    return () => {
-      if (socket && activePartyId) {
-        console.log(`[JamSync] Unmounting or leaving party ${activePartyId}. Emitting leave_party.`);
-        socket.emit('leave_party');
-      }
-    };
-  }, [socket, partyId]);
+    if (!partyId) {
+      resetPartySyncState();
+      prevPartyIdRef.current = null;
+    }
+  }, [partyId, resetPartySyncState]);
 
   useEffect(() => {
     if (!userUid || !isHydrated || !isPlaying) return;

@@ -122,13 +122,19 @@ export function useAudioPlayback(streamSrc?: string, options: AudioPlaybackOptio
         audioRef.current.play().catch(console.error);
         usePlayerStore.setState({ progress: 0 });
       }
+      const partyState = usePlayerStore.getState();
+      if (socket && partyState.partyId) {
+        const sentAt = Date.now();
+        socket.emit('playback_state', { type: 'seek', time: 0, reason: 'repeat_track', sentAt });
+        socket.emit('playback_state', { type: 'resume', time: 0, reason: 'repeat_track', sentAt });
+      }
       return;
     }
     playNext();
     if (!usePlayerStore.getState().isPlaying) {
       await triggerAutoplay();
     }
-  }, [playNext, triggerAutoplay, isRepeat, canControlPlayback]);
+  }, [playNext, triggerAutoplay, isRepeat, canControlPlayback, socket]);
 
   const handleTrackEnd = useCallback(async () => {
     const state = usePlayerStore.getState();

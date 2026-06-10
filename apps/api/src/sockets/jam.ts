@@ -43,6 +43,12 @@ function getLivePartyState(partyData: any) {
   };
 }
 
+function getSafeTime(time: unknown, fallback = 0) {
+  return typeof time === 'number' && Number.isFinite(time) && time >= 0
+    ? time
+    : fallback;
+}
+
 export function registerJamHandlers(
   io: SocketIOServer,
   socket: SocketIOSocket,
@@ -251,27 +257,37 @@ export function registerJamHandlers(
         return;
       }
 
+      if (!['play_track', 'pause', 'resume', 'seek'].includes(data?.type)) {
+        return;
+      }
+
       if (data.type === 'seek' && !Number.isFinite(data.time)) {
         return;
       }
-      
-      socket.to(socket.data.roomId).emit('playback_state', data);
+
+      const normalizedState = {
+        ...data,
+        time: getSafeTime(data.time, data.type === 'play_track' ? 0 : partyData.currentTime),
+        serverSentAt: Date.now(),
+      };
+
+      socket.to(socket.data.roomId).emit('playback_state', normalizedState);
       
       if (data.type === 'play_track' && data.track) {
         partyData.currentTrack = data.track;
         partyData.isPlaying = true;
-        partyData.currentTime = Number.isFinite(data.time) ? Math.max(0, data.time) : 0;
+        partyData.currentTime = normalizedState.time;
         partyData.stateUpdatedAt = Date.now();
       } else if (data.type === 'pause') {
         partyData.isPlaying = false;
-        partyData.currentTime = Number.isFinite(data.time) ? Math.max(0, data.time) : partyData.currentTime;
+        partyData.currentTime = normalizedState.time;
         partyData.stateUpdatedAt = Date.now();
       } else if (data.type === 'resume') {
         partyData.isPlaying = true;
-        partyData.currentTime = Number.isFinite(data.time) ? Math.max(0, data.time) : partyData.currentTime;
+        partyData.currentTime = normalizedState.time;
         partyData.stateUpdatedAt = Date.now();
       } else if (data.type === 'seek') {
-        partyData.currentTime = Math.max(0, data.time);
+        partyData.currentTime = normalizedState.time;
         partyData.stateUpdatedAt = Date.now();
       }
 
@@ -315,6 +331,7 @@ export function registerJamHandlers(
     const syncState = {
       ...data,
       time: Math.max(0, data.time),
+      serverSentAt: Date.now(),
     };
 
     socket.to(socket.data.roomId).emit('sync_state', syncState);

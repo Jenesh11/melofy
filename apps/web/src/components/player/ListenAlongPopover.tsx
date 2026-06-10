@@ -79,7 +79,9 @@ export function ListenAlongPopover({ usePortal = true }: { usePortal?: boolean }
       initialState?: { 
         hostName?: string; 
         currentTrack?: Track | null;
+        currentTime?: number;
         isPlaying?: boolean; 
+        listenersCanControl?: boolean;
       }; 
       isHost?: boolean 
     }) => {
@@ -91,12 +93,20 @@ export function ListenAlongPopover({ usePortal = true }: { usePortal?: boolean }
         
         if (response.initialState) {
           const state = response.initialState;
+          if (state.listenersCanControl !== undefined) {
+            usePlayerStore.getState().setListenersCanControl(!!state.listenersCanControl);
+          }
           if (state.currentTrack) {
-            usePlayerStore.getState().play(state.currentTrack);
+            usePlayerStore.getState().play(state.currentTrack, true);
+            if (typeof state.currentTime === 'number') {
+              usePlayerStore.setState({ progress: Math.floor(Math.max(0, state.currentTime) * 1000) });
+            }
             if (state.isPlaying) {
               setTimeout(() => {
-                usePlayerStore.getState().resume();
+                usePlayerStore.getState().resume(true);
               }, 500);
+            } else {
+              usePlayerStore.getState().pause(true);
             }
           }
         }

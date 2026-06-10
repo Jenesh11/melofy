@@ -190,6 +190,12 @@ export function PlayerShell() {
           setStreamSrcIssuedAt(0);
           console.error('[PlayerShell] Failed to prepare stream URL:', error);
           const trackTitle = playback.currentTrack?.title || 'Unknown Track';
+          const partyState = usePlayerStore.getState();
+          if (partyState.partyId && !partyState.isPartyHost) {
+            toast.error(`Failed to stream "${trackTitle}". Waiting for host sync...`);
+            usePlayerStore.getState().pause(true);
+            return;
+          }
           toast.error(`Failed to stream "${trackTitle}". Skipping...`);
           usePlayerStore.getState().playNext(true, true);
         }
@@ -201,7 +207,7 @@ export function PlayerShell() {
     return () => {
       cancelled = true;
     };
-  }, [playback.currentTrack?.url, playback.currentTrack?.title, user]);
+  }, [playback.currentTrack?.id, playback.currentTrack?.url, playback.currentTrack?.title, user]);
 
   useEffect(() => {
     audioErrorRetryRef.current = {
@@ -358,6 +364,12 @@ export function PlayerShell() {
           }
 
           const trackTitle = playback.currentTrack?.title || 'Unknown Track';
+          const partyState = usePlayerStore.getState();
+          if (partyState.partyId && !partyState.isPartyHost) {
+            toast.error(`Playback issue with "${trackTitle}". Waiting for host sync...`);
+            usePlayerStore.getState().pause(true);
+            return;
+          }
           if (error?.code === 4) {
             toast.error(`Track "${trackTitle}" is currently unavailable or unsupported. Skipping...`);
           } else {
