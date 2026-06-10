@@ -8,6 +8,9 @@ on:
         required: false
         default: 'Manual trigger'
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: Connect Tailscale & Deploy
@@ -20,26 +23,25 @@ jobs:
       - name: Connect to Tailscale Network
         uses: tailscale/github-action@v2
         with:
-          # It is recommended to use OAuth Client ID and Secret (highly secure with tagged ephemeral nodes)
-          # Alternatively, you can use a regular Tailscale Auth Key (TS_AUTHKEY)
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
-          # Or if you are using an authkey, uncomment the line below and comment the oauth fields:
-          # authkey: ${{ secrets.TS_AUTHKEY }}
 
       - name: Setup SSH Key
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           # Add the Tailscale machine to known_hosts to prevent MITM warnings / interactive prompts
-          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
       - name: Execute Deploy Script on Home Server
-        run: |
-          echo "Starting SSH connection to ${{ secrets.SSH_HOST }}..."
-          ssh -i ~/.ssh/id_rsa "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "cd ~ && ./deploy.sh"
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          echo "Starting SSH connection to $SSH_HOST..."
+          ssh -i ~/.ssh/id_rsa "$SSH_USER@$SSH_HOST" "cd ~ && ./melofy-deploy.sh"
