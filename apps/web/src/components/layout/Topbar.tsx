@@ -270,7 +270,7 @@ export function Topbar() {
         <Link href='/settings'>
           <Button
             variant='ghost'
-            className='h-10 rounded-full px-3 py-2 bg-card/40 hover:bg-card hover:scale-105 transition-all text-foreground font-medium border border-border/50 hover:border-border flex items-center gap-2'
+            className='h-10 rounded-full px-3 py-2 bg-card/40 hover:bg-card hover:scale-[0.97] active:scale-95 cursor-pointer transition-all text-foreground font-medium border border-border/50 hover:border-border flex items-center gap-2'
           >
             <span className='hidden sm:block text-sm mr-1 truncate max-w-[120px]'>
               {user?.displayName || 'Settings'}

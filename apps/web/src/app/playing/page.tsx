@@ -270,7 +270,7 @@ export default function PlayingPage() {
                   >
                     <Button
                       size='lg'
-                      className='bg-foreground text-background font-black h-16 w-16 md:w-auto md:px-12 rounded-full hover:scale-105 transition-all active:scale-95 shadow-xl border-none text-base'
+                      className='bg-primary text-primary-foreground font-black h-16 w-16 md:w-auto md:px-12 rounded-full hover:scale-105 transition-all active:scale-95 shadow-xl border-none text-base cursor-pointer'
                       onClick={handleTogglePlay}
                     >
                       {isPlaying ? (

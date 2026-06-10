@@ -204,7 +204,7 @@ export function Sidebar() {
                 'flex items-center rounded-md text-sm font-medium transition-[padding,gap,colors] duration-300 ease-in-out group/item cursor-pointer w-full h-10',
                 isCollapsed ? 'px-[18px] gap-0' : 'px-3.5 gap-4',
                 route.active
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  ? 'bg-sidebar-accent text-primary font-bold'
                   : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
               )}
               title={isCollapsed ? route.label : undefined}
@@ -254,7 +254,7 @@ export function Sidebar() {
                           'flex items-center rounded-md text-sm transition-[padding,gap,colors] duration-300 ease-in-out group/playlist cursor-pointer w-full h-10 px-3',
                           isCollapsed ? 'gap-0' : 'gap-3',
                           pathname === `/playlist/${playlist.id}`
-                            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                            ? 'bg-sidebar-accent text-primary font-bold'
                             : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/50',
                         )}
                         title={isCollapsed ? playlist.name : undefined}

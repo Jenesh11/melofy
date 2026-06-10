@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';import { useAuth } from '@/lib/firebase/auth-context';
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@/lib/firebase/auth-context';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -15,24 +16,22 @@ import {
   Settings,
   Music,
   Sparkles,
-  Share2,
-  Smartphone,
   Laptop,
+  Smartphone,
   Github,
   HelpCircle,
   Shield,
   FileText,
-  Globe,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import Link from 'next/link';
-import { Card } from '@/components/ui/card';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import { Switch } from '@/components/ui/Switch';
 import { PreMidGuide } from '@/components/settings/PreMidGuide';
 import { useTheme, Essence } from '@/lib/theme-context';
 import { cn } from '@/lib/utils';
-
 import { DonateButton } from '@/components/common/DonateButton';
 
 interface GitHubAsset {
@@ -48,9 +47,20 @@ interface GitHubRelease {
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
-  const { essence, setEssence, mode, setMode } = useTheme();
+  const {
+    essence,
+    setEssence,
+    mode,
+    setMode,
+    customBg,
+    setCustomBg,
+    customAccent,
+    setCustomAccent,
+  } = useTheme();
   const { autoPip, toggleAutoPip } = useSettingsStore();
   const router = useRouter();
+  
+  const [showDiscordGuide, setShowDiscordGuide] = useState(false);
   const [isNative, setIsNative] = useState(false);
   const [isTauri, setIsTauri] = useState(false);
   const [localVersion, setLocalVersion] = useState<string>('');
@@ -67,7 +77,7 @@ export default function SettingsPage() {
       const c = cParts[i] || 0;
       if (l > c) return true;
       if (l < c) return false;
-      }
+    }
     return false;
   };
 
@@ -119,7 +129,7 @@ export default function SettingsPage() {
   const handleDownloadUpdate = async () => {
     if (!latestRelease) return;
     
-    let downloadUrl = latestRelease.html_url; // fallback to GitHub Release web page
+    let downloadUrl = latestRelease.html_url;
     
     if (isTauri) {
       const exeAsset = latestRelease.assets?.find((a) => a.name.endsWith('.exe'));
@@ -165,7 +175,6 @@ export default function SettingsPage() {
     }
   };
 
-
   useEffect(() => {
     const isCapacitorNative = typeof window !== 'undefined' && (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
     if (isCapacitorNative) {
@@ -197,6 +206,7 @@ export default function SettingsPage() {
     { id: 'cyan', name: 'Cyan', color: '#22d3ee' },
     { id: 'lavender', name: 'Lavender', color: '#a78bfa' },
     { id: 'rose', name: 'Rose', color: '#f43f5e' },
+    { id: 'custom', name: 'Custom Theme', color: customAccent },
   ];
 
   const exeAsset = latestRelease?.assets?.find((a) => a.name.endsWith('.exe'));
@@ -204,364 +214,510 @@ export default function SettingsPage() {
 
   if (!user) return null;
 
+  const isCustomTheme = essence === 'custom';
+
   return (
-    <main className='p-6 md:p-12 h-full max-w-4xl mx-auto flex flex-col gap-12 pb-24'>
+    <main className='p-6 sm:p-10 md:p-14 h-full max-w-3xl mx-auto flex flex-col gap-8 md:gap-10 pb-24 overflow-y-auto custom-scrollbar'>
       {/* Header */}
       <motion.header
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className='flex flex-col gap-4'
+        className='flex flex-col gap-4 shrink-0'
       >
         <div className='flex items-center gap-4'>
           <Button
             variant='ghost'
             size='icon'
             onClick={() => router.back()}
-            className='h-10 w-10 rounded-full bg-foreground/5 hover:bg-foreground/10'
+            className='h-11 w-11 rounded-full bg-foreground/5 hover:bg-foreground/10 cursor-pointer transition-colors shrink-0'
           >
-            <ChevronLeft className='h-5 w-5' />
+            <ChevronLeft className='h-6 w-6' />
           </Button>
           <div className='flex items-center gap-3'>
-            <div className='h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20'>
-              <Settings className='h-5 w-5 text-primary' />
+            <div className='h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0'>
+              <Settings className='h-6 w-6 text-primary' />
             </div>
-            <h1 className='text-3xl font-black text-foreground tracking-tight'>Settings</h1>
+            <h1 className='text-3xl sm:text-4xl font-black text-foreground tracking-tight'>Settings</h1>
           </div>
         </div>
       </motion.header>
 
-      <div className='flex flex-col gap-16'>
+      {/* Unified List Container */}
+      <div className='flex flex-col gap-8 sm:gap-10 mt-4 w-full'>
+        
         {/* Account Section */}
-        <section className='space-y-6'>
-          <header className='flex items-center gap-2 px-2'>
-            <User className='h-4 w-4 text-primary' />
+        <section className='space-y-4'>
+          <div className='space-y-1'>
             <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Account & Profile</h2>
-          </header>
+          </div>
           
-          <Card className='p-8 bg-card/50 border-border backdrop-blur-3xl rounded-[2.5rem] overflow-hidden relative group'>
-            <div className='absolute -bottom-24 -right-24 h-64 w-64 bg-primary/5 blur-[80px] rounded-full' />
-            
-            <div className='relative z-10 flex flex-col md:flex-row gap-8 items-center'>
-              <div className='h-24 w-24 rounded-full overflow-hidden shrink-0 border-4 border-primary/10 shadow-2xl bg-muted flex items-center justify-center relative'>
+          <div className='flex items-center justify-between gap-5 py-2.5'>
+            <div className='flex items-center gap-4 min-w-0'>
+              <div className='h-14 w-14 rounded-full overflow-hidden border border-primary/20 bg-muted flex items-center justify-center relative shrink-0 shadow-sm'>
                 {user.photoURL ? (
                   <Image
                     src={user.photoURL}
                     alt='Profile'
-                    width={96}
-                    height={96}
+                    width={56}
+                    height={56}
                     referrerPolicy='no-referrer'
                     className='h-full w-full object-cover'
                   />
                 ) : (
-                  <User className='h-10 w-10 text-muted-foreground' />
+                  <User className='h-5 w-5 text-muted-foreground' />
                 )}
               </div>
-
-              <div className='flex flex-col gap-1 flex-1 text-center md:text-left'>
-                <h3 className='text-2xl font-black text-foreground'>{user.displayName || 'Melofy User'}</h3>
-                <div className='flex flex-wrap justify-center md:justify-start gap-4 mt-1'>
-                  <div className='flex items-center gap-2 text-sm text-muted-foreground'>
-                    <Mail className='h-3.5 w-3.5 opacity-50' />
-                    <span>{user.email}</span>
+              <div className='min-w-0'>
+                <h3 className='text-base sm:text-lg font-bold text-foreground leading-tight truncate'>{user.displayName || 'Melofy User'}</h3>
+                <div className='flex flex-col gap-0.5 text-xs text-muted-foreground mt-1'>
+                  <div className='flex items-center gap-1.5 truncate'>
+                    <Mail className='h-3.5 w-3.5 opacity-60 shrink-0' />
+                    <span className='truncate'>{user.email}</span>
                   </div>
-                  <div className='flex items-center gap-2 text-sm text-muted-foreground'>
-                    <Calendar className='h-3.5 w-3.5 opacity-50' />
+                  <div className='flex items-center gap-1.5'>
+                    <Calendar className='h-3.5 w-3.5 opacity-60 shrink-0' />
                     <span>Joined {user.metadata.creationTime ? new Date(user.metadata.creationTime).toLocaleDateString() : 'recently'}</span>
                   </div>
                 </div>
               </div>
-
-              <Button
-                onClick={handleSignOut}
-                variant='destructive'
-                className='rounded-full px-8 h-12 text-sm font-bold shadow-xl shadow-red-500/10 hover:shadow-red-500/20 active:scale-95 transition-all'
-              >
-                <LogOut className='mr-2 h-4 w-4' />
-                Sign Out
-              </Button>
             </div>
-          </Card>
+            
+            <Button
+              onClick={handleSignOut}
+              variant='outline'
+              size='sm'
+              className='rounded-full text-xs font-bold h-9 px-4.5 border-foreground/10 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 transition-all cursor-pointer shrink-0'
+            >
+              <LogOut className='mr-1.5 h-3.5 w-3.5' />
+              Sign Out
+            </Button>
+          </div>
         </section>
 
-        <div className='h-px w-full bg-border/50' />
+        <div className='h-px w-full bg-foreground/5' />
 
-        {/* Preferences Section */}
-        <section className='space-y-6'>
-          <header className='flex items-center gap-2 px-2'>
-            <Sparkles className='h-4 w-4 text-primary' />
-            <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Preferences</h2>
-          </header>
-
-          <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-            {/* Mode Selector */}
-            <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem]'>
-              <div className='flex flex-col gap-6'>
-                <div className='flex flex-col gap-0.5'>
-                  <h3 className='font-bold text-foreground text-lg'>Interface Mode</h3>
-                  <p className='text-muted-foreground text-xs'>Choose your preferred experience.</p>
+        {/* Appearance Section */}
+        <section className='space-y-5'>
+          <div className='space-y-1'>
+            <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Appearance</h2>
+          </div>
+          
+          <div className='flex flex-col gap-3.5 divide-y divide-foreground/5'>
+            {/* Interface Mode Row */}
+            <div className='flex items-center justify-between gap-6 py-3.5'>
+              <div className='min-w-0 space-y-1'>
+                <div className='flex items-center flex-wrap gap-x-2'>
+                  <h4 className={cn('text-sm sm:text-base font-bold text-foreground', isCustomTheme && 'opacity-40')}>
+                    Interface Mode
+                  </h4>
+                  {isCustomTheme && (
+                    <span className='text-[8px] font-black text-amber-500 uppercase tracking-widest bg-amber-500/10 px-1.5 py-0.5 rounded'>
+                      Overridden
+                    </span>
+                  )}
                 </div>
-
-                <div className='grid grid-cols-2 gap-3 p-1 bg-foreground/5 rounded-2xl'>
-                  <button
-                    onClick={() => setMode('light')}
-                    className={cn(
-                      'flex items-center justify-center gap-2 py-3 rounded-xl transition-all duration-300',
-                      mode === 'light' ? 'bg-background shadow-lg text-foreground font-bold' : 'text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    <Sun className='h-4 w-4' />
-                    <span className='text-xs uppercase tracking-wider'>Light</span>
-                  </button>
-                  <button
-                    onClick={() => setMode('dark')}
-                    className={cn(
-                      'flex items-center justify-center gap-2 py-3 rounded-xl transition-all duration-300',
-                      mode === 'dark' ? 'bg-background shadow-lg text-foreground font-bold' : 'text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    <Moon className='h-4 w-4' />
-                    <span className='text-xs uppercase tracking-wider'>Dark</span>
-                  </button>
-                </div>
+                <p className='text-xs text-muted-foreground hidden xs:block'>Choose light or dark style preset.</p>
               </div>
-            </Card>
+              
+              <div
+                className={cn(
+                  'flex p-0.5 bg-foreground/5 rounded-xl shrink-0 border border-foreground/5 transition-opacity',
+                  isCustomTheme && 'opacity-30 pointer-events-none'
+                )}
+              >
+                <button
+                  onClick={() => setMode('light')}
+                  disabled={isCustomTheme}
+                  className={cn(
+                    'flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all text-xs font-black cursor-pointer',
+                    mode === 'light'
+                      ? 'bg-background shadow-xs text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <Sun className='h-3.5 w-3.5' />
+                  <span>LIGHT</span>
+                </button>
+                <button
+                  onClick={() => setMode('dark')}
+                  disabled={isCustomTheme}
+                  className={cn(
+                    'flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all text-xs font-black cursor-pointer',
+                    mode === 'dark'
+                      ? 'bg-background shadow-xs text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <Moon className='h-3.5 w-3.5' />
+                  <span>DARK</span>
+                </button>
+              </div>
+            </div>
 
-            {/* Essence Selector */}
-            <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem]'>
-              <div className='flex flex-col gap-6'>
-                <div className='flex flex-col gap-0.5'>
-                  <h3 className='font-bold text-foreground text-lg'>Theme Essence</h3>
-                  <p className='text-muted-foreground text-xs'>Personalize your accent color.</p>
+            {/* Theme Accent Row */}
+            <div className='flex flex-col gap-4 py-4'>
+              <div className='flex items-center justify-between gap-6'>
+                <div className='min-w-0 space-y-1'>
+                  <h4 className='text-sm sm:text-base font-bold text-foreground'>Theme Accent</h4>
+                  <p className='text-xs text-muted-foreground hidden xs:block'>Choose highlight accent color palette.</p>
                 </div>
-
-                <div className='grid grid-cols-3 gap-2'>
+                
+                <div className='flex items-center gap-2 shrink-0 flex-wrap justify-end max-w-[240px] sm:max-w-none'>
                   {themes.map((t) => (
                     <button
                       key={t.id}
                       onClick={() => setEssence(t.id as Essence)}
                       className={cn(
-                        'flex items-center justify-center p-2 rounded-xl transition-all border group relative',
-                        essence === t.id ? 'bg-primary/10 border-primary shadow-lg' : 'bg-foreground/5 border-transparent hover:border-foreground/10'
+                        'flex items-center justify-center w-8 h-8 rounded-lg transition-all border relative cursor-pointer outline-none shrink-0',
+                        essence === t.id
+                          ? 'bg-primary/10 border-primary shadow-xs'
+                          : 'bg-foreground/5 border-transparent hover:border-foreground/10'
                       )}
                       title={t.name}
                     >
-                      <div className='w-5 h-5 rounded-full shadow-inner' style={{ backgroundColor: t.color }} />
+                      <div
+                        className='w-3.5 h-3.5 rounded-full shadow-inner'
+                        style={{
+                          background: t.id === 'custom'
+                            ? `linear-gradient(135deg, ${customBg} 0%, ${customAccent} 100%)`
+                            : t.color
+                        }}
+                      />
                       {essence === t.id && (
-                        <motion.div layoutId='active-essence' className='absolute -top-1 -right-1 h-3 w-3 bg-primary rounded-full border-2 border-background' />
+                        <div className='absolute -top-0.5 -right-0.5 h-2 w-2 bg-primary rounded-full border border-background' />
                       )}
                     </button>
                   ))}
                 </div>
               </div>
-            </Card>
 
-            {/* Playback Settings */}
-            <Card className='hidden md:block p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] md:col-span-2'>
-              <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
-                <div className='space-y-1'>
-                  <div className='flex items-center gap-2'>
-                    <Music className='h-4 w-4 text-primary' />
-                    <h3 className='font-bold text-foreground text-lg'>Playback Settings</h3>
-                  </div>
-                  <p className='text-muted-foreground text-sm max-w-md'>
-                    Automatically open a picture-in-picture window when you switch to another tab.
-                  </p>
-                </div>
-                <Switch checked={autoPip} onCheckedChange={toggleAutoPip} />
+              {/* Custom Color Pickers */}
+              <AnimatePresence initial={false}>
+                {isCustomTheme && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                    className='flex flex-wrap gap-5 pt-4 border-t border-foreground/5 w-full mt-1 overflow-hidden'
+                  >
+                    <div className='flex items-center gap-3'>
+                      <span className='text-xs font-bold text-muted-foreground uppercase tracking-wider'>BG Color:</span>
+                      <div className='relative flex items-center gap-2 bg-foreground/5 px-3 py-1.5 rounded-lg border border-foreground/5'>
+                        <input
+                          type='color'
+                          value={customBg}
+                          onChange={(e) => setCustomBg(e.target.value)}
+                          className='w-6 h-6 rounded cursor-pointer border-0 p-0 bg-transparent shrink-0'
+                        />
+                        <span className='text-xs font-mono font-bold text-foreground select-all uppercase'>{customBg}</span>
+                      </div>
+                    </div>
+
+                    <div className='flex items-center gap-3'>
+                      <span className='text-xs font-bold text-muted-foreground uppercase tracking-wider'>Accent Color:</span>
+                      <div className='relative flex items-center gap-2 bg-foreground/5 px-3 py-1.5 rounded-lg border border-foreground/5'>
+                        <input
+                          type='color'
+                          value={customAccent}
+                          onChange={(e) => setCustomAccent(e.target.value)}
+                          className='w-6 h-6 rounded cursor-pointer border-0 p-0 bg-transparent shrink-0'
+                        />
+                        <span className='text-xs font-mono font-bold text-foreground select-all uppercase'>{customAccent}</span>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </section>
+
+        <div className='h-px w-full bg-foreground/5' />
+
+        {/* Playback Settings Section */}
+        <section className='space-y-4'>
+          <div className='space-y-1'>
+            <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Playback Settings</h2>
+          </div>
+          
+          <div className='flex items-center justify-between gap-6 py-2'>
+            <div className='min-w-0 space-y-1 max-w-xl'>
+              <h4 className='text-sm sm:text-base font-bold text-foreground flex items-center gap-1.5'>
+                <Music className='h-4.5 w-4.5 text-primary shrink-0' />
+                Picture-in-Picture Mode
+              </h4>
+              <p className='text-xs text-muted-foreground leading-normal'>
+                Automatically pop open a mini floating player when switching browser tabs.
+              </p>
+            </div>
+            <Switch checked={autoPip} onCheckedChange={toggleAutoPip} className='scale-95 shrink-0' />
+          </div>
+        </section>
+
+        <div className='h-px w-full bg-foreground/5' />
+
+        {/* Integrations Section */}
+        <section className='space-y-4'>
+          <div className='space-y-1'>
+            <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Integrations</h2>
+          </div>
+          
+          <div className='flex flex-col gap-2'>
+            <button
+              onClick={() => setShowDiscordGuide(!showDiscordGuide)}
+              className='flex items-center justify-between w-full text-left cursor-pointer outline-none py-2.5 group'
+            >
+              <div className='min-w-0 space-y-1'>
+                <h4 className='text-sm sm:text-base font-bold text-foreground group-hover:text-primary transition-colors flex items-center gap-1.5'>
+                  Discord Rich Presence
+                </h4>
+                <p className='text-xs text-muted-foreground'>Share what you play with friends via PreMiD presence.</p>
               </div>
-            </Card>
+              <div className='flex items-center gap-1.5 text-xs font-bold text-primary shrink-0'>
+                <span>{showDiscordGuide ? 'COLLAPSE' : 'CONFIGURE'}</span>
+                {showDiscordGuide ? <ChevronUp className='h-4 w-4' /> : <ChevronDown className='h-4 w-4' />}
+              </div>
+            </button>
+            
+            <AnimatePresence initial={false}>
+              {showDiscordGuide && (
+                <motion.div
+                  key='discord-guide'
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeInOut' }}
+                  className='overflow-hidden border-t border-foreground/5 mt-2 pt-4'
+                >
+                  <PreMidGuide />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </section>
 
-        <div className='h-px w-full bg-border/50' />
+        <div className='h-px w-full bg-foreground/5' />
 
-        {/* Extras & Integrations Section */}
-        <section className='space-y-6'>
-          <header className='flex items-center gap-2 px-2'>
-            <Share2 className='h-4 w-4 text-primary' />
-            <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Extras & Integrations</h2>
-          </header>
+        {/* Apps & Updates Section */}
+        <section className='space-y-4'>
+          <div className='space-y-1'>
+            <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Apps & Updates</h2>
+          </div>
 
-          <div className='grid grid-cols-1 md:grid-cols-2 gap-6 items-start'>
-            <div className='flex flex-col gap-6'>
-              {/* Update Center (Tauri/Capacitor only) */}
-              {(isTauri || isNative) && (
-                <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] flex flex-col gap-4 relative overflow-hidden'>
-                  <div className='absolute -bottom-16 -right-16 h-40 w-40 bg-primary/5 blur-[50px] rounded-full' />
-                  
-                  <div className='flex items-center justify-between gap-2 mb-2'>
-                    <div className='flex items-center gap-2'>
-                      <Sparkles className='h-5 w-5 text-primary animate-pulse' />
-                      <h3 className='font-bold text-foreground text-lg'>Update Center</h3>
-                    </div>
-                    {localVersion && (
-                      <span className='text-xs px-2.5 py-1 rounded-full bg-foreground/5 text-muted-foreground font-semibold'>
-                        v{localVersion}
-                      </span>
-                    )}
-                  </div>
-
-                  {updateState === 'checking' && (
-                    <div className='flex flex-col items-center justify-center py-6 gap-3 text-center'>
-                      <div className='h-8 w-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin' />
-                      <p className='text-sm text-muted-foreground'>Checking for latest updates...</p>
-                    </div>
-                  )}
-
-                  {updateState === 'error' && (
-                    <div className='flex flex-col gap-3 py-2'>
-                      <p className='text-sm text-red-400'>Failed to retrieve the latest version information.</p>
-                      <Button onClick={checkForUpdates} variant='outline' className='w-full rounded-full font-bold'>
-                        Retry Check
-                      </Button>
-                    </div>
-                  )}
-
-                  {updateState === 'up-to-date' && (
-                    <div className='flex flex-col gap-4 py-2'>
-                      <div className='flex items-center gap-2.5 text-emerald-400 bg-emerald-500/10 p-4 rounded-2xl border border-emerald-500/10'>
-                        <span className='text-sm font-bold'>You are running the latest version!</span>
-                      </div>
-                      <p className='text-xs text-muted-foreground leading-relaxed'>
-                        Your app shell is fully up to date. No action is required.
-                      </p>
-                      <Button onClick={checkForUpdates} variant='ghost' className='w-full rounded-full text-xs text-muted-foreground hover:text-foreground font-bold'>
-                        Check Again
-                      </Button>
-                    </div>
-                  )}
-
-                  {updateState === 'update-available' && (
-                    <div className='flex flex-col gap-4 py-2 relative z-10'>
-                      <div className='flex items-center gap-2.5 text-amber-400 bg-amber-500/10 p-4 rounded-2xl border border-amber-500/10'>
-                        <div className='h-2.5 w-2.5 rounded-full bg-amber-400 animate-ping' />
-                        <span className='text-sm font-bold'>New version v{latestRelease?.tag_name} is available!</span>
-                      </div>
-
-                      <div className='flex flex-col gap-2'>
-                        <Button 
-                          onClick={handleDownloadUpdate} 
-                          className='w-full rounded-full font-bold shadow-xl shadow-primary/20'
-                        >
-                          Download Update
-                        </Button>
-                        <Button 
-                          onClick={handleViewChangelog} 
-                          variant='outline'
-                          className='w-full rounded-full font-bold border-border/60 hover:bg-foreground/5'
-                        >
-                          View Changelog
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </Card>
-              )}
-
-              {/* Desktop App */}
-              {!isTauri && (
-                <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] flex flex-col gap-4 relative overflow-hidden group'>
-                  <div className='absolute -bottom-12 -right-12 h-32 w-32 bg-primary/5 blur-[50px] rounded-full' />
-                  <div className='flex items-center gap-2 mb-2'>
+          {(!isTauri && !isNative) && (
+            <div className='flex flex-col border border-foreground/5 rounded-xl overflow-hidden divide-y divide-foreground/5 bg-foreground/[0.01]'>
+              {/* EXE */}
+              <div className='flex items-center justify-between gap-6 p-4 hover:bg-foreground/[0.01] transition-colors'>
+                <div className='flex items-start gap-3 min-w-0'>
+                  <div className='h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0 mt-0.5'>
                     <Laptop className='h-5 w-5 text-primary' />
-                    <h3 className='font-bold text-foreground text-lg'>Desktop App</h3>
                   </div>
-                  <p className='text-sm text-muted-foreground leading-relaxed'>
-                    Enjoy a seamless frameless player with custom keybindings and desktop sync.
-                  </p>
-                  <div className='flex flex-col gap-2.5 mt-2 relative z-10'>
-                    <a href={exeUrl} target='_blank' rel='noopener noreferrer'>
-                      <Button className='w-full rounded-full font-bold shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-transform'>
-                        Download for Windows (.exe)
-                      </Button>
-                    </a>
-                    <a 
-                      href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy_x64.msi' 
-                      target='_blank' 
-                      rel='noopener noreferrer'
-                      className='text-center text-xs text-muted-foreground hover:text-primary transition-colors font-medium'
-                    >
-                      Need MSI? Download Windows Installer (.msi)
-                    </a>
+                  <div className='space-y-1 min-w-0'>
+                    <h4 className='font-bold text-foreground text-sm flex items-center gap-1.5 truncate'>
+                      Windows Desktop App
+                      <span className='text-[8px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold shrink-0'>
+                        EXE
+                      </span>
+                    </h4>
+                    <p className='text-xs text-muted-foreground truncate max-w-sm sm:max-w-md'>
+                      Frameless player and global media key shortcuts.
+                    </p>
                   </div>
-                </Card>
-              )}
-
-              {/* Mobile App */}
-              {!isNative && !isTauri && (
-                <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] flex flex-col gap-4'>
-                  <div className='flex items-center gap-2 mb-2'>
-                    <Smartphone className='h-5 w-5 text-primary' />
-                    <h3 className='font-bold text-foreground text-lg'>Mobile App</h3>
-                  </div>
-                  <p className='text-sm text-muted-foreground'>
-                    Take Melofy on the go with our dedicated Android app.
-                  </p>
-                  <a href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy.apk' target='_blank' rel='noopener noreferrer'>
-                    <Button className='w-full rounded-full font-bold shadow-xl shadow-primary/20'>
-                      Download for Android
-                    </Button>
-                  </a>
-                </Card>
-              )}
-
-              {/* Support */}
-              <Card className='p-6 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] flex flex-col gap-4'>
-                <div className='flex items-center gap-2 mb-2'>
-                  <Sparkles className='h-5 w-5 text-primary' />
-                  <h3 className='font-bold text-foreground text-lg'>Support Melofy</h3>
                 </div>
-                <p className='text-sm text-muted-foreground'>
-                  Enjoying Melofy? Consider supporting the development to help keep the music playing.
-                </p>
-                <DonateButton className="self-center md:self-start w-full" />
-              </Card>
-            </div>
+                <a href={exeUrl} target='_blank' rel='noopener noreferrer' className='shrink-0'>
+                  <Button size='sm' className='rounded-full text-xs font-bold h-8 px-4 cursor-pointer'>
+                    Download
+                  </Button>
+                </a>
+              </div>
 
-            <div className='hidden md:flex flex-col'>
-              <PreMidGuide />
+              {/* MSI */}
+              <div className='flex items-center justify-between gap-6 p-4 hover:bg-foreground/[0.01] transition-colors'>
+                <div className='flex items-start gap-3 min-w-0'>
+                  <div className='h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0 mt-0.5'>
+                    <Laptop className='h-5 w-5 text-primary' />
+                  </div>
+                  <div className='space-y-1 min-w-0'>
+                    <h4 className='font-bold text-foreground text-sm flex items-center gap-1.5 truncate'>
+                      Windows Installer
+                      <span className='text-[8px] px-1.5 py-0.5 rounded-full bg-foreground/5 text-muted-foreground font-bold shrink-0'>
+                        MSI
+                      </span>
+                    </h4>
+                    <p className='text-xs text-muted-foreground truncate max-w-sm sm:max-w-md'>
+                      Standard system installer setup package.
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy_x64.msi'
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='shrink-0'
+                >
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    className='rounded-full text-xs font-bold h-8 px-4 border-foreground/10 hover:bg-foreground/5 cursor-pointer'
+                  >
+                    Download
+                  </Button>
+                </a>
+              </div>
+
+              {/* APK */}
+              <div className='flex items-center justify-between gap-6 p-4 hover:bg-foreground/[0.01] transition-colors'>
+                <div className='flex items-start gap-3 min-w-0'>
+                  <div className='h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0 mt-0.5'>
+                    <Smartphone className='h-5 w-5 text-primary' />
+                  </div>
+                  <div className='space-y-1 min-w-0'>
+                    <h4 className='font-bold text-foreground text-sm flex items-center gap-1.5 truncate'>
+                      Android Mobile App
+                      <span className='text-[8px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold shrink-0'>
+                        APK
+                      </span>
+                    </h4>
+                    <p className='text-xs text-muted-foreground truncate max-w-sm sm:max-w-md'>
+                      Take Melofy player on the go.
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy.apk'
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='shrink-0'
+                >
+                  <Button size='sm' className='rounded-full text-xs font-bold h-8 px-4 cursor-pointer'>
+                    Download
+                  </Button>
+                </a>
+              </div>
             </div>
+          )}
+
+          {/* Update Center (Tauri/Capacitor only) */}
+          {(isTauri || isNative) && (
+            <div className='flex flex-col gap-4 border border-foreground/5 rounded-xl p-4 bg-foreground/[0.01]'>
+              <div className='flex items-center justify-between border-b border-foreground/5 pb-2.5'>
+                <span className='text-sm font-bold text-foreground'>Application Updates</span>
+                {localVersion && (
+                  <span className='text-xs px-2.5 py-0.5 rounded-full bg-foreground/5 text-muted-foreground font-semibold'>
+                    v{localVersion}
+                  </span>
+                )}
+              </div>
+
+              {updateState === 'checking' && (
+                <div className='flex items-center gap-2.5 text-xs text-muted-foreground py-1.5'>
+                  <div className='h-4 w-4 rounded-full border border-primary/20 border-t-primary animate-spin' />
+                  <span>Checking for updates...</span>
+                </div>
+              )}
+
+              {updateState === 'error' && (
+                <div className='flex items-center justify-between gap-4 py-1.5'>
+                  <span className='text-xs text-red-500 font-semibold'>Failed to fetch update status.</span>
+                  <Button
+                    onClick={checkForUpdates}
+                    variant='outline'
+                    size='sm'
+                    className='rounded-full text-[10px] font-bold h-7.5 px-3 border-foreground/10 cursor-pointer'
+                  >
+                    Retry
+                  </Button>
+                </div>
+              )}
+
+              {updateState === 'up-to-date' && (
+                <div className='flex items-center justify-between gap-4 py-1.5'>
+                  <span className='text-xs text-emerald-500 dark:text-emerald-400 font-bold'>App is up to date!</span>
+                  <Button
+                    onClick={checkForUpdates}
+                    variant='ghost'
+                    size='sm'
+                    className='rounded-full text-[10px] text-muted-foreground hover:text-foreground font-bold h-7.5 px-3 cursor-pointer'
+                  >
+                    Check Again
+                  </Button>
+                </div>
+              )}
+
+              {updateState === 'update-available' && (
+                <div className='flex flex-col gap-2.5 py-0.5'>
+                  <span className='text-xs text-amber-500 font-bold flex items-center'>
+                    <div className='h-2 w-2 rounded-full bg-amber-500 animate-ping mr-1.5' />
+                    v{latestRelease?.tag_name} is available!
+                  </span>
+                  <div className='flex gap-2'>
+                    <Button
+                      onClick={handleDownloadUpdate}
+                      size='sm'
+                      className='rounded-full font-bold text-[10px] h-7.5 px-3 shadow-sm cursor-pointer'
+                    >
+                      Install
+                    </Button>
+                    <Button
+                      onClick={handleViewChangelog}
+                      variant='outline'
+                      size='sm'
+                      className='rounded-full font-bold text-[10px] h-7.5 px-3 border-foreground/10 hover:bg-foreground/5 cursor-pointer'
+                    >
+                      Changelog
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        <div className='h-px w-full bg-foreground/5' />
+
+        {/* Support & Resources Section */}
+        <section className='space-y-4'>
+          <div className='space-y-1'>
+            <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Support & Info</h2>
+          </div>
+          
+          <div className='flex items-center justify-between gap-6 py-2.5'>
+            <div className='min-w-0 space-y-1 max-w-lg'>
+              <h4 className='text-sm sm:text-base font-bold text-foreground flex items-center gap-1.5'>
+                <Sparkles className='h-4.5 w-4.5 text-primary shrink-0' />
+                Support Melofy
+              </h4>
+              <p className='text-xs text-muted-foreground leading-normal'>
+                Help keep Melofy servers online by donating.
+              </p>
+            </div>
+            <DonateButton className='w-auto shrink-0 scale-100' />
+          </div>
+
+          <div className='grid grid-cols-2 sm:grid-cols-4 gap-3.5 pt-2'>
+            {[
+              { href: '/github', label: 'GitHub', icon: Github },
+              { href: '/help', label: 'Help Center', icon: HelpCircle },
+              { href: '/privacy', label: 'Privacy Policy', icon: Shield },
+              { href: '/terms', label: 'Terms of Service', icon: FileText },
+            ].map((link) => {
+              const LinkIcon = link.icon;
+              return (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  target='_blank'
+                  className='flex items-center gap-3 p-3.5 rounded-xl border border-foreground/5 bg-foreground/[0.01] hover:bg-foreground/5 hover:border-foreground/10 transition-all group'
+                >
+                  <LinkIcon className='h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0' />
+                  <span className='text-xs font-bold text-foreground'>{link.label}</span>
+                </Link>
+              );
+            })}
           </div>
         </section>
-
-        <div className='h-px w-full bg-border/50' />
-
-        {/* Legal & Resources Section */}
-        <section className='space-y-6'>
-          <header className='flex items-center gap-2 px-2'>
-            <Globe className='h-4 w-4 text-primary' />
-            <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Legal & Resources</h2>
-          </header>
-
-          <Card className='p-4 bg-card/50 border-border backdrop-blur-3xl rounded-[2rem] overflow-hidden'>
-            <div className='grid grid-cols-2 md:grid-cols-4 gap-2'>
-              <Link href='/github' target='_blank' className='flex items-center gap-3 p-4 rounded-xl hover:bg-foreground/5 transition-all group'>
-                <div className='h-10 w-10 rounded-full bg-foreground/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors'>
-                  <Github className='h-5 w-5 text-muted-foreground group-hover:text-primary' />
-                </div>
-                <span className='text-sm font-bold text-foreground'>GitHub</span>
-              </Link>
-              <Link href='/help' target='_blank' className='flex items-center gap-3 p-4 rounded-xl hover:bg-foreground/5 transition-all group'>
-                <div className='h-10 w-10 rounded-full bg-foreground/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors'>
-                  <HelpCircle className='h-5 w-5 text-muted-foreground group-hover:text-primary' />
-                </div>
-                <span className='text-sm font-bold text-foreground'>Help</span>
-              </Link>
-              <Link href='/privacy' target='_blank' className='flex items-center gap-3 p-4 rounded-xl hover:bg-foreground/5 transition-all group'>
-                <div className='h-10 w-10 rounded-full bg-foreground/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors'>
-                  <Shield className='h-5 w-5 text-muted-foreground group-hover:text-primary' />
-                </div>
-                <span className='text-sm font-bold text-foreground'>Privacy</span>
-              </Link>
-              <Link href='/terms' target='_blank' className='flex items-center gap-3 p-4 rounded-xl hover:bg-foreground/5 transition-all group'>
-                <div className='h-10 w-10 rounded-full bg-foreground/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors'>
-                  <FileText className='h-5 w-5 text-muted-foreground group-hover:text-primary' />
-                </div>
-                <span className='text-sm font-bold text-foreground'>Terms</span>
-              </Link>
-            </div>
-          </Card>
-        </section>
+        
       </div>
     </main>
   );

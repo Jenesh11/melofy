@@ -61,7 +61,14 @@
       "icons/media/media-pause.ico",
       "icons/media/media-next.ico",
       "icons/media/media-next-disabled.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "displayLanguageSelector": false
+      }
+    }
   },
   "plugins": {
     "deep-link": {

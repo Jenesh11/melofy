@@ -234,5 +234,5 @@ If you appreciate the work and want to support the development of Melofy, consid
 
 <div align="center">
   <p>Built with 💖 and ☕ by <b><a href="https://github.com/lazyshrey">lazyshrey</a></b></p>
-  <p><i>© 2026 Melofy. Licensed under ISC.</i></p>
+  <p><i>© 2026 Melofy. Licensed under the MIT License.</i></p>
 </div>
