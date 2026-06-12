@@ -8,11 +8,15 @@ import { NativePlayer } from '@/lib/capacitor/NativePlayer';
 const SYNC_RULES = {
   heartbeatIntervalMs: 4000,
   minEmitIntervalMs: 1200,
-  hardSeekDriftSec: 2.5,
+  hardSeekForwardDriftSec: 5,
+  hardSeekBackwardDriftSec: 10,
+  forcedSyncDriftSec: 0.5,
   softCorrectionDriftSec: 0.75,
   settledDriftSec: 0.25,
-  correctionRateDelta: 0.04,
+  correctionRateMaxDelta: 0.06,
+  correctionRateDriftFactor: 0.015,
   maxClockProjectionSec: 5,
+  staleSyncToleranceMs: 250,
 } as const;
 
 type SyncReason =
@@ -78,6 +82,8 @@ export function usePartyEvents({
   const pendingSyncTimeRef = useRef<number | null>(null);
   const lastSyncEmitAtRef = useRef(0);
   const syncSequenceRef = useRef(0);
+  const lastAppliedSyncEventAtRef = useRef(0);
+  const lastAppliedSyncTrackIdRef = useRef<string | null>(null);
 
   const getSafeTime = useCallback((time: unknown) => {
     return typeof time === 'number' && Number.isFinite(time) && time >= 0 ? time : 0;
@@ -88,6 +94,8 @@ export function usePartyEvents({
     pendingSyncTimeRef.current = null;
     lastSyncEmitAtRef.current = 0;
     syncSequenceRef.current = 0;
+    lastAppliedSyncEventAtRef.current = 0;
+    lastAppliedSyncTrackIdRef.current = null;
   }, []);
 
   const getProjectedRemoteTime = useCallback((data: RemotePlaybackState | RemoteSyncState) => {
@@ -106,6 +114,14 @@ export function usePartyEvents({
     );
     return baseTime + elapsedSeconds;
   }, [getSafeTime]);
+
+  const getCorrectionRate = useCallback((signedDrift: number, absDrift: number) => {
+    const delta = Math.min(
+      SYNC_RULES.correctionRateMaxDelta,
+      Math.max(0.02, absDrift * SYNC_RULES.correctionRateDriftFactor),
+    );
+    return Number((signedDrift > 0 ? 1 + delta : 1 - delta).toFixed(2));
+  }, []);
 
   const getPlaybackSnapshot = useCallback(() => {
     const audio = audioRef.current;
@@ -196,10 +212,28 @@ export function usePartyEvents({
       if ((!audio && !Capacitor.isNativePlatform()) || typeof data.time !== 'number') return;
 
       const activeTrack = usePlayerStore.getState().currentTrack;
+      const incomingTrackId = data.track?.id ?? activeTrack?.id ?? null;
+      const eventAt = data.serverSentAt || data.sentAt || 0;
+      if (
+        eventAt &&
+        incomingTrackId &&
+        lastAppliedSyncTrackIdRef.current === incomingTrackId &&
+        eventAt + SYNC_RULES.staleSyncToleranceMs < lastAppliedSyncEventAtRef.current
+      ) {
+        console.log(`[JamSync] Ignoring stale sync for ${incomingTrackId}.`);
+        return;
+      }
+      if (eventAt && incomingTrackId) {
+        lastAppliedSyncEventAtRef.current = Math.max(lastAppliedSyncEventAtRef.current, eventAt);
+        lastAppliedSyncTrackIdRef.current = incomingTrackId;
+      }
+
+      let changedTrack = false;
       if (data.track && (!activeTrack || activeTrack.id !== data.track.id)) {
         console.log(`[JamSync] Auto-healing track desync. Loading host track: ${data.track.title}`);
         lastReceivedTrackRef.current = data.track.id;
         usePlayerStore.getState().play(data.track, true);
+        changedTrack = true;
       }
 
       const remoteTime = getProjectedRemoteTime(data);
@@ -208,21 +242,32 @@ export function usePartyEvents({
         : audio?.currentTime ?? 0;
       const signedDrift = remoteTime - localTime;
       const absDrift = Math.abs(signedDrift);
+      const shouldForceSeek =
+        changedTrack ||
+        data.reason === 'track_changed' ||
+        data.reason === 'host_started' ||
+        data.reason === 'rejoin';
+      const hardSeekThreshold = signedDrift >= 0
+        ? SYNC_RULES.hardSeekForwardDriftSec
+        : SYNC_RULES.hardSeekBackwardDriftSec;
 
       if (Capacitor.isNativePlatform()) {
-        if (absDrift > SYNC_RULES.softCorrectionDriftSec) {
+        if (shouldForceSeek || absDrift > hardSeekThreshold) {
           applyRemoteTime(remoteTime);
         }
       } else if (audio && audio.readyState >= 1) {
-        if (absDrift > SYNC_RULES.hardSeekDriftSec) {
-          console.log(`[JamSync] Hard re-align: drift ${absDrift.toFixed(2)}s`);
+        if (shouldForceSeek && absDrift > SYNC_RULES.forcedSyncDriftSec) {
+          console.log(`[JamSync] Hard re-align: forced ${data.reason || 'track_desync'} drift ${absDrift.toFixed(2)}s`);
+          applyRemoteTime(remoteTime);
+          audio.playbackRate = 1.0;
+        } else if (absDrift > hardSeekThreshold) {
+          const direction = signedDrift >= 0 ? 'forward' : 'backward';
+          console.log(`[JamSync] Hard re-align ${direction}: drift ${absDrift.toFixed(2)}s`);
           applyRemoteTime(remoteTime);
           audio.playbackRate = 1.0;
         } else if (absDrift > SYNC_RULES.softCorrectionDriftSec) {
-          const newRate = signedDrift > 0
-            ? 1 + SYNC_RULES.correctionRateDelta
-            : 1 - SYNC_RULES.correctionRateDelta;
-          if (audio.playbackRate !== newRate) {
+          const newRate = getCorrectionRate(signedDrift, absDrift);
+          if (Math.abs(audio.playbackRate - newRate) >= 0.005) {
             console.log(`[JamSync] Gradual correction: drift ${absDrift.toFixed(2)}s, rate -> ${newRate}`);
             audio.playbackRate = newRate;
           }
@@ -280,7 +325,7 @@ export function usePartyEvents({
       socket.off('listener_left', handleListenerLeft);
       socket.off('party_ended', handlePartyEnded);
     };
-  }, [socket, audioRef, applyRemoteTime, getProjectedRemoteTime, emitHostSync, resetPartySyncState]);
+  }, [socket, audioRef, applyRemoteTime, getProjectedRemoteTime, getCorrectionRate, emitHostSync, resetPartySyncState]);
 
   useEffect(() => {
     const audio = audioRef.current;

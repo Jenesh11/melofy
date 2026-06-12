@@ -217,7 +217,7 @@ export default function SettingsPage() {
   const isCustomTheme = essence === 'custom';
 
   return (
-    <main className='p-6 sm:p-10 md:p-14 h-full max-w-3xl mx-auto flex flex-col gap-8 md:gap-10 pb-24 overflow-y-auto custom-scrollbar'>
+    <main className='p-4 sm:p-10 md:p-14 h-full max-w-3xl mx-auto flex flex-col gap-8 md:gap-10 pb-24 overflow-y-auto custom-scrollbar'>
       {/* Header */}
       <motion.header
         initial={{ opacity: 0, y: 15 }}
@@ -251,9 +251,9 @@ export default function SettingsPage() {
             <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Account & Profile</h2>
           </div>
           
-          <div className='flex items-center justify-between gap-5 py-2.5'>
-            <div className='flex items-center gap-4 min-w-0'>
-              <div className='h-14 w-14 rounded-full overflow-hidden border border-primary/20 bg-muted flex items-center justify-center relative shrink-0 shadow-sm'>
+          <div className='flex items-center justify-between gap-4 py-2.5 w-full'>
+            <div className='flex items-center gap-3 sm:gap-4 min-w-0 flex-1'>
+              <div className='h-12 w-12 sm:h-14 sm:w-14 rounded-full overflow-hidden border border-primary/20 bg-muted flex items-center justify-center relative shrink-0 shadow-sm'>
                 {user.photoURL ? (
                   <Image
                     src={user.photoURL}
@@ -267,8 +267,8 @@ export default function SettingsPage() {
                   <User className='h-5 w-5 text-muted-foreground' />
                 )}
               </div>
-              <div className='min-w-0'>
-                <h3 className='text-base sm:text-lg font-bold text-foreground leading-tight truncate'>{user.displayName || 'Melofy User'}</h3>
+              <div className='min-w-0 flex-1'>
+                <h3 className='text-sm sm:text-lg font-bold text-foreground leading-tight truncate'>{user.displayName || 'Melofy User'}</h3>
                 <div className='flex flex-col gap-0.5 text-xs text-muted-foreground mt-1'>
                   <div className='flex items-center gap-1.5 truncate'>
                     <Mail className='h-3.5 w-3.5 opacity-60 shrink-0' />
@@ -286,9 +286,9 @@ export default function SettingsPage() {
               onClick={handleSignOut}
               variant='outline'
               size='sm'
-              className='rounded-full text-xs font-bold h-9 px-4.5 border-foreground/10 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 transition-all cursor-pointer shrink-0'
+              className='rounded-full text-xs font-bold h-9 px-3 sm:px-4.5 border-foreground/10 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 transition-all cursor-pointer shrink-0'
             >
-              <LogOut className='mr-1.5 h-3.5 w-3.5' />
+              <LogOut className='mr-1 sm:mr-1.5 h-3.5 w-3.5' />
               Sign Out
             </Button>
           </div>
@@ -304,8 +304,8 @@ export default function SettingsPage() {
           
           <div className='flex flex-col gap-3.5 divide-y divide-foreground/5'>
             {/* Interface Mode Row */}
-            <div className='flex items-center justify-between gap-6 py-3.5'>
-              <div className='min-w-0 space-y-1'>
+            <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-3.5'>
+              <div className='min-w-0 space-y-0.5'>
                 <div className='flex items-center flex-wrap gap-x-2'>
                   <h4 className={cn('text-sm sm:text-base font-bold text-foreground', isCustomTheme && 'opacity-40')}>
                     Interface Mode
@@ -321,7 +321,7 @@ export default function SettingsPage() {
               
               <div
                 className={cn(
-                  'flex p-0.5 bg-foreground/5 rounded-xl shrink-0 border border-foreground/5 transition-opacity',
+                  'flex p-0.5 bg-foreground/5 rounded-xl shrink-0 border border-foreground/5 transition-opacity self-start sm:self-auto',
                   isCustomTheme && 'opacity-30 pointer-events-none'
                 )}
               >
@@ -356,13 +356,13 @@ export default function SettingsPage() {
 
             {/* Theme Accent Row */}
             <div className='flex flex-col gap-4 py-4'>
-              <div className='flex items-center justify-between gap-6'>
-                <div className='min-w-0 space-y-1'>
+              <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4'>
+                <div className='min-w-0 space-y-0.5'>
                   <h4 className='text-sm sm:text-base font-bold text-foreground'>Theme Accent</h4>
                   <p className='text-xs text-muted-foreground hidden xs:block'>Choose highlight accent color palette.</p>
                 </div>
                 
-                <div className='flex items-center gap-2 shrink-0 flex-wrap justify-end max-w-[240px] sm:max-w-none'>
+                <div className='flex items-center gap-2 shrink-0 flex-wrap justify-start sm:justify-end max-w-full sm:max-w-none'>
                   {themes.map((t) => (
                     <button
                       key={t.id}
@@ -441,7 +441,7 @@ export default function SettingsPage() {
             <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Playback Settings</h2>
           </div>
           
-          <div className='flex items-center justify-between gap-6 py-2'>
+          <div className='flex items-start justify-between gap-4 py-2'>
             <div className='min-w-0 space-y-1 max-w-xl'>
               <h4 className='text-sm sm:text-base font-bold text-foreground flex items-center gap-1.5'>
                 <Music className='h-4.5 w-4.5 text-primary shrink-0' />
@@ -451,7 +451,7 @@ export default function SettingsPage() {
                 Automatically pop open a mini floating player when switching browser tabs.
               </p>
             </div>
-            <Switch checked={autoPip} onCheckedChange={toggleAutoPip} className='scale-95 shrink-0' />
+            <Switch checked={autoPip} onCheckedChange={toggleAutoPip} className='scale-95 shrink-0 mt-1' />
           </div>
         </section>
 
@@ -508,7 +508,7 @@ export default function SettingsPage() {
           {(!isTauri && !isNative) && (
             <div className='flex flex-col border border-foreground/5 rounded-xl overflow-hidden divide-y divide-foreground/5 bg-foreground/[0.01]'>
               {/* EXE */}
-              <div className='flex items-center justify-between gap-6 p-4 hover:bg-foreground/[0.01] transition-colors'>
+              <div className='flex flex-col xs:flex-row xs:items-center justify-between gap-4 p-4 hover:bg-foreground/[0.01] transition-colors'>
                 <div className='flex items-start gap-3 min-w-0'>
                   <div className='h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0 mt-0.5'>
                     <Laptop className='h-5 w-5 text-primary' />
@@ -525,7 +525,7 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 </div>
-                <a href={exeUrl} target='_blank' rel='noopener noreferrer' className='shrink-0'>
+                <a href={exeUrl} target='_blank' rel='noopener noreferrer' className='self-start xs:self-auto shrink-0'>
                   <Button size='sm' className='rounded-full text-xs font-bold h-8 px-4 cursor-pointer'>
                     Download
                   </Button>
@@ -533,7 +533,7 @@ export default function SettingsPage() {
               </div>
 
               {/* MSI */}
-              <div className='flex items-center justify-between gap-6 p-4 hover:bg-foreground/[0.01] transition-colors'>
+              <div className='flex flex-col xs:flex-row xs:items-center justify-between gap-4 p-4 hover:bg-foreground/[0.01] transition-colors'>
                 <div className='flex items-start gap-3 min-w-0'>
                   <div className='h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0 mt-0.5'>
                     <Laptop className='h-5 w-5 text-primary' />
@@ -554,7 +554,7 @@ export default function SettingsPage() {
                   href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy_x64.msi'
                   target='_blank'
                   rel='noopener noreferrer'
-                  className='shrink-0'
+                  className='self-start xs:self-auto shrink-0'
                 >
                   <Button
                     variant='outline'
@@ -567,7 +567,7 @@ export default function SettingsPage() {
               </div>
 
               {/* APK */}
-              <div className='flex items-center justify-between gap-6 p-4 hover:bg-foreground/[0.01] transition-colors'>
+              <div className='flex flex-col xs:flex-row xs:items-center justify-between gap-4 p-4 hover:bg-foreground/[0.01] transition-colors'>
                 <div className='flex items-start gap-3 min-w-0'>
                   <div className='h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0 mt-0.5'>
                     <Smartphone className='h-5 w-5 text-primary' />
@@ -588,7 +588,7 @@ export default function SettingsPage() {
                   href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy.apk'
                   target='_blank'
                   rel='noopener noreferrer'
-                  className='shrink-0'
+                  className='self-start xs:self-auto shrink-0'
                 >
                   <Button size='sm' className='rounded-full text-xs font-bold h-8 px-4 cursor-pointer'>
                     Download
@@ -682,8 +682,8 @@ export default function SettingsPage() {
             <h2 className='text-xs font-black uppercase tracking-[0.2em] text-muted-foreground'>Support & Info</h2>
           </div>
           
-          <div className='flex items-center justify-between gap-6 py-2.5'>
-            <div className='min-w-0 space-y-1 max-w-lg'>
+          <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-2.5'>
+            <div className='min-w-0 space-y-0.5 max-w-lg'>
               <h4 className='text-sm sm:text-base font-bold text-foreground flex items-center gap-1.5'>
                 <Sparkles className='h-4.5 w-4.5 text-primary shrink-0' />
                 Support Melofy
@@ -692,7 +692,7 @@ export default function SettingsPage() {
                 Help keep Melofy servers online by donating.
               </p>
             </div>
-            <DonateButton className='w-auto shrink-0 scale-100' />
+            <DonateButton className='w-auto shrink-0 scale-100 self-start sm:self-auto' />
           </div>
 
           <div className='grid grid-cols-2 sm:grid-cols-4 gap-3.5 pt-2'>
@@ -708,10 +708,10 @@ export default function SettingsPage() {
                   key={link.label}
                   href={link.href}
                   target='_blank'
-                  className='flex items-center gap-3 p-3.5 rounded-xl border border-foreground/5 bg-foreground/[0.01] hover:bg-foreground/5 hover:border-foreground/10 transition-all group'
+                  className='flex items-center gap-2.5 p-3 sm:p-3.5 rounded-xl border border-foreground/5 bg-foreground/[0.01] hover:bg-foreground/5 hover:border-foreground/10 transition-all group min-w-0'
                 >
                   <LinkIcon className='h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0' />
-                  <span className='text-xs font-bold text-foreground'>{link.label}</span>
+                  <span className='text-xs font-bold text-foreground truncate sm:overflow-visible'>{link.label}</span>
                 </Link>
               );
             })}

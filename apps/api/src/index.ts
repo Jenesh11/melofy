@@ -102,6 +102,22 @@ const privateRateLimit = rateLimit({
   legacyHeaders: false,
 });
 
+const inflightSearches = new Map<string, Promise<any>>();
+
+async function getOrRunCachedSearch(cacheKey: string, runSearch: () => Promise<any>) {
+  const existing = inflightSearches.get(cacheKey);
+  if (existing) {
+    console.log(`[SearchCache] Joining in-flight search for: ${cacheKey}`);
+    return existing;
+  }
+
+  const promise = runSearch().finally(() => {
+    inflightSearches.delete(cacheKey);
+  });
+  inflightSearches.set(cacheKey, promise);
+  return promise;
+}
+
 app.use((req, res, next) => {
   console.log(`[HTTP] ${req.method} ${req.path}`);
   // 30s timeout for non-stream routes
@@ -249,93 +265,104 @@ app.get('/api/search', requireFirebaseAuth, privateRateLimit, async (req, res) =
       return res.json(cached);
     }
 
-    const node = lavalink.nodeManager.leastUsedNodes()[0];
-    if (!node)
-      return res.status(500).json({ error: 'No NodeLink nodes available' });
-
-    // Handle Spotify Playlist URLs/URIs specially to bypass the 100 tracks limit
-    const spotifyPlaylistRegex = /(?:open\.spotify\.com\/playlist\/|spotify:playlist:)([a-zA-Z0-9]{22})/;
-    const match = trimmedQuery.match(spotifyPlaylistRegex);
-
-    let finalResult: any;
-
-    if (match) {
-      const playlistId = match[1];
-      console.log(`[SpotifyImport] Detected Spotify playlist URL: ${playlistId}. Fetching full playlist...`);
-      
-      try {
-        const fullData = await fetchFullSpotifyPlaylist(playlistId);
-        
-        // Transform to Lavalink-like structure that the frontend expects
-        const tracks = (fullData.tracks?.items || [])
-          .map((item: any) => item.track)
-          .filter(Boolean)
-          .filter((t: any) => {
-            const hasValidTitle = t.name && typeof t.name === 'string' && t.name.toLowerCase() !== 'unknown' && t.name.toLowerCase() !== 'unknown title';
-            const hasValidDuration = typeof t.duration_ms === 'number' && t.duration_ms > 0;
-            return t.id && hasValidTitle && hasValidDuration;
-          })
-          .map((t: any) => ({
-            encoded: '', // Will be resolved by client on-demand in useAudioPlayback
-            info: {
-              identifier: t.id,
-              title: t.name,
-              author: t.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist',
-              length: t.duration_ms || 0,
-              duration: t.duration_ms || 0, // Explicitly provide duration for Firestore
-              artworkUrl: t.album?.images?.[0]?.url || '',
-              uri: `https://open.spotify.com/track/${t.id}`,
-              sourceName: 'spotify',
-              isSeekable: true,
-              isStream: false,
-              isrc: t.external_ids?.isrc || null
-            }
-          }));
-
-        finalResult = {
-          loadType: 'playlist',
-          playlistInfo: {
-            name: fullData.name,
-            selectedTrack: 0
-          },
-          tracks
-        };
-      } catch (err) {
-        console.error('[SpotifyImport] Failed to fetch full playlist metadata:', err);
-        // Fallback to normal node search if manual fetch fails
+    const finalResult = await getOrRunCachedSearch(cacheKey, async () => {
+      const node = lavalink.nodeManager.leastUsedNodes()[0];
+      if (!node || !node.connected) {
+        const error = new Error('No NodeLink nodes available');
+        (error as Error & { statusCode?: number }).statusCode = 500;
+        throw error;
       }
-    }
 
-    if (!finalResult) {
-      finalResult = await node.search(
-        { query: trimmedQuery },
-        { id: req.user?.uid || 'MelofyInternal' },
-      );
-    }
+      // Handle Spotify Playlist URLs/URIs specially to bypass the 100 tracks limit
+      const spotifyPlaylistRegex = /(?:open\.spotify\.com\/playlist\/|spotify:playlist:)([a-zA-Z0-9]{22})/;
+      const match = trimmedQuery.match(spotifyPlaylistRegex);
 
-    // Filter out unavailable tracks from general search result if they exist
-    if (finalResult && Array.isArray(finalResult.tracks)) {
-      finalResult.tracks = finalResult.tracks.filter((track: any) => {
-        if (!track || !track.info) return false;
-        const title = track.info.title;
-        const length = track.info.length || track.info.duration || 0;
-        
-        const hasValidTitle = title && typeof title === 'string' && title.toLowerCase() !== 'unknown' && title.toLowerCase() !== 'unknown title';
-        const hasValidDuration = typeof length === 'number' && length > 0;
-        
-        return hasValidTitle && hasValidDuration;
-      });
-    }
+      let searchResult: any;
 
-    // Cache the result for 24 hours
-    if (finalResult && finalResult.loadType !== 'error' && finalResult.loadType !== 'empty') {
-      await redis.set(cacheKey, finalResult, { ex: 86400 });
-    }
+      if (match) {
+        const playlistId = match[1];
+        console.log(`[SpotifyImport] Detected Spotify playlist URL: ${playlistId}. Fetching full playlist...`);
+
+        try {
+          const fullData = await fetchFullSpotifyPlaylist(playlistId);
+
+          // Transform to Lavalink-like structure that the frontend expects
+          const tracks = (fullData.tracks?.items || [])
+            .map((item: any) => item.track)
+            .filter(Boolean)
+            .filter((t: any) => {
+              const hasValidTitle = t.name && typeof t.name === 'string' && t.name.toLowerCase() !== 'unknown' && t.name.toLowerCase() !== 'unknown title';
+              const hasValidDuration = typeof t.duration_ms === 'number' && t.duration_ms > 0;
+              return t.id && hasValidTitle && hasValidDuration;
+            })
+            .map((t: any) => ({
+              encoded: '', // Will be resolved by client on-demand in useAudioPlayback
+              info: {
+                identifier: t.id,
+                title: t.name,
+                author: t.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist',
+                length: t.duration_ms || 0,
+                duration: t.duration_ms || 0, // Explicitly provide duration for Firestore
+                artworkUrl: t.album?.images?.[0]?.url || '',
+                uri: `https://open.spotify.com/track/${t.id}`,
+                sourceName: 'spotify',
+                isSeekable: true,
+                isStream: false,
+                isrc: t.external_ids?.isrc || null
+              }
+            }));
+
+          searchResult = {
+            loadType: 'playlist',
+            playlistInfo: {
+              name: fullData.name,
+              selectedTrack: 0
+            },
+            tracks
+          };
+        } catch (err) {
+          console.error('[SpotifyImport] Failed to fetch full playlist metadata:', err);
+          // Fallback to normal node search if manual fetch fails
+        }
+      }
+
+      if (!searchResult) {
+        searchResult = await node.search(
+          { query: trimmedQuery },
+          { id: req.user?.uid || 'MelofyInternal' },
+        );
+      }
+
+      // Filter out unavailable tracks from general search result if they exist
+      if (searchResult && Array.isArray(searchResult.tracks)) {
+        searchResult.tracks = searchResult.tracks.filter((track: any) => {
+          if (!track || !track.info) return false;
+          const title = track.info.title;
+          const length = track.info.length || track.info.duration || 0;
+
+          const hasValidTitle = title && typeof title === 'string' && title.toLowerCase() !== 'unknown' && title.toLowerCase() !== 'unknown title';
+          const hasValidDuration = typeof length === 'number' && length > 0;
+
+          return hasValidTitle && hasValidDuration;
+        });
+      }
+
+      // Cache the result for 24 hours
+      if (searchResult && searchResult.loadType !== 'error' && searchResult.loadType !== 'empty') {
+        await redis.set(cacheKey, searchResult, { ex: 86400 });
+      }
+
+      return searchResult;
+    });
 
     res.json(finalResult);
   } catch (error) {
     console.error('Search error:', error);
-    res.status(500).json({ error: 'Search failed' });
+    const statusCode =
+      error instanceof Error && typeof (error as Error & { statusCode?: number }).statusCode === 'number'
+        ? (error as Error & { statusCode: number }).statusCode
+        : 500;
+    res.status(statusCode).json({ error: statusCode === 500 ? 'Search failed' : 'Search unavailable' });
   }
 });
 
@@ -534,12 +561,10 @@ io.on('connection', (socket) => {
   );
 
   socket.on('join_room', () => {
-    socket.rooms.forEach((room) => {
-      if (room !== socket.id) socket.leave(room);
-    });
-
     socket.join(secureRoomId);
-    socket.data.roomId = secureRoomId;
+    if (!socket.data.partyId) {
+      socket.data.roomId = secureRoomId;
+    }
     console.log(`Socket ${socket.id} joined secure room ${secureRoomId}`);
   });
 

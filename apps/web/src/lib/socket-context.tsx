@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '@/lib/firebase/auth-context';
 
@@ -23,6 +23,11 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const { user } = useAuth();
+  const userRef = useRef(user);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   useEffect(() => {
     let activeSocket: Socket | null = null;
@@ -30,7 +35,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     let reconnectAuthHandler: (() => void) | null = null;
     let cancelled = false;
 
-    if (!user) {
+    if (!userRef.current) {
       return;
     }
 
@@ -38,7 +43,10 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       if (!activeSocket || cancelled) return;
 
       try {
-        const refreshedToken = await user.getIdToken(forceRefresh);
+        const currentUser = userRef.current;
+        if (!currentUser) return;
+
+        const refreshedToken = await currentUser.getIdToken(forceRefresh);
         if (cancelled || !activeSocket) return;
 
         activeSocket.auth = { token: refreshedToken };
@@ -63,7 +71,10 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     const connectSocket = async () => {
-      const token = await user.getIdToken();
+      const currentUser = userRef.current;
+      if (!currentUser) return;
+
+      const token = await currentUser.getIdToken();
       let backendUrl = process.env.BACKEND_API_URL || '/';
       if (typeof window !== 'undefined' && window.location.port === '3000') {
         backendUrl = `http://${window.location.hostname}:3001`;
@@ -123,16 +134,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
       setSocket(null);
       setIsConnected(false);
     };
-  }, [user]);
-
-  useEffect(() => {
-    if (isConnected && socket) {
-      const roomId = user?.uid;
-      if (roomId) {
-        socket.emit('join_room', roomId);
-      }
-    }
-  }, [user?.uid, isConnected, socket]);
+  }, [user?.uid]);
 
   return (
     <SocketContext.Provider value={{ socket, isConnected }}>
