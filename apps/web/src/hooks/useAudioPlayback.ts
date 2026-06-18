@@ -81,25 +81,9 @@ export function useAudioPlayback(streamSrc?: string, options: AudioPlaybackOptio
 
   // Helper to sync time to both local state and store
   const setCurrentTime = useCallback((time: number) => {
-    const timeMs = Math.floor(time * 1000);
-    const audio = audioRef.current;
-
-    if (audio) {
-      const currentStoreProgress = usePlayerStore.getState().progress;
-      // Prevent resetting the store progress to 0 if the browser resets the media element.
-      // A reset is detected if:
-      // - timeMs is 0
-      // - the store currently has progress > 2000ms
-      // - the audio element is NOT seeking (meaning it's not a user-initiated seek)
-      // - the user is not currently dragging the progress slider
-      if (timeMs === 0 && currentStoreProgress > 2000 && !audio.seeking && !isDraggingSlider) {
-        return;
-      }
-    }
-
     setLocalTime(time);
-    usePlayerStore.setState({ progress: timeMs });
-  }, [isDraggingSlider]);
+    usePlayerStore.setState({ progress: Math.floor(time * 1000) });
+  }, []);
 
   // 1. Persistence & Hydration
   const { isHydrated, syncStateToServer } = usePlayerSync(audioRef, setCurrentTime);
