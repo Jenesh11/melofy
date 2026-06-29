@@ -12,6 +12,7 @@ import {
   Calendar,
   Sun,
   Moon,
+  Zap,
   ChevronLeft,
   Settings,
   Music,
@@ -350,6 +351,19 @@ export default function SettingsPage() {
                 >
                   <Moon className='h-3.5 w-3.5' />
                   <span>DARK</span>
+                </button>
+                <button
+                  onClick={() => setMode('amoled')}
+                  disabled={isCustomTheme}
+                  className={cn(
+                    'flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all text-xs font-black cursor-pointer',
+                    mode === 'amoled'
+                      ? 'bg-background shadow-xs text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <Zap className='h-3.5 w-3.5' />
+                  <span>AMOLED</span>
                 </button>
               </div>
             </div>

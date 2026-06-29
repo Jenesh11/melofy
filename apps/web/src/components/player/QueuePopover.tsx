@@ -124,7 +124,7 @@ export function QueuePopover() {
                     <p className='text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors'>
                       {track.title}
                     </p>
-                    <p className='text-xs text-muted-foreground truncate'>
+                    <p className='text-xs text-muted-foreground truncate font-outfit'>
                       {track.artist}
                     </p>
                   </div>

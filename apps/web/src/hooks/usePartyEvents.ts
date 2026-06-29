@@ -185,7 +185,7 @@ export function usePartyEvents({
 
     const handlePlaybackState = (data: RemotePlaybackState) => {
       const audio = audioRef.current;
-      if (!audio && !Capacitor.isNativePlatform()) return;
+      if (!audio) return;
 
       if (data.type === 'play_track' && data.track) {
         lastReceivedTrackRef.current = data.track.id;
@@ -209,7 +209,7 @@ export function usePartyEvents({
 
     const handleSyncState = (data: RemoteSyncState) => {
       const audio = audioRef.current;
-      if ((!audio && !Capacitor.isNativePlatform()) || typeof data.time !== 'number') return;
+      if (!audio || typeof data.time !== 'number') return;
 
       const activeTrack = usePlayerStore.getState().currentTrack;
       const incomingTrackId = data.track?.id ?? activeTrack?.id ?? null;
@@ -237,9 +237,7 @@ export function usePartyEvents({
       }
 
       const remoteTime = getProjectedRemoteTime(data);
-      const localTime = Capacitor.isNativePlatform()
-        ? usePlayerStore.getState().progress / 1000
-        : audio?.currentTime ?? 0;
+      const localTime = audio?.currentTime ?? 0;
       const signedDrift = remoteTime - localTime;
       const absDrift = Math.abs(signedDrift);
       const shouldForceSeek =
@@ -251,11 +249,7 @@ export function usePartyEvents({
         ? SYNC_RULES.hardSeekForwardDriftSec
         : SYNC_RULES.hardSeekBackwardDriftSec;
 
-      if (Capacitor.isNativePlatform()) {
-        if (shouldForceSeek || absDrift > hardSeekThreshold) {
-          applyRemoteTime(remoteTime);
-        }
-      } else if (audio && audio.readyState >= 1) {
+      if (audio && audio.readyState >= 1) {
         if (shouldForceSeek && absDrift > SYNC_RULES.forcedSyncDriftSec) {
           console.log(`[JamSync] Hard re-align: forced ${data.reason || 'track_desync'} drift ${absDrift.toFixed(2)}s`);
           applyRemoteTime(remoteTime);

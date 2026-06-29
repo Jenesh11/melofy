@@ -7,9 +7,11 @@ import {
   mapSpotifyTrackToPlayerTrack,
   type SpotifyTrackLike,
 } from '@/lib/track-mappers';
+import { addPlaylist } from '@/lib/firebase/playlists';
 
 interface SpotifyCollection {
   id: string;
+  name?: string;
   type?: string;
   images?: Array<{ url?: string }>;
 }
@@ -21,6 +23,7 @@ interface SpotifyCollectionTracksResponse {
 export function useSpotifyCollection() {
   const playPlaylist = usePlayerStore((state) => state.playPlaylist);
   const [isPlayingCollection, setIsPlayingCollection] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const { user } = useAuth();
 
   const handlePlaySpotifyCollection = async (collection: SpotifyCollection) => {
@@ -68,5 +71,61 @@ export function useSpotifyCollection() {
     }
   };
 
-  return { handlePlaySpotifyCollection, isPlayingCollection };
+  const handleImportSpotifyPlaylist = async (playlist: {
+    id: string;
+    name?: string;
+    images?: Array<{ url?: string }>;
+  }) => {
+    if (!user) return;
+    setIsImporting(true);
+    const playlistName = playlist.name || 'Playlist';
+    const toastId = toast.loading(`Importing ${playlistName}...`);
+    try {
+      const authHeaders = await getFirebaseAuthHeaders(user);
+      const res = await fetch(`/api/spotify/playlists/${playlist.id}`, {
+        headers: authHeaders,
+      });
+
+      if (!res.ok) throw new Error('Failed to fetch playlist details');
+
+      const fullData = await res.json();
+      const tracksForDb = (fullData.tracks || []).map((t: any) => ({
+        encoded: '', // Will be resolved on playback
+        info: {
+          identifier: t.id,
+          title: t.name,
+          author:
+            t.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist',
+          duration: t.duration_ms || 0,
+          artworkUrl: t.album?.images?.[0]?.url || '',
+          uri: `https://open.spotify.com/track/${t.id}`,
+          sourceName: 'spotify',
+          isSeekable: true,
+          isStream: false,
+          isrc: t.external_ids?.isrc || null,
+        },
+      }));
+
+      await addPlaylist(user.uid, {
+        name: fullData.name,
+        trackCount: fullData.trackCount || fullData.tracks?.length || 0,
+        artworkUrl: fullData.artworkUrl || fullData.images?.[0]?.url,
+        tracks: tracksForDb,
+      });
+
+      toast.success('Playlist imported to your library!', { id: toastId });
+    } catch (err) {
+      console.error('Import error:', err);
+      toast.error('Failed to import playlist', { id: toastId });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  return {
+    handlePlaySpotifyCollection,
+    isPlayingCollection,
+    handleImportSpotifyPlaylist,
+    isImporting,
+  };
 }

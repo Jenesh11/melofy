@@ -150,7 +150,7 @@ export function Topbar() {
   };
 
   return (
-    <div className='h-16 flex items-center justify-between px-6 bg-background/60 backdrop-blur-3xl border-b border-border transition-all duration-300'>
+    <div className='h-16 flex items-center justify-between gap-4 px-6 bg-background/60 backdrop-blur-3xl border-b border-border transition-all duration-300'>
       <div className='flex items-center gap-4 flex-1'>
         {/* Mobile Logo (only shown on search page where topbar search is hidden) */}
         {pathname === '/search' && (
@@ -270,7 +270,7 @@ export function Topbar() {
         <Link href='/settings'>
           <Button
             variant='ghost'
-            className='h-10 rounded-full px-3 py-2 bg-card/40 hover:bg-card hover:scale-[0.97] active:scale-95 cursor-pointer transition-all text-foreground font-medium border border-border/50 hover:border-border flex items-center gap-2'
+            className='h-10 w-10 sm:w-auto rounded-full p-0 sm:px-3 sm:py-2 bg-card/40 hover:bg-card hover:scale-[0.97] active:scale-95 cursor-pointer transition-all text-foreground font-medium border border-border/50 hover:border-border flex items-center justify-center sm:gap-2'
           >
             <span className='hidden sm:block text-sm mr-1 truncate max-w-[120px]'>
               {user?.displayName || 'Settings'}

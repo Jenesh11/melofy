@@ -283,7 +283,7 @@ export default function PlaylistPage() {
   const isLikedSongs = (playlist as CustomPlaylistData).isLikedSongs || playlist.name === 'Liked Songs';
 
   return (
-    <div className='flex flex-col min-h-full overflow-x-hidden custom-scrollbar p-4 md:p-8 pb-32 md:pb-8 relative'>
+    <div className='flex flex-col min-h-full overflow-x-hidden custom-scrollbar p-4 md:p-8 pb-8 md:pb-8 relative'>
       {isLikedSongs ? (
         <div
           className='absolute top-0 left-0 right-0 h-[50vh] opacity-25 blur-[120px] pointer-events-none z-10 bg-linear-to-br from-indigo-500 via-purple-500 to-pink-500'
@@ -387,7 +387,7 @@ export default function PlaylistPage() {
 
 function PlaylistPageSkeleton() {
   return (
-    <div className='flex flex-col min-h-full overflow-x-hidden p-4 md:p-8 pb-32 md:pb-8 relative animate-pulse'>
+    <div className='flex flex-col min-h-full overflow-x-hidden p-4 md:p-8 pb-8 md:pb-8 relative animate-pulse'>
       {/* Header Skeleton */}
       <header className='flex flex-col md:flex-row items-center md:items-end gap-6 mb-8 mt-4'>
         {/* Cover Art Skeleton */}

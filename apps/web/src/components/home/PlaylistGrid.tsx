@@ -127,7 +127,7 @@ export function PlaylistGrid({
             onClick={() => onPlayPlaylist(items[0])}
           >
             <Play className='h-4 w-4 fill-current group-hover/playall:scale-110 transition-transform' />
-            <span className='text-xs uppercase tracking-widest font-bold'>
+            <span className='text-xs font-bold'>
               Play Featured
             </span>
           </Button>
@@ -137,7 +137,7 @@ export function PlaylistGrid({
         className={
           isCarousel
             ? 'flex overflow-x-auto gap-6 pb-4 custom-scrollbar carousel-scrollbar snap-x snap-mandatory scroll-smooth'
-            : 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6'
+            : 'grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-6'
         }
       >
         {items.map((item, index) => (
@@ -148,7 +148,7 @@ export function PlaylistGrid({
             transition={{ delay: index * 0.05 }}
             className={`flex flex-col gap-3 group cursor-pointer ${
               isCarousel
-                ? 'min-w-[160px] w-[160px] md:min-w-[200px] md:w-[200px] lg:min-w-[220px] lg:w-[220px] snap-start shrink-0'
+                ? 'min-w-[160px] w-[160px] sm:min-w-[180px] sm:w-[180px] md:min-w-[200px] md:w-[200px] snap-start shrink-0'
                 : ''
             }`}
             onClick={() => router.push(`/playlist/${item.id}`)}
@@ -180,7 +180,7 @@ export function PlaylistGrid({
                 )}
               </div>
 
-              <div className='h-full w-full bg-linear-to-br from-muted to-background group-hover:scale-110 transition-transform duration-700 flex items-center justify-center'>
+              <div className='h-full w-full bg-linear-to-br from-muted to-background transition-transform duration-700 flex items-center justify-center'>
                 {item.images?.[0]?.url ? (
                   <img
                     src={item.images[0].url}
@@ -193,12 +193,12 @@ export function PlaylistGrid({
               </div>
 
               <div className='absolute bottom-4 right-4 bg-background/60 backdrop-blur-md px-3 py-1 rounded-full border border-border z-20'>
-                <p className='text-[10px] text-foreground font-bold tracking-wider uppercase'>
+                <p className='text-[10px] text-foreground font-bold uppercase'>
                   {item.tracks?.total
-                    ? `${item.tracks.total} TRACKS`
+                    ? `${item.tracks.total} Tracks`
                     : isAlbum
-                      ? 'ALBUM'
-                      : 'MIX'}
+                      ? 'Album'
+                      : 'Mix'}
                 </p>
               </div>
             </div>
@@ -206,7 +206,7 @@ export function PlaylistGrid({
               <p className='text-foreground font-bold truncate text-base group-hover:text-primary transition-colors'>
                 {item.name}
               </p>
-              <p className='text-muted-foreground text-xs truncate uppercase tracking-tighter mt-1 font-medium'>
+              <p className='text-muted-foreground text-xs truncate uppercase tracking-tighter mt-1 font-medium font-outfit'>
                 {isAlbum
                   ? item.artists?.[0]?.name
                   : item.owner?.display_name ||

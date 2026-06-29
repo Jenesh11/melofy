@@ -178,7 +178,7 @@ export function MobilePlayer({
           >
             <ChevronDown className='h-8 w-8' />
           </Button>
-          <div className='text-xs font-bold uppercase tracking-widest text-white/50'>
+          <div className='text-xs font-semibold text-white/50'>
             Now Playing
           </div>
           <div className='flex items-center gap-1'>
@@ -247,7 +247,7 @@ export function MobilePlayer({
               <h2 className='text-3xl font-black text-white truncate drop-shadow-lg tracking-tight w-full text-left'>
                 {currentTrack.title}
               </h2>
-              <p className='text-xl text-white/60 truncate mt-1 font-medium w-full text-left'>
+              <p className='text-xl text-white/60 truncate mt-1 font-medium font-outfit w-full text-left'>
                 {currentTrack.artist}
               </p>
             </motion.div>
@@ -485,7 +485,7 @@ export function MobilePlayer({
                       <p className='text-base font-bold text-white truncate group-hover:text-primary transition-colors'>
                         {track.title}
                       </p>
-                      <p className='text-sm text-white/60 truncate'>
+                      <p className='text-sm text-white/60 truncate font-outfit'>
                         {track.artist}
                       </p>
                     </div>

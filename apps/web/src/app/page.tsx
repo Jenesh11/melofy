@@ -8,10 +8,9 @@ import { Button } from '@/components/ui/button';
 import { LandingPage } from '@/components/layout/LandingPage';
 import { TrackCarousel } from '@/components/home/TrackCarousel';
 import { PlaylistGrid } from '@/components/home/PlaylistGrid';
-import { usePlayerStore } from '@/store/usePlayerStore';
+import { Track, usePlayerStore } from '@/store/usePlayerStore';
 import Link from 'next/link';
 import { HeroPlaylistCard } from '@/components/home/HeroPlaylistCard';
-import { HistoryCarousel } from '@/components/home/HistoryCarousel';
 import { useSpotifyCollection } from '@/hooks/useSpotifyCollection';
 import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
 import {
@@ -23,11 +22,6 @@ import { useHomeStore } from '@/store/useHomeStore';
 export default function Home() {
   const { user, loading } = useAuth();
   const history = usePlayerStore((state) => state.history);
-  const play = usePlayerStore((state) => state.play);
-  const currentTrack = usePlayerStore((state) => state.currentTrack);
-  const isPlaying = usePlayerStore((state) => state.isPlaying);
-  const pause = usePlayerStore((state) => state.pause);
-  const resume = usePlayerStore((state) => state.resume);
   const playPlaylist = usePlayerStore((state) => state.playPlaylist);
 
   const {
@@ -50,7 +44,7 @@ export default function Home() {
   } = useHomeStore();
   const [isFetching, setIsFetching] = useState(!hasFetched);
 
-  const { handlePlaySpotifyCollection } = useSpotifyCollection();
+  const { handlePlaySpotifyCollection, handleImportSpotifyPlaylist } = useSpotifyCollection();
 
   const trendingTracks = useMemo(
     () =>
@@ -83,6 +77,12 @@ export default function Home() {
     () => newReleasesAsTracks.map((track) => mapSpotifyTrackToPlayerTrack(track)),
     [newReleasesAsTracks],
   );
+
+  const uniqueHistory = useMemo(() => {
+    return Array.from(new Map(history.map((item) => [item.title, item])).values())
+      .reverse()
+      .slice(0, 10);
+  }, [history]);
 
   const handlePlayTrending = useCallback(() => {
     playPlaylist(trendingTracksToPlay);
@@ -226,12 +226,12 @@ export default function Home() {
   const greeting = getGreeting();
 
   return (
-    <div className='p-4 md:p-6 flex flex-col gap-10 overflow-x-hidden'>
+    <div className='p-4 md:p-4 flex flex-col gap-10 overflow-x-hidden'>
       <header className='flex flex-col gap-2'>
         <motion.p
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          className='text-primary font-bold tracking-widest text-xs uppercase'
+          className='text-primary font-semibold text-sm'
         >
           Welcome back
         </motion.p>
@@ -251,7 +251,7 @@ export default function Home() {
         <>
           <section className='relative group/hero'>
             <div className='flex items-center justify-between mb-6 px-1'>
-              <h2 className='text-zinc-500 font-bold uppercase tracking-[0.3em] text-[10px]'>
+              <h2 className='text-zinc-500 font-bold uppercase tracking-wider text-[10px]'>
                 Featured Collections
               </h2>
               <div className='flex items-center gap-2'>
@@ -298,20 +298,19 @@ export default function Home() {
           </section>
 
           <div className='flex flex-col gap-10'>
-            <HistoryCarousel
-              history={history}
-              currentTrack={currentTrack}
-              isPlaying={isPlaying}
-              onPlay={play}
-              onPause={pause}
-              onResume={resume}
-            />
+            {uniqueHistory.length > 0 && (
+              <TrackCarousel
+                title="Jump Back In"
+                tracks={uniqueHistory}
+              />
+            )}
 
             {discoveryMixes.length > 0 && (
               <PlaylistGrid
                 title='Made For You'
                 items={discoveryMixes}
                 onPlayPlaylist={handlePlaySpotifyCollection}
+                onImport={handleImportSpotifyPlaylist}
               />
             )}
 
@@ -319,6 +318,7 @@ export default function Home() {
               title="Editor's Picks"
               items={editorsPicks}
               onPlayPlaylist={handlePlaySpotifyCollection}
+              onImport={handleImportSpotifyPlaylist}
             />
 
             <section className='mt-8'>
@@ -332,7 +332,7 @@ export default function Home() {
                 <Link href='/trending'>
                   <Button
                     variant='ghost'
-                    className='text-muted-foreground hover:text-foreground text-xs uppercase tracking-widest'
+                    className='text-muted-foreground hover:text-foreground text-xs font-semibold'
                   >
                     See all
                   </Button>
@@ -361,6 +361,7 @@ export default function Home() {
               title='Your Curated Mixes'
               items={mixes}
               onPlayPlaylist={handlePlaySpotifyCollection}
+              onImport={handleImportSpotifyPlaylist}
             />
           </div>
         </>
@@ -403,8 +404,8 @@ function HomePageSkeleton() {
       {/* Grid of Playlist Skeletons */}
       <section className='mt-8'>
         <div className='h-8 w-48 bg-zinc-200 dark:bg-zinc-800/60 rounded mb-6' />
-        <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6'>
-          {Array.from({ length: 6 }).map((_, i) => (
+        <div className='grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-6'>
+          {Array.from({ length: 12 }).map((_, i) => (
             <div key={i} className='flex flex-col gap-3'>
               <div className='aspect-square rounded-[2rem] bg-zinc-200 dark:bg-zinc-800/60 shadow-xl' />
               <div className='flex flex-col gap-2 mt-2 px-1'>
@@ -420,8 +421,8 @@ function HomePageSkeleton() {
       <section className='mt-8'>
         <div className='h-8 w-56 bg-zinc-200 dark:bg-zinc-800/60 rounded mb-6' />
         <div className='flex overflow-x-auto gap-6 pb-6 carousel-scrollbar'>
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className='flex flex-col gap-3 min-w-[200px] w-[200px]'>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className='flex flex-col gap-3 min-w-[160px] w-[160px] sm:min-w-[180px] sm:w-[180px] md:min-w-[200px] md:w-[200px] shrink-0'>
               <div className='aspect-square rounded-[2.5rem] bg-zinc-200 dark:bg-zinc-800/60 shadow-lg' />
               <div className='flex flex-col gap-2 px-2 mt-2'>
                 <div className='h-4 w-3/4 bg-zinc-200 dark:bg-zinc-800/60 rounded' />

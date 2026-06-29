@@ -400,7 +400,7 @@ export function PlayerShell() {
           />
         </>
       ) : (
-        <div className='h-14 md:h-20 border-t border-white/5 bg-black/60 backdrop-blur-3xl flex items-center justify-center text-zinc-500 text-sm w-full absolute bottom-16 md:relative md:bottom-0'>
+        <div className='h-14 md:h-20 border-t border-white/5 bg-black/60 backdrop-blur-3xl flex items-center justify-center text-zinc-500 text-sm w-full relative mb-16 md:mb-0'>
           Select a track to start listening
         </div>
       )}

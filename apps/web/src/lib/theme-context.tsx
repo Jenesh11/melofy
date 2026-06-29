@@ -11,7 +11,7 @@ export type Essence =
   | 'rose'
   | 'custom';
 
-type Mode = 'light' | 'dark';
+type Mode = 'light' | 'dark' | 'amoled';
 
 interface ThemeContextType {
   essence: Essence;
@@ -118,10 +118,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       document.documentElement.style.removeProperty('--ring');
 
       document.documentElement.setAttribute('data-essence', essence);
+      document.documentElement.classList.remove('dark', 'amoled');
       if (mode === 'dark') {
         document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
+      } else if (mode === 'amoled') {
+        document.documentElement.classList.add('dark', 'amoled');
       }
     }
   }, [essence, mode, customBg, customAccent]);

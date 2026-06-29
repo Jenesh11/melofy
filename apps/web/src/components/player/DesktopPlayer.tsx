@@ -189,7 +189,7 @@ export function DesktopPlayer({
                     e.stopPropagation();
                     router.push(`/search?q=${encodeURIComponent(currentTrack.artist)}`);
                   }}
-                  className='text-xs text-muted-foreground truncate hover:text-primary hover:underline underline-offset-2 cursor-pointer transition-all'
+                  className='text-xs text-muted-foreground truncate hover:text-primary hover:underline underline-offset-2 cursor-pointer transition-all font-outfit'
                 >
                   {currentTrack.artist}
                 </p>

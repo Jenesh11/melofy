@@ -221,8 +221,11 @@ export function Sidebar() {
         ))}
       </div>
 
+      {/* Divider */}
+      <div className='border-t border-sidebar-border/30 my-4 w-full shrink-0' />
+
       {/* Playlists Section */}
-      <div className='mt-8 flex flex-col gap-1 flex-1 overflow-hidden w-full'>
+      <div className='flex flex-col gap-1 flex-1 overflow-hidden w-full'>
         <div className='h-6 overflow-hidden shrink-0 relative w-full flex items-center px-3'>
           <span className={cn(
             'text-xs font-semibold tracking-wider text-sidebar-foreground/40 uppercase transition-[max-width,opacity] duration-300 ease-in-out whitespace-nowrap overflow-hidden',

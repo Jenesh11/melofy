@@ -223,7 +223,7 @@ export default function PlayingPage() {
                     <motion.p
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 0.8, y: 0 }}
-                      className='text-primary font-black tracking-[0.4em] text-xs uppercase'
+                      className='text-primary font-bold text-sm'
                     >
                       Now Playing
                     </motion.p>
@@ -378,7 +378,7 @@ export default function PlayingPage() {
                   <Drawer.Description className='sr-only'>
                     Lyrics for {currentTrack?.title}
                   </Drawer.Description>
-                  <p className='text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-0.5'>
+                  <p className='text-xs font-bold text-primary mb-0.5'>
                     Now Reading
                   </p>
                   <Drawer.Title asChild>
