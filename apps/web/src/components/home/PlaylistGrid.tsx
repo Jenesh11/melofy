@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { mapTrackItemToPlayerTrack } from '@/lib/track-mappers';
+import { cn } from '@/lib/utils';
 
 interface PlaylistGridItem {
   id: string;
@@ -22,6 +23,7 @@ interface PlaylistGridItem {
   artists?: Array<{ name?: string }>;
   owner?: { display_name?: string };
   tracks?: { total?: number };
+  type?: string;
 }
 
 interface PlaylistGridProps {
@@ -31,6 +33,7 @@ interface PlaylistGridProps {
   isCarousel?: boolean;
   onPlayPlaylist?: (playlist: PlaylistGridItem) => void;
   onImport?: (playlist: PlaylistGridItem) => void;
+  className?: string;
 }
 
 export function PlaylistGrid({
@@ -40,6 +43,7 @@ export function PlaylistGrid({
   isCarousel = false,
   onPlayPlaylist,
   onImport,
+  className,
 }: PlaylistGridProps) {
   const playInContext = usePlayerStore((state) => state.playInContext);
   const currentTrack = usePlayerStore((state) => state.currentTrack);
@@ -114,7 +118,7 @@ export function PlaylistGrid({
   if (!items || items.length === 0) return null;
 
   return (
-    <section className='mt-8'>
+    <section className={cn('mt-8', className)}>
       <div className='flex items-center justify-between mb-6'>
         <h3 className='text-3xl font-bold text-foreground flex items-center gap-2'>
           {title}
@@ -137,7 +141,7 @@ export function PlaylistGrid({
         className={
           isCarousel
             ? 'flex overflow-x-auto gap-6 pb-4 custom-scrollbar carousel-scrollbar snap-x snap-mandatory scroll-smooth'
-            : 'grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-6'
+            : 'grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6'
         }
       >
         {items.map((item, index) => (
@@ -148,7 +152,7 @@ export function PlaylistGrid({
             transition={{ delay: index * 0.05 }}
             className={`flex flex-col gap-3 group cursor-pointer ${
               isCarousel
-                ? 'min-w-[160px] w-[160px] sm:min-w-[180px] sm:w-[180px] md:min-w-[200px] md:w-[200px] snap-start shrink-0'
+                ? 'min-w-[140px] w-[140px] sm:min-w-[160px] sm:w-[160px] md:min-w-[180px] md:w-[180px] snap-start shrink-0'
                 : ''
             }`}
             onClick={() => router.push(`/playlist/${item.id}`)}

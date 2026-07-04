@@ -62,7 +62,7 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const playPlaylist = usePlayerStore((state) => state.playPlaylist);
-  const { handlePlaySpotifyCollection } = useSpotifyCollection();
+  const { handlePlayCollection } = useSpotifyCollection();
   const { user } = useAuth();
   const [isImporting, setIsImporting] = useState(false);
 
@@ -576,7 +576,7 @@ export default function SearchPage() {
                   title='Featured Playlists'
                   items={spotifyPlaylists}
                   isCarousel={true}
-                  onPlayPlaylist={handlePlaySpotifyCollection}
+                  onPlayPlaylist={handlePlayCollection}
                   onImport={handleImportSpotifyPlaylist}
                 />
               )}

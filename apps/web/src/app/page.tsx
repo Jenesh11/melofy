@@ -18,6 +18,7 @@ import {
   type SpotifyTrackLike,
 } from '@/lib/track-mappers';
 import { useHomeStore } from '@/store/useHomeStore';
+import { useLibraryStore } from '@/store/useLibraryStore';
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -44,7 +45,8 @@ export default function Home() {
   } = useHomeStore();
   const [isFetching, setIsFetching] = useState(!hasFetched);
 
-  const { handlePlaySpotifyCollection, handleImportSpotifyPlaylist } = useSpotifyCollection();
+  const { handlePlayCollection, handleImportSpotifyPlaylist } = useSpotifyCollection();
+  const recentPlaylists = useLibraryStore((state) => state.recentPlaylists) || [];
 
   const trendingTracks = useMemo(
     () =>
@@ -291,7 +293,7 @@ export default function Home() {
                   key={playlist.id + index}
                   playlist={playlist}
                   index={index}
-                  onPlay={handlePlaySpotifyCollection}
+                  onPlay={handlePlayCollection}
                 />
               ))}
             </div>
@@ -302,6 +304,23 @@ export default function Home() {
               <TrackCarousel
                 title="Jump Back In"
                 tracks={uniqueHistory}
+                className='mt-0'
+              />
+            )}
+
+            {recentPlaylists.length > 0 && (
+              <PlaylistGrid
+                title="Recent Playlists"
+                items={recentPlaylists.map(p => ({
+                  id: p.id,
+                  name: p.name,
+                  images: [{ url: p.artworkUrl }],
+                  type: p.type,
+                  tracks: { total: p.trackCount }
+                }))}
+                isCarousel={true}
+                onPlayPlaylist={handlePlayCollection}
+                className='mt-0'
               />
             )}
 
@@ -309,19 +328,21 @@ export default function Home() {
               <PlaylistGrid
                 title='Made For You'
                 items={discoveryMixes}
-                onPlayPlaylist={handlePlaySpotifyCollection}
+                onPlayPlaylist={handlePlayCollection}
                 onImport={handleImportSpotifyPlaylist}
+                className='mt-0'
               />
             )}
 
             <PlaylistGrid
               title="Editor's Picks"
               items={editorsPicks}
-              onPlayPlaylist={handlePlaySpotifyCollection}
+              onPlayPlaylist={handlePlayCollection}
               onImport={handleImportSpotifyPlaylist}
+              className='mt-0'
             />
 
-            <section className='mt-8'>
+            <section className='mt-0'>
               <div className='flex items-center justify-between mb-6'>
                 <Link href='/trending' className='group flex items-center gap-2'>
                   <h3 className='text-3xl font-bold text-foreground group-hover:text-primary transition-colors'>
@@ -342,6 +363,7 @@ export default function Home() {
                 title=''
                 tracks={trendingTracks}
                 onPlayAll={handlePlayTrending}
+                className='mt-0'
               />
             </section>
 
@@ -349,19 +371,22 @@ export default function Home() {
               title='Because You Like Music'
               tracks={recommendations}
               onPlayAll={handlePlayRecommendations}
+              className='mt-0'
             />
 
             <TrackCarousel
               title='New Releases'
               tracks={newReleasesAsTracks}
               onPlayAll={handlePlayNewReleases}
+              className='mt-0'
             />
 
             <PlaylistGrid
               title='Your Curated Mixes'
               items={mixes}
-              onPlayPlaylist={handlePlaySpotifyCollection}
+              onPlayPlaylist={handlePlayCollection}
               onImport={handleImportSpotifyPlaylist}
+              className='mt-0'
             />
           </div>
         </>
@@ -404,7 +429,7 @@ function HomePageSkeleton() {
       {/* Grid of Playlist Skeletons */}
       <section className='mt-8'>
         <div className='h-8 w-48 bg-zinc-200 dark:bg-zinc-800/60 rounded mb-6' />
-        <div className='grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-6'>
+        <div className='grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6'>
           {Array.from({ length: 12 }).map((_, i) => (
             <div key={i} className='flex flex-col gap-3'>
               <div className='aspect-square rounded-[2rem] bg-zinc-200 dark:bg-zinc-800/60 shadow-xl' />
@@ -422,7 +447,7 @@ function HomePageSkeleton() {
         <div className='h-8 w-56 bg-zinc-200 dark:bg-zinc-800/60 rounded mb-6' />
         <div className='flex overflow-x-auto gap-6 pb-6 carousel-scrollbar'>
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className='flex flex-col gap-3 min-w-[160px] w-[160px] sm:min-w-[180px] sm:w-[180px] md:min-w-[200px] md:w-[200px] shrink-0'>
+            <div key={i} className='flex flex-col gap-3 min-w-[140px] w-[140px] sm:min-w-[160px] sm:w-[160px] md:min-w-[180px] md:w-[180px] shrink-0'>
               <div className='aspect-square rounded-[2.5rem] bg-zinc-200 dark:bg-zinc-800/60 shadow-lg' />
               <div className='flex flex-col gap-2 px-2 mt-2'>
                 <div className='h-4 w-3/4 bg-zinc-200 dark:bg-zinc-800/60 rounded' />

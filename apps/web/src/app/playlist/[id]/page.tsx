@@ -61,6 +61,7 @@ export default function PlaylistPage() {
   const savedPlaylists = useLibraryStore((state) => state.savedPlaylists);
   const addPlaylist = useLibraryStore((state) => state.addPlaylist);
   const removePlaylist = useLibraryStore((state) => state.removePlaylist);
+  const addRecentPlaylist = useLibraryStore((state) => state.addRecentPlaylist);
 
   const [playlist, setPlaylist] = useState<PlaylistData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -239,7 +240,17 @@ export default function PlaylistPage() {
     else if (isYoutubeSource) source = 'youtube';
     
     playPlaylist(tracksToPlay, id, source);
-  }, [id, isSpotifySource, isYoutubeSource, playPlaylist, tracksToPlay]);
+
+    if (playlist) {
+      addRecentPlaylist({
+        id,
+        name: playlist.name,
+        artworkUrl: playlist.artworkUrl || playlist.images?.[0]?.url || '',
+        type: source,
+        trackCount: trackItems.length,
+      });
+    }
+  }, [id, isSpotifySource, isYoutubeSource, playPlaylist, tracksToPlay, addRecentPlaylist, playlist, trackItems]);
 
   const handleToggleSave = useCallback(() => {
     if (!playlist) return;

@@ -38,7 +38,11 @@ export function PlayerShell() {
     attempts: 0,
   });
 
-  const { isOpen: isLyricsOpen, toggle: toggleLyricsPanel } = useLyricsPanelStore();
+  const { isOpen, activeTab, toggle: togglePanel } = useLyricsPanelStore();
+  const isLyricsOpen = isOpen && activeTab === 'lyrics';
+  const isQueueOpen = isOpen && activeTab === 'queue';
+  const toggleLyricsPanel = useCallback(() => togglePanel('lyrics'), [togglePanel]);
+  const toggleQueuePanel = useCallback(() => togglePanel('queue'), [togglePanel]);
 
   const { user } = useAuth();
   const refreshStreamSrc = useCallback(async () => {
@@ -397,6 +401,8 @@ export function PlayerShell() {
             isPipOpen={pip.isPipOpen}
             isLyricsOpen={isLyricsOpen}
             toggleLyrics={toggleLyricsPanel}
+            isQueueOpen={isQueueOpen}
+            toggleQueue={toggleQueuePanel}
           />
         </>
       ) : (

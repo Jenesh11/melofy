@@ -11,12 +11,11 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 export function LyricsPanel() {
-  const { isOpen, close } = useLyricsPanelStore();
+  const { isOpen, close, activeTab, setActiveTab } = useLyricsPanelStore();
   const queue = usePlayerStore((state) => state.queue);
   const playFromQueue = usePlayerStore((state) => state.playFromQueue);
   const setQueue = usePlayerStore((state) => state.setQueue);
 
-  const [activeTab, setActiveTab] = useState<'lyrics' | 'queue'>('lyrics');
   const [width, setWidth] = useState(360);
   const [isResizing, setIsResizing] = useState(false);
 
