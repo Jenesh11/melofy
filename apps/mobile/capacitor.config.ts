@@ -55,6 +55,13 @@ const config: CapacitorConfig = {
       style: 'Dark',
       backgroundColor: '#000000',
     },
+    // ─── Media Session (background audio) ────────────────────────────────
+    // Start the foreground service immediately on plugin load, not just
+    // when playback begins. This prevents a race where the app goes to
+    // background before the service has started.
+    MediaSession: {
+      foregroundService: 'always',
+    },
   },
   android: {
     // Allow the WebView to play audio in the background via AudioFocus.

@@ -4,7 +4,7 @@
 import { useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Play, Music2 } from 'lucide-react';
-import { usePlayerStore } from '@/store/usePlayerStore';
+import { Track, usePlayerStore } from '@/store/usePlayerStore';
 import { resolvePlayableTrack, TrackItem } from '@/components/ui/TrackList';
 import { TrackOptionsMenu } from '@/components/ui/TrackOptionsMenu';
 import { Button } from '@/components/ui/button';
@@ -19,14 +19,16 @@ import { cn } from '@/lib/utils';
 
 interface TrackCarouselProps {
   title: string;
-  tracks: SpotifyTrackLike[];
+  tracks: (SpotifyTrackLike | Track)[];
   onPlayAll?: () => void;
+  className?: string;
 }
 
 export function TrackCarousel({
   title,
   tracks,
   onPlayAll,
+  className,
 }: TrackCarouselProps) {
   const playInContext = usePlayerStore((state) => state.playInContext);
   const currentTrack = usePlayerStore((state) => state.currentTrack);
@@ -35,7 +37,22 @@ export function TrackCarousel({
   const resume = usePlayerStore((state) => state.resume);
 
   const trackItems: TrackItem[] = useMemo(
-    () => (tracks || []).map((track) => mapSpotifyTrackToTrackItem(track)),
+    () =>
+      (tracks || []).map((track) => {
+        if ('artworkUrl' in track && 'title' in track) {
+          return {
+            id: track.id,
+            identifier: track.identifier,
+            title: track.title,
+            artist: track.artist,
+            artworkUrl: track.artworkUrl,
+            duration: track.duration,
+            album: track.title,
+            encoded: track.url,
+          };
+        }
+        return mapSpotifyTrackToTrackItem(track as SpotifyTrackLike);
+      }),
     [tracks],
   );
 
@@ -112,7 +129,7 @@ export function TrackCarousel({
   if (!tracks || tracks.length === 0) return null;
 
   return (
-    <section className='mt-8'>
+    <section className={cn('mt-8', className)}>
       <div className='flex items-center justify-between mb-6'>
         <h3 className='text-3xl font-bold text-foreground flex items-center gap-2'>
           {title}
@@ -125,7 +142,7 @@ export function TrackCarousel({
             onClick={onPlayAll}
           >
             <Play className='h-4 w-4 fill-current group-hover/playall:scale-110 transition-transform' />
-            <span className='text-xs uppercase tracking-widest font-bold'>
+            <span className='text-xs font-bold'>
               Play All
             </span>
           </Button>
@@ -141,11 +158,11 @@ export function TrackCarousel({
 
           return (
             <motion.div
-              key={(track.id || track.name || 'track') + index}
+              key={(trackItem?.id || 'track') + index}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: index * 0.05 }}
-              className='flex flex-col gap-3 group cursor-pointer snap-start min-w-[200px] w-[200px]'
+              className='flex flex-col gap-3 group cursor-pointer snap-start min-w-[140px] w-[140px] sm:min-w-[160px] sm:w-[160px] md:min-w-[180px] md:w-[180px] shrink-0'
               onClick={() => void handlePlay(index)}
             >
               <div className='aspect-square rounded-[2.5rem] bg-muted relative overflow-hidden shadow-lg group-hover:shadow-primary/20 transition-all duration-500'>
@@ -154,25 +171,25 @@ export function TrackCarousel({
                     {isActive ? (
                       <div className='flex items-center justify-center gap-0.5 h-4'>
                         <div
-                          className='w-0.5 h-2 bg-black animate-bounce'
+                          className='w-0.5 h-2 bg-primary-foreground animate-bounce'
                           style={{ animationDelay: '0ms' }}
                         />
                         <div
-                          className='w-0.5 h-3 bg-black animate-bounce'
+                          className='w-0.5 h-3 bg-primary-foreground animate-bounce'
                           style={{ animationDelay: '100ms' }}
                         />
                         <div
-                          className='w-0.5 h-2 bg-black animate-bounce'
+                          className='w-0.5 h-2 bg-primary-foreground animate-bounce'
                           style={{ animationDelay: '200ms' }}
                         />
                       </div>
                     ) : (
-                      <Play className='h-5 w-5 fill-black translate-x-0.5' />
+                      <Play className='h-5 w-5 fill-primary-foreground translate-x-0.5' />
                     )}
                   </div>
                 </div>
                 <div className='absolute inset-0 bg-background/20 opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none' />
-                <div className='h-full w-full bg-linear-to-br from-muted to-background group-hover:scale-110 transition-transform duration-700 flex items-center justify-center'>
+                <div className='h-full w-full bg-linear-to-br from-muted to-background transition-transform duration-700 flex items-center justify-center'>
                   {artworkUrl ? (
                     <img
                       src={artworkUrl}
@@ -189,7 +206,7 @@ export function TrackCarousel({
                   <p className='text-foreground font-bold truncate text-base group-hover:text-primary transition-colors'>
                     {titleText}
                   </p>
-                  <p className='text-muted-foreground text-xs truncate uppercase tracking-tighter mt-1 font-medium'>
+                  <p className='text-muted-foreground text-xs truncate uppercase tracking-tighter mt-1 font-medium font-outfit'>
                     {artistText}
                   </p>
                 </div>

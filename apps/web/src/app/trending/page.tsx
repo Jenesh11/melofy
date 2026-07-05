@@ -65,7 +65,7 @@ export default function TrendingPage() {
   }, [user]);
 
   return (
-    <div className='flex flex-col min-h-full overflow-x-hidden custom-scrollbar p-4 md:p-8 pb-32 md:pb-8'>
+    <div className='flex flex-col min-h-full overflow-x-hidden custom-scrollbar p-4 md:p-8 pb-8 md:pb-8'>
       <header className='flex flex-col md:flex-row items-center md:items-end gap-6 mb-8 mt-4'>
         <div className='h-48 w-48 md:h-60 md:w-60 rounded-[2.5rem] bg-linear-to-br from-primary/30 to-blue-500/20 shadow-2xl shrink-0 flex items-center justify-center'>
           <TrendingUp className='h-24 w-24 text-primary' />

@@ -15,6 +15,7 @@ import {
   Heart,
   ListMusic,
   Trash2,
+  GripVertical,
 } from 'lucide-react';
 import { useLikedSongs } from '@/hooks/useLikedSongs';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,7 @@ import { usePlayerStore, Track } from '@/store/usePlayerStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
 import { SyncedLyrics } from '@/components/ui/SyncedLyrics';
-import { ListenAlongPopover } from './ListenAlongPopover';
+import { ListenAlongDrawer } from './ListenAlongDrawer';
 import { Drawer } from 'vaul';
 
 interface MobilePlayerProps {
@@ -77,6 +78,39 @@ export function MobilePlayer({
   const playFromQueue = usePlayerStore((state) => state.playFromQueue);
   const setQueue = usePlayerStore((state) => state.setQueue);
 
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (dropIndex: number) => {
+    if (draggedIndex === null || draggedIndex === dropIndex) return;
+
+    const updatedQueue = [...queue];
+    const [draggedItem] = updatedQueue.splice(draggedIndex, 1);
+    updatedQueue.splice(dropIndex, 0, draggedItem);
+    
+    setQueue(updatedQueue);
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
   useEffect(() => {
     const handleHardwareBack = (e: Event) => {
       if (showQueue) {
@@ -103,13 +137,12 @@ export function MobilePlayer({
     <Drawer.Root 
       open={isExpanded} 
       onOpenChange={(open) => !open && setIsExpanded(false)}
-      shouldScaleBackground={true}
     >
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-100" />
-        <Drawer.Content className='md:hidden fixed inset-0 z-101 bg-black text-white flex flex-col overflow-hidden outline-none'>
+        <Drawer.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]" />
+        <Drawer.Content className="md:hidden fixed bottom-0 left-0 right-0 top-12 z-[101] bg-zinc-950 border-t border-white/10 rounded-t-[2rem] text-white flex flex-col overflow-hidden outline-none">
           <Drawer.Title className="sr-only">Now Playing</Drawer.Title>
-          <div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-white/20 mt-4 mb-2 z-110" />
+          <div className="mx-auto w-12 h-1.5 shrink-0 rounded-full bg-white/20 mt-4 mb-2 z-[110]" />
       {/* Background Essence */}
       <AnimatePresence mode='wait'>
         {currentTrack && (
@@ -145,11 +178,11 @@ export function MobilePlayer({
           >
             <ChevronDown className='h-8 w-8' />
           </Button>
-          <div className='text-xs font-bold uppercase tracking-widest text-white/50'>
+          <div className='text-xs font-semibold text-white/50'>
             Now Playing
           </div>
           <div className='flex items-center gap-1'>
-            <ListenAlongPopover />
+            <ListenAlongDrawer />
           </div>
         </div>
 
@@ -214,7 +247,7 @@ export function MobilePlayer({
               <h2 className='text-3xl font-black text-white truncate drop-shadow-lg tracking-tight w-full text-left'>
                 {currentTrack.title}
               </h2>
-              <p className='text-xl text-white/60 truncate mt-1 font-medium w-full text-left'>
+              <p className='text-xl text-white/60 truncate mt-1 font-medium font-outfit w-full text-left'>
                 {currentTrack.artist}
               </p>
             </motion.div>
@@ -340,7 +373,7 @@ export function MobilePlayer({
       </div>
 
       {/* Lyrics Drawer */}
-      <Drawer.Root 
+      <Drawer.NestedRoot 
         open={showLyrics} 
         onOpenChange={setShowLyrics}
       >
@@ -378,10 +411,10 @@ export function MobilePlayer({
             </div>
           </Drawer.Content>
         </Drawer.Portal>
-      </Drawer.Root>
+      </Drawer.NestedRoot>
 
       {/* Queue Drawer */}
-      <Drawer.Root 
+      <Drawer.NestedRoot 
         open={showQueue} 
         onOpenChange={setShowQueue}
       >
@@ -415,18 +448,30 @@ export function MobilePlayer({
                 queue.map((track, i) => (
                   <div
                     key={`${track.id}-${i}`}
+                    draggable
+                    onDragStart={() => handleDragStart(i)}
+                    onDragOver={(e) => handleDragOver(e, i)}
+                    onDragLeave={handleDragLeave}
+                    onDragEnd={handleDragEnd}
+                    onDrop={() => handleDrop(i)}
                     onClick={() => {
                       playFromQueue(i);
                       setShowQueue(false);
                     }}
-                    className='flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors group cursor-pointer'
+                    className={`flex items-center gap-2.5 p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors group cursor-pointer border-t-2 relative ${
+                      dragOverIndex === i && draggedIndex !== i ? 'border-primary' : 'border-transparent'
+                    } ${draggedIndex === i ? 'opacity-40' : ''}`}
                   >
+                    <div className='flex items-center shrink-0 opacity-40 hover:opacity-100 transition-opacity duration-150 cursor-grab active:cursor-grabbing text-white mr-0.5'>
+                      <GripVertical className='h-4 w-4' />
+                    </div>
                     <div className='h-12 w-12 shrink-0 rounded-lg overflow-hidden relative bg-white/10 flex items-center justify-center'>
                       {track.artworkUrl ? (
                         <Image
                           src={track.artworkUrl}
                           alt={track.title}
                           fill
+                          sizes="48px"
                           className='object-cover'
                         />
                       ) : (
@@ -440,7 +485,7 @@ export function MobilePlayer({
                       <p className='text-base font-bold text-white truncate group-hover:text-primary transition-colors'>
                         {track.title}
                       </p>
-                      <p className='text-sm text-white/60 truncate'>
+                      <p className='text-sm text-white/60 truncate font-outfit'>
                         {track.artist}
                       </p>
                     </div>
@@ -476,7 +521,7 @@ export function MobilePlayer({
             )}
           </Drawer.Content>
         </Drawer.Portal>
-      </Drawer.Root>
+      </Drawer.NestedRoot>
 
       {/* Subtle overlay texture */}
       <div className='absolute inset-0 pointer-events-none opacity-[0.03] bg-[url("https://www.transparenttextures.com/patterns/p6.png")] mix-blend-overlay z-0' />

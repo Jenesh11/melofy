@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { Card } from '@/components/ui/card';
 import { ExternalLink, Monitor, Chrome } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -26,81 +25,86 @@ export function PreMidGuide() {
   ];
 
   return (
-    <Card className='p-6 bg-card/40 border-border/50 backdrop-blur-3xl rounded-[2.5rem] overflow-hidden relative group shadow-2xl shadow-primary/5'>
-      <div className='absolute -top-24 -right-24 h-64 w-64 bg-primary/10 blur-[80px] rounded-full group-hover:bg-primary/20 transition-all duration-1000' />
-
-      <div className='relative z-10'>
-        <div className='flex items-center gap-4 mb-8'>
-          <div className='h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-inner'>
-            <Monitor className='h-6 w-6 text-primary' />
-          </div>
-          <div>
-            <h2 className='text-xl font-bold text-foreground leading-tight'>
-              Discord Presence
-            </h2>
-            <p className='text-muted-foreground text-xs font-medium opacity-80'>
-              Share your rhythm with PreMiD.
-            </p>
-          </div>
+    <div className='flex flex-col gap-6 py-2'>
+      <div className='flex items-center gap-3.5'>
+        <div className='h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0 shadow-inner'>
+          <Monitor className='h-5 w-5 text-primary' />
         </div>
-
-        <div className='flex flex-col gap-4'>
-          {steps.map((step, idx) => (
-            <motion.div
-              key={idx}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: idx * 0.1 }}
-              className='flex items-start gap-4 p-4 rounded-2xl bg-foreground/4 border border-foreground/4 hover:bg-foreground/5 hover:border-foreground/10 transition-all duration-300'
-            >
-              <div className='h-9 w-9 rounded-xl bg-background/60 flex items-center justify-center border border-foreground/10 shrink-0 shadow-sm'>
-                <step.icon className='h-4.5 w-4.5 text-foreground/80' />
-              </div>
-
-              <div className='flex flex-col gap-2 flex-1 min-w-0'>
-                <div className='space-y-0.5'>
-                  <h3 className='font-bold text-foreground text-sm flex items-center justify-between'>
-                    {step.title}
-                    <span className='text-[9px] font-black opacity-10 select-none'>
-                      0{idx + 1}
-                    </span>
-                  </h3>
-                  <p className='text-[11px] text-muted-foreground leading-snug wrap-break-word'>
-                    {step.description}
-                  </p>
-                </div>
-
-                <a
-                  href={step.link}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  className={cn(
-                    buttonVariants({ variant: 'link', size: 'sm' }),
-                    'h-auto w-fit p-0 text-primary hover:text-primary/80 no-underline text-xs font-bold transition-opacity',
-                  )}
-                >
-                  Configure{' '}
-                  <ExternalLink className='ml-1.5 h-3 w-3 opacity-60' />
-                </a>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
-        <div className='mt-8 pt-6 border-t border-foreground/5 flex flex-col gap-4'>
-          <a
-            href='https://premid.app/store/presences/Melofy'
-            target='_blank'
-            rel='noopener noreferrer'
-            className={cn(
-              buttonVariants({ variant: 'outline' }),
-              'w-full rounded-2xl text-[11px] font-black uppercase tracking-widest border-foreground/10 h-11 hover:bg-foreground/5 transition-all',
-            )}
-          >
-            Add to Discord
-          </a>
+        <div>
+          <h3 className='font-bold text-foreground text-base leading-tight'>
+            Discord Rich Presence
+          </h3>
+          <p className='text-muted-foreground text-xs font-medium opacity-80'>
+            Share your current rhythm with friends via PreMiD.
+          </p>
         </div>
       </div>
-    </Card>
+
+      <div className='relative flex flex-col gap-6 pl-1 mt-2'>
+        {steps.map((step, idx) => (
+          <motion.div
+            key={idx}
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: idx * 0.1 }}
+            className='relative flex gap-4'
+          >
+            {/* Timeline connector line */}
+            {idx < steps.length - 1 && (
+              <div className='absolute left-[17px] top-9 bottom-[-24px] w-0.5 bg-foreground/10' />
+            )}
+
+            {/* Step Icon Container */}
+            <div className='h-9 w-9 rounded-full bg-foreground/5 flex items-center justify-center border border-foreground/10 shrink-0 relative z-10 bg-background'>
+              <step.icon className='h-4.5 w-4.5 text-foreground/80' />
+            </div>
+
+            {/* Step Details */}
+            <div className='flex flex-col gap-1.5 flex-1 min-w-0 pt-0.5'>
+              <div className='space-y-0.5'>
+                <h4 className='font-bold text-foreground text-sm flex items-center gap-2'>
+                  {step.title}
+                  <span className='text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-black uppercase tracking-wider'>
+                    Step {idx + 1}
+                  </span>
+                </h4>
+                <p className='text-xs text-muted-foreground leading-relaxed max-w-md'>
+                  {step.description}
+                </p>
+              </div>
+
+              <a
+                href={step.link}
+                target='_blank'
+                rel='noopener noreferrer'
+                className={cn(
+                  buttonVariants({ variant: 'link', size: 'sm' }),
+                  'h-auto w-fit p-0 text-primary hover:text-primary/80 no-underline text-xs font-bold transition-colors flex items-center gap-1',
+                )}
+              >
+                Configure
+                <ExternalLink className='h-3 w-3 opacity-60' />
+              </a>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      <div className='mt-2 pt-4 border-t border-foreground/5'>
+        <a
+          href='https://premid.app/store/presences/Melofy'
+          target='_blank'
+          rel='noopener noreferrer'
+          className={cn(
+            buttonVariants({ variant: 'outline' }),
+            'w-full sm:w-auto rounded-full text-xs font-bold border-foreground/10 h-10 px-5 hover:bg-foreground/5 transition-all inline-flex items-center justify-center gap-1.5',
+          )}
+        >
+          Add to Discord
+          <ExternalLink className='h-3.5 w-3.5 opacity-60' />
+        </a>
+      </div>
+    </div>
   );
 }
+

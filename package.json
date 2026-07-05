@@ -1,24 +1,43 @@
 {
   "name": "melofy",
   "private": true,
-  "version": "1.0.4",
+  "version": "1.0.5",
+  "description": "A premium cross-platform music streaming platform with desktop, mobile, and web applications.",
   "packageManager": "npm@10.8.2",
+  "author": {
+    "name": "Shrey Jaiswal",
+    "url": "https://github.com/lazyshrey"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/lazyshrey/melofy#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lazyshrey/melofy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lazyshrey/melofy/issues"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "build": "turbo run build",
     "dev": "turbo run dev",
-    "nodelink": "cd ../../test/stream/NodeLink && npm start",
-    "lint": "turbo run lint",
+    "dev:web": "turbo run dev --filter=web",
+    "dev:desktop": "turbo run dev --filter=desktop",
+    "dev:mobile": "turbo run dev --filter=mobile",
+    "dev:api": "turbo run dev --filter=api",
+    "build": "turbo run build",
+    "build:web": "turbo run build --filter=web",
+    "build:desktop": "turbo run build --filter=desktop",
+    "build:mobile": "turbo run build --filter=mobile",
+    "build:api": "turbo run build --filter=api",
     "start": "turbo run start",
+    "lint": "turbo run lint",
     "test": "turbo run test"
   },
   "devDependencies": {
     "turbo": "^2.9.15",
     "typescript": "^5.0.0"
-  },
-  "author": "lazyshrey",
-  "license": "ISC"
+  }
 }

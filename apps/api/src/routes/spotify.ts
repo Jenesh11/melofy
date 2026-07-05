@@ -151,26 +151,33 @@ router.get('/recommendations', async (req, res) => {
 });
 
 /**
- * GET /api/spotify/popular-playlists
- * Uses search queries for popular playlists since direct IDs for editorial playlists often return 404 now.
+ * GET /api/spotify/editors-picks
+ * GET /api/spotify/editors-pick
+ * GET /api/spotify/popular-playlists (for backward compatibility)
+ * Uses search queries with market=US to get popular global playlists.
  */
-router.get('/popular-playlists', async (req, res) => {
-  const SEARCH_QUERIES = [
-    "Top hits",
-    'Rap hits',
-    'New Music',
-    'Bollywood hits',
-    'Rock',
-    'Punjabi',
-    'Hot Country',
-    'Peaceful Piano',
-    'Indie Pop',
-  ];
-
+const handleEditorsPicks = async (req: any, res: any) => {
+  const cacheKey = 'spotify:editors-picks';
   try {
+    const cached = await redis.get(cacheKey);
+    if (cached) return res.json(cached);
+
+    const SEARCH_QUERIES = [
+      "New Music Friday",
+      "Classic Rock Gold",
+      "Hot Country",
+      "Lofi Fruits Music",
+      "Indie Pop Hits",
+      "All Out 2010s",
+      "Alternative Beats",
+      "Chill Lofi Study Beats",
+      "Mega Hit Mix",
+      "Pop Brand New",
+    ];
+
     const results = await Promise.allSettled(
       SEARCH_QUERIES.map((q) =>
-        spotifyGet(`/search?q=${encodeURIComponent(q)}&type=playlist&limit=5`),
+        spotifyGet(`/search?q=${encodeURIComponent(q)}&type=playlist&limit=5&market=US`),
       ),
     );
 
@@ -178,20 +185,81 @@ router.get('/popular-playlists', async (req, res) => {
       .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
       .map((r) => {
         const items = r.value?.playlists?.items || [];
-        // Find the first playlist that isn't null (Spotify returns null for restricted editorial playlists)
         return items.find((p: any) => p !== null);
       })
-      .filter(Boolean); // Ensure no empty slots in carousel
+      .filter(Boolean);
+
+    if (playlists.length > 0) {
+      await redis.set(cacheKey, playlists, { ex: 43200 }); // 12 hours
+    }
 
     res.json(playlists);
   } catch (error: any) {
     console.error(
-      '[Spotify] Popular playlists error:',
+      '[Spotify] Editors picks error:',
       error?.response?.data || error.message,
     );
-    res.status(500).json({ error: 'Failed to fetch popular playlists' });
+    res.status(500).json({ error: 'Failed to fetch editor\'s picks' });
+  }
+};
+
+router.get('/editors-picks', handleEditorsPicks);
+router.get('/editors-pick', handleEditorsPicks);
+router.get('/popular-playlists', handleEditorsPicks);
+
+/**
+ * GET /api/spotify/featured-playlists
+ * Pulls curated global featured playlists from Spotify search with market=US to bypass local regional variations.
+ */
+router.get('/featured-playlists', async (req, res) => {
+  const cacheKey = 'spotify:featured-playlists';
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached) return res.json(cached);
+
+    const GLOBAL_FEATURED_QUERIES = [
+      "Today's Top Hits",
+      "Mega Hit Mix",
+      "All Out 2000s",
+      "Pop Rising",
+      "Rock Classics",
+      "Chill Tracks",
+      "RapCaviar",
+      "Mint",
+      "Feelin' Good",
+      "Beast Mode",
+      "Viva Latino",
+      "Soft Pop Hits",
+    ];
+
+    const results = await Promise.allSettled(
+      GLOBAL_FEATURED_QUERIES.map((q) =>
+        spotifyGet(`/search?q=${encodeURIComponent(q)}&type=playlist&limit=5&market=US`),
+      ),
+    );
+
+    const playlists = results
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+      .map((r) => {
+        const items = r.value?.playlists?.items || [];
+        return items.find((p: any) => p !== null);
+      })
+      .filter(Boolean);
+
+    if (playlists.length > 0) {
+      await redis.set(cacheKey, playlists, { ex: 43200 }); // 12 hours
+    }
+    
+    res.json(playlists);
+  } catch (error: any) {
+    console.error(
+      '[Spotify] Featured playlists search failed:',
+      error?.response?.data || error.message
+    );
+    res.status(500).json({ error: 'Failed to fetch featured playlists' });
   }
 });
+
 
 /**
  * POST /api/spotify/discovery

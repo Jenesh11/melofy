@@ -11,12 +11,12 @@ import {
   Mic2,
   Heart,
   PictureInPicture2,
+  ListMusic,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProgressBar } from './ProgressBar';
 import { VolumeControl } from './VolumeControl';
 import { ListenAlongPopover } from './ListenAlongPopover';
-import { QueuePopover } from './QueuePopover';
 import { cn } from '@/lib/utils';
 import { Track } from '@/store/usePlayerStore';
 import Image from 'next/image';
@@ -52,6 +52,8 @@ interface DesktopPlayerProps {
   isPipOpen?: boolean;
   isLyricsOpen?: boolean;
   toggleLyrics?: () => void;
+  isQueueOpen?: boolean;
+  toggleQueue?: () => void;
 }
 
 export function DesktopPlayer({
@@ -79,6 +81,8 @@ export function DesktopPlayer({
   isPipOpen,
   isLyricsOpen,
   toggleLyrics,
+  isQueueOpen,
+  toggleQueue,
 }: DesktopPlayerProps) {
   const { isLiked, toggleLike } = useLikedSongs();
   const [pipAvailable, setPipAvailable] = useState(false);
@@ -189,7 +193,7 @@ export function DesktopPlayer({
                     e.stopPropagation();
                     router.push(`/search?q=${encodeURIComponent(currentTrack.artist)}`);
                   }}
-                  className='text-xs text-muted-foreground truncate hover:text-primary hover:underline underline-offset-2 cursor-pointer transition-all'
+                  className='text-xs text-muted-foreground truncate hover:text-primary hover:underline underline-offset-2 cursor-pointer transition-all font-outfit'
                 >
                   {currentTrack.artist}
                 </p>
@@ -345,7 +349,21 @@ export function DesktopPlayer({
           <Heart className={cn('h-5 w-5', isLiked(currentTrack.id) && 'fill-current')} />
         </Button>
         <ListenAlongPopover />
-        <QueuePopover />
+        <Button
+          variant='ghost'
+          size='icon'
+          className={cn(
+            'transition-colors',
+            isQueueOpen ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleQueue?.();
+          }}
+          title='View Queue'
+        >
+          <ListMusic className='h-5 w-5' />
+        </Button>
         <Button
           variant='ghost'
           size='icon'

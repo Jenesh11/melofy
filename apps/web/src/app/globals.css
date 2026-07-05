@@ -1,3 +1,4 @@
+@import url('https://fonts.cdnfonts.com/css/product-sans');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
@@ -5,11 +6,14 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --breakpoint-xs: 480px;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-outfit);
+  --font-sans: 'Product Sans', 'Google Sans', var(--font-outfit), sans-serif;
   --font-mono: var(--font-geist-mono);
   --font-outfit: var(--font-outfit);
+  --tracking-tighter: -0.01em;
+  --tracking-tight: -0.005em;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -84,19 +88,19 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: oklch(0.20 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: oklch(0.24 0 0);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: oklch(0.24 0 0);
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.87 0 0);
   --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
+  --secondary: oklch(0.28 0 0);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
+  --muted: oklch(0.28 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.371 0 0);
+  --accent: oklch(0.32 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
@@ -107,11 +111,40 @@
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.205 0 0);
+  --sidebar: oklch(0.22 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent: oklch(0.28 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+.amoled {
+  --background: oklch(0 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.87 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.205 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.205 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --sidebar: oklch(0.12 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.205 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
@@ -192,27 +225,27 @@
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: color-mix(in oklch, var(--foreground) 8%, transparent);
+    background: color-mix(in oklch, var(--primary) 20%, transparent);
     border-radius: 10px;
     transition: background 0.3s ease;
   }
 
   .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-    background: color-mix(in oklch, var(--foreground) 12%, transparent);
+    background: color-mix(in oklch, var(--primary) 35%, transparent);
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in oklch, var(--foreground) 22%, transparent);
+    background: var(--primary);
   }
 
   .custom-scrollbar {
     /* Always reserve scrollbar space so layout never shifts on hover */
     scrollbar-width: thin;
-    scrollbar-color: color-mix(in oklch, var(--foreground) 8%, transparent) transparent;
+    scrollbar-color: color-mix(in oklch, var(--primary) 20%, transparent) transparent;
   }
 
   .custom-scrollbar:hover {
-    scrollbar-color: color-mix(in oklch, var(--foreground) 12%, transparent) transparent;
+    scrollbar-color: color-mix(in oklch, var(--primary) 35%, transparent) transparent;
   }
 
   /* Sidebar Specific Scrollbar (Visible on Hover) */
@@ -221,11 +254,11 @@
   }
 
   .sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
-    background: color-mix(in oklch, var(--foreground) 10%, transparent);
+    background: color-mix(in oklch, var(--primary) 20%, transparent);
   }
 
   .sidebar-scrollbar:hover::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in oklch, var(--foreground) 20%, transparent);
+    background: var(--primary);
   }
 
   .sidebar-scrollbar {
@@ -233,7 +266,7 @@
   }
 
   .sidebar-scrollbar:hover {
-    scrollbar-color: color-mix(in oklch, var(--foreground) 10%, transparent) transparent;
+    scrollbar-color: color-mix(in oklch, var(--primary) 20%, transparent) transparent;
   }
 
   /* Carousel Specific Scrollbar (Visible on Hover) */
@@ -242,11 +275,11 @@
   }
 
   .carousel-scrollbar:hover::-webkit-scrollbar-thumb {
-    background: color-mix(in oklch, var(--foreground) 12%, transparent);
+    background: color-mix(in oklch, var(--primary) 25%, transparent);
   }
 
   .carousel-scrollbar:hover::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in oklch, var(--foreground) 22%, transparent);
+    background: var(--primary);
   }
 
   .carousel-scrollbar {
@@ -254,7 +287,7 @@
   }
 
   .carousel-scrollbar:hover {
-    scrollbar-color: color-mix(in oklch, var(--foreground) 12%, transparent) transparent;
+    scrollbar-color: color-mix(in oklch, var(--primary) 25%, transparent) transparent;
   }
 }
 

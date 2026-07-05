@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { createPortal } from 'react-dom';
 import { MobilePlayer } from '@/components/player/MobilePlayer';
@@ -9,10 +9,11 @@ import { PipPlayer } from '@/components/player/PipPlayer';
 import { useAudioPlayback } from '@/hooks/useAudioPlayback';
 import { useDocPip } from '@/hooks/usePip';
 import { useAuth } from '@/lib/firebase/auth-context';
-import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
+import { buildStreamUrl } from '@/lib/streamUrl';
 import { useLikedSongs } from '@/hooks/useLikedSongs';
 import { useLyricsPanelStore } from '@/store/useLyricsPanelStore';
 import { usePlayerStore, type Track } from '@/store/usePlayerStore';
+import { Capacitor } from '@capacitor/core';
 
 interface PipState {
   currentTrack: Track | null;
@@ -30,11 +31,41 @@ interface PipState {
 export function PlayerShell() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [streamSrc, setStreamSrc] = useState<string | undefined>(undefined);
+  const [streamTrackId, setStreamTrackId] = useState<string | null>(null);
+  const [streamSrcIssuedAt, setStreamSrcIssuedAt] = useState(0);
+  const audioErrorRetryRef = useRef<{ trackId: string | null; attempts: number }>({
+    trackId: null,
+    attempts: 0,
+  });
 
-  const { isOpen: isLyricsOpen, toggle: toggleLyricsPanel } = useLyricsPanelStore();
+  const { isOpen, activeTab, toggle: togglePanel } = useLyricsPanelStore();
+  const isLyricsOpen = isOpen && activeTab === 'lyrics';
+  const isQueueOpen = isOpen && activeTab === 'queue';
+  const toggleLyricsPanel = useCallback(() => togglePanel('lyrics'), [togglePanel]);
+  const toggleQueuePanel = useCallback(() => togglePanel('queue'), [togglePanel]);
 
-  const playback = useAudioPlayback();
   const { user } = useAuth();
+  const refreshStreamSrc = useCallback(async () => {
+    const encodedTrack = usePlayerStore.getState().currentTrack?.url;
+    if (!encodedTrack || !user) {
+      setStreamSrc(undefined);
+      setStreamTrackId(null);
+      setStreamSrcIssuedAt(0);
+      return null;
+    }
+
+    const url = await buildStreamUrl(encodedTrack, user);
+    setStreamSrc(url ?? undefined);
+    setStreamTrackId(usePlayerStore.getState().currentTrack?.id ?? null);
+    setStreamSrcIssuedAt(url ? Date.now() : 0);
+    return url;
+  }, [user]);
+
+  const playback = useAudioPlayback(streamSrc, {
+    refreshStreamSrc,
+    streamSrcIssuedAt,
+    streamTrackId,
+  });
   const { isLiked, toggleLike } = useLikedSongs();
 
   const pip = useDocPip(playback.currentTrack, playback.isPlaying);
@@ -142,40 +173,33 @@ export function PlayerShell() {
     const buildStreamSrc = async () => {
       const encodedTrack = playback.currentTrack?.url;
       if (!encodedTrack || !user) {
-        if (!cancelled) setStreamSrc(undefined);
+        if (!cancelled) {
+          setStreamSrc(undefined);
+          setStreamTrackId(null);
+          setStreamSrcIssuedAt(0);
+        }
         return;
       }
 
       try {
-        const authHeaders = await getFirebaseAuthHeaders(user);
-        const ticketRes = await fetch('/api/stream-ticket', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...authHeaders,
-          },
-          body: JSON.stringify({ url: encodedTrack }),
-        });
-        if (!ticketRes.ok) {
-          throw new Error(`Failed to create stream ticket (${ticketRes.status})`);
-        }
-
-        const ticketData = (await ticketRes.json()) as { ticket?: string };
-        if (!ticketData.ticket) {
-          throw new Error('Missing stream ticket');
-        }
-
+        const url = await buildStreamUrl(encodedTrack, user);
         if (cancelled) return;
-        const params = new URLSearchParams({
-          ticket: ticketData.ticket,
-          url: encodedTrack,
-        });
-        setStreamSrc(`/api/stream?${params.toString()}`);
+        setStreamSrc(url ?? undefined);
+        setStreamTrackId(playback.currentTrack?.id ?? null);
+        setStreamSrcIssuedAt(url ? Date.now() : 0);
       } catch (error) {
         if (!cancelled) {
           setStreamSrc(undefined);
+          setStreamTrackId(null);
+          setStreamSrcIssuedAt(0);
           console.error('[PlayerShell] Failed to prepare stream URL:', error);
           const trackTitle = playback.currentTrack?.title || 'Unknown Track';
+          const partyState = usePlayerStore.getState();
+          if (partyState.partyId && !partyState.isPartyHost) {
+            toast.error(`Failed to stream "${trackTitle}". Waiting for host sync...`);
+            usePlayerStore.getState().pause(true);
+            return;
+          }
           toast.error(`Failed to stream "${trackTitle}". Skipping...`);
           usePlayerStore.getState().playNext(true, true);
         }
@@ -187,7 +211,14 @@ export function PlayerShell() {
     return () => {
       cancelled = true;
     };
-  }, [playback.currentTrack?.url, playback.currentTrack?.title, user]);
+  }, [playback.currentTrack?.id, playback.currentTrack?.url, playback.currentTrack?.title, user]);
+
+  useEffect(() => {
+    audioErrorRetryRef.current = {
+      trackId: playback.currentTrack?.id ?? null,
+      attempts: 0,
+    };
+  }, [playback.currentTrack?.id]);
 
   const sharedProps = playback.currentTrack ? {
     currentTrack: playback.currentTrack,
@@ -214,9 +245,17 @@ export function PlayerShell() {
     <>
       <audio
         ref={playback.audioRef}
-        src={streamSrc}
+        src={Capacitor.isNativePlatform() ? undefined : (streamTrackId === playback.currentTrack?.id ? streamSrc : undefined)}
         onLoadedData={(e) => {
-          e.currentTarget.volume = playback.volume;
+          e.currentTarget.volume = Capacitor.isNativePlatform() ? 1 : playback.volume;
+          const pendingProgressSeconds = usePlayerStore.getState().progress / 1000;
+          if (
+            !Capacitor.isNativePlatform() &&
+            pendingProgressSeconds > 0 &&
+            e.currentTarget.currentTime < 0.5
+          ) {
+            e.currentTarget.currentTime = pendingProgressSeconds;
+          }
         }}
         onDurationChange={(e) => {
           const audio = e.currentTarget;
@@ -226,7 +265,7 @@ export function PlayerShell() {
             if (
               actualDurationMs > 0 &&
               isFinite(actualDurationMs) &&
-              Math.abs(track.duration - actualDurationMs) > 1000
+              (isNaN(track.duration) || Math.abs(track.duration - actualDurationMs) > 1000)
             ) {
               usePlayerStore.setState((state) => {
                 if (state.currentTrack && state.currentTrack.id === track.id) {
@@ -242,28 +281,99 @@ export function PlayerShell() {
             }
           }
         }}
-        onEnded={playback.handleTrackEnd}
-        onWaiting={() => playback.setIsBuffering(true)}
+        onEnded={() => {
+          if (!Capacitor.isNativePlatform()) playback.handleTrackEnd();
+        }}
+        onWaiting={() => {
+          if (!Capacitor.isNativePlatform()) playback.setIsBuffering(true);
+        }}
         onCanPlay={(e) => {
-          playback.setIsBuffering(false);
-          if (playback.isPlaying) {
-            e.currentTarget.play().catch(() => {});
+          if (!Capacitor.isNativePlatform()) {
+            playback.setIsBuffering(false);
+            if (playback.isPlaying) {
+              e.currentTarget.play().catch(() => {});
+            }
           }
         }}
-        onLoadStart={() => playback.setIsBuffering(true)}
-        onPlaying={() => playback.setIsBuffering(false)}
-        onTimeUpdate={(e) => playback.setCurrentTime(e.currentTarget.currentTime)}
-        onSeeked={() => {
-          usePlayerStore.setState((state) => ({
-            seekTrigger: (state.seekTrigger || 0) + 1,
-          }));
+        onLoadStart={() => {
+          if (!Capacitor.isNativePlatform()) playback.setIsBuffering(true);
         }}
-        autoPlay={playback.isPlaying}
+        onPlaying={() => {
+          if (!Capacitor.isNativePlatform()) {
+            playback.setIsBuffering(false);
+            audioErrorRetryRef.current = {
+              trackId: playback.currentTrack?.id ?? null,
+              attempts: 0,
+            };
+          }
+        }}
+        onTimeUpdate={(e) => {
+          if (!Capacitor.isNativePlatform() && !playback.isDraggingSlider) {
+            playback.setCurrentTime(e.currentTarget.currentTime);
+          }
+        }}
+        onSeeked={() => {
+          if (!Capacitor.isNativePlatform()) {
+            usePlayerStore.setState((state) => ({
+              seekTrigger: (state.seekTrigger || 0) + 1,
+            }));
+          }
+        }}
+        autoPlay={!Capacitor.isNativePlatform() && playback.isPlaying}
         onError={(e) => {
           if (!playback.currentTrack?.url) return;
           const error = e.currentTarget.error;
           console.error('[PlayerShell] Audio error:', error);
+          const trackId = playback.currentTrack.id;
+          const retry = audioErrorRetryRef.current;
+
+          if (
+            !Capacitor.isNativePlatform() &&
+            retry.trackId === trackId &&
+            retry.attempts < 1
+          ) {
+            retry.attempts += 1;
+            playback.setIsBuffering(true);
+            const audio = e.currentTarget;
+            void refreshStreamSrc()
+              .then((freshSrc) => {
+                const latestState = usePlayerStore.getState();
+                if (!freshSrc || latestState.currentTrack?.id !== trackId) return;
+
+                const resumeAt = latestState.progress / 1000;
+                if (audio.src !== freshSrc) {
+                  audio.src = freshSrc;
+                }
+                const restoreResumeTime = () => {
+                  if (resumeAt > 0 && audio.currentTime < 0.5) {
+                    audio.currentTime = resumeAt;
+                  }
+                };
+                if (audio.readyState >= 1) {
+                  restoreResumeTime();
+                } else {
+                  audio.addEventListener('loadedmetadata', restoreResumeTime, { once: true });
+                }
+                if (latestState.isPlaying) {
+                  audio.play().catch(console.error);
+                }
+              })
+              .catch((refreshError) => {
+                console.error('[PlayerShell] Failed to refresh stream after audio error:', refreshError);
+              })
+              .finally(() => {
+                playback.setIsBuffering(false);
+              });
+            return;
+          }
+
           const trackTitle = playback.currentTrack?.title || 'Unknown Track';
+          const partyState = usePlayerStore.getState();
+          if (partyState.partyId && !partyState.isPartyHost) {
+            toast.error(`Playback issue with "${trackTitle}". Waiting for host sync...`);
+            usePlayerStore.getState().pause(true);
+            return;
+          }
           if (error?.code === 4) {
             toast.error(`Track "${trackTitle}" is currently unavailable or unsupported. Skipping...`);
           } else {
@@ -291,10 +401,12 @@ export function PlayerShell() {
             isPipOpen={pip.isPipOpen}
             isLyricsOpen={isLyricsOpen}
             toggleLyrics={toggleLyricsPanel}
+            isQueueOpen={isQueueOpen}
+            toggleQueue={toggleQueuePanel}
           />
         </>
       ) : (
-        <div className='h-14 md:h-20 border-t border-white/5 bg-black/60 backdrop-blur-3xl flex items-center justify-center text-zinc-500 text-sm w-full absolute bottom-16 md:relative md:bottom-0'>
+        <div className='h-14 md:h-20 border-t border-white/5 bg-black/60 backdrop-blur-3xl flex items-center justify-center text-zinc-500 text-sm w-full relative mb-16 md:mb-0'>
           Select a track to start listening
         </div>
       )}

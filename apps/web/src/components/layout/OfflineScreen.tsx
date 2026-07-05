@@ -22,13 +22,12 @@ export function OfflineScreen() {
       }
       
       // Browser says online, but let's verify actual internet access
-      // by pinging a reliable, fast external endpoint.
+      // by pinging a same-origin resource to bypass CORS/privacy blockers.
       try {
         const controller = new AbortController();
-        const id = setTimeout(() => controller.abort(), 3000); // 3s timeout
-        // Ping Google's generate_204 endpoint or a public DNS for a tiny response
-        await fetch('https://www.google.com/generate_204', {
-          mode: 'no-cors',
+        const id = setTimeout(() => controller.abort(), 5000); // 5s timeout
+        await fetch('/manifest.json', {
+          method: 'HEAD',
           signal: controller.signal,
           cache: 'no-store'
         });

@@ -239,7 +239,7 @@ export function TrackList({ tracks, showHeader = true }: TrackListProps) {
                 >
                   {item.title}
                 </span>
-                <span className='text-xs text-muted-foreground truncate'>
+                <span className='text-xs text-muted-foreground truncate font-outfit'>
                   {item.artist}
                 </span>
               </div>

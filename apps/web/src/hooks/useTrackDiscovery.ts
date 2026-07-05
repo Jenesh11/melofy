@@ -60,6 +60,12 @@ export function useTrackDiscovery() {
           if (!cancelled) {
             setIsBuffering(false);
             if (!success) {
+              const partyState = usePlayerStore.getState();
+              if (partyState.partyId && !partyState.isPartyHost) {
+                toast.error(`Track "${currentTrack.title}" is unavailable. Waiting for host sync...`);
+                usePlayerStore.getState().pause(true);
+                return;
+              }
               toast.error(`Track "${currentTrack.title}" is unavailable. Skipping...`);
               usePlayerStore.getState().playNext(true, true);
             }

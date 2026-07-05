@@ -20,6 +20,8 @@ const MAX_PROXY_RETRIES = 3;
 const RESOLVE_TIMEOUT_MS = 10_000;
 const UPSTREAM_TIMEOUT_MS = 20_000;
 const MAX_RESOLVE_BODY_BYTES = 1_000_000;
+const TRACKSTREAM_URL_CACHE_TTL_MS = 4 * 60 * 1000;
+const MAX_TRACKSTREAM_URL_CACHE_ENTRIES = 500;
 const BLOCKED_HOSTNAMES = new Set([
   'localhost',
   'metadata.google.internal',
@@ -255,13 +257,57 @@ function applyUpstreamHeaders(
  * The entry is removed once the promise settles (resolve or reject).
  */
 const inflightTrackResolves = new Map<string, Promise<string>>();
+const cachedTrackResolves = new Map<string, { url: string; expiresAt: number }>();
+
+function getTrackResolveCacheKey(encodedTrack: string, itag: number | null): string {
+  return `${encodedTrack}:${itag === null ? 'auto' : itag}`;
+}
+
+function getCachedTrackstreamUrl(cacheKey: string): string | null {
+  const cached = cachedTrackResolves.get(cacheKey);
+  if (!cached) return null;
+
+  if (cached.expiresAt <= Date.now()) {
+    cachedTrackResolves.delete(cacheKey);
+    return null;
+  }
+
+  console.log(`[TrackResolve] Cache hit for key=${cacheKey}`);
+  return cached.url;
+}
+
+function cacheTrackstreamUrl(cacheKey: string, url: string): void {
+  if (cachedTrackResolves.size >= MAX_TRACKSTREAM_URL_CACHE_ENTRIES) {
+    const now = Date.now();
+    for (const [key, cached] of cachedTrackResolves) {
+      if (cached.expiresAt <= now) cachedTrackResolves.delete(key);
+    }
+  }
+
+  while (cachedTrackResolves.size >= MAX_TRACKSTREAM_URL_CACHE_ENTRIES) {
+    const oldestKey = cachedTrackResolves.keys().next().value;
+    if (!oldestKey) break;
+    cachedTrackResolves.delete(oldestKey);
+  }
+
+  cachedTrackResolves.set(cacheKey, {
+    url,
+    expiresAt: Date.now() + TRACKSTREAM_URL_CACHE_TTL_MS,
+  });
+}
 
 function requestTrackstreamUrl(
   node: NodeLike,
   encodedTrack: string,
   itag: number | null,
+  forceRefresh = false,
 ): Promise<string> {
-  const cacheKey = `${encodedTrack}:${itag === null ? 'auto' : itag}`;
+  const cacheKey = getTrackResolveCacheKey(encodedTrack, itag);
+
+  if (!forceRefresh) {
+    const cached = getCachedTrackstreamUrl(cacheKey);
+    if (cached) return Promise.resolve(cached);
+  }
 
   const existing = inflightTrackResolves.get(cacheKey);
   if (existing) {
@@ -353,6 +399,9 @@ function requestTrackstreamUrl(
     // Remove the entry once settled so failed resolutions can be retried
     // and so the map doesn't grow unboundedly.
     inflightTrackResolves.delete(cacheKey);
+  }).then((url) => {
+    cacheTrackstreamUrl(cacheKey, url);
+    return url;
   });
 
   inflightTrackResolves.set(cacheKey, promise);
@@ -471,16 +520,16 @@ router.get('/stream', requireStreamAccess, streamRateLimit, async (req, res) => 
     return itagCandidates[itagCursor];
   };
 
-  const resolveCdnUrl = async (advanceCandidate: boolean): Promise<string> => {
+  const resolveCdnUrl = async (advanceCandidate: boolean, forceRefresh = false): Promise<string> => {
     let lastError: Error | null = null;
 
     for (let i = 0; i < itagCandidates.length; i++) {
       const candidate = pickNextCandidate(i > 0 || advanceCandidate);
 
       try {
-        const resolved = await requestTrackstreamUrl(node, trackUrl, candidate);
+        const resolved = await requestTrackstreamUrl(node, trackUrl, candidate, forceRefresh);
         console.log(
-          `[Relay:${requestId}] Resolved CDN URL using itag=${candidate === null ? 'auto' : candidate}`,
+          `[Relay:${requestId}] Resolved CDN URL using itag=${candidate === null ? 'auto' : candidate}${forceRefresh ? ' (refresh)' : ''}`,
         );
         return resolved;
       } catch (error) {
@@ -564,7 +613,7 @@ router.get('/stream', requireStreamAccess, streamRateLimit, async (req, res) => 
           upstreamRes.resume();
           const advanceCandidate = isLikelyUnplayableContentType(contentType);
 
-          void resolveCdnUrl(advanceCandidate)
+          void resolveCdnUrl(advanceCandidate, true)
             .then((freshUrl) => {
               void proxyWithRedirects(freshUrl, 0, retryCount + 1);
             })
@@ -607,7 +656,7 @@ router.get('/stream', requireStreamAccess, streamRateLimit, async (req, res) => 
 
     upstreamReq.on('error', (error) => {
       if (retryCount < MAX_PROXY_RETRIES && !res.headersSent) {
-        void resolveCdnUrl(false)
+        void resolveCdnUrl(false, true)
           .then((freshUrl) => {
             void proxyWithRedirects(freshUrl, 0, retryCount + 1);
           })

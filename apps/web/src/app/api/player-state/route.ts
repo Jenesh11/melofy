@@ -34,7 +34,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const text = await req.text();
+    const body = text ? JSON.parse(text) : {};
+    
     const backendRes = await fetch(buildBackendUrl('/api/player-state'), {
       method: 'POST',
       headers: {

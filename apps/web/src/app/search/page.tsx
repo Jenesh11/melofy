@@ -62,7 +62,7 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const playPlaylist = usePlayerStore((state) => state.playPlaylist);
-  const { handlePlaySpotifyCollection } = useSpotifyCollection();
+  const { handlePlayCollection } = useSpotifyCollection();
   const { user } = useAuth();
   const [isImporting, setIsImporting] = useState(false);
 
@@ -347,7 +347,7 @@ export default function SearchPage() {
         )}
       </div>
 
-      <div className='flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pb-32'>
+      <div className='flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar pb-8'>
         {loading && (
           <div className='flex items-center justify-center py-12'>
             <Loader2 className='h-8 w-8 animate-spin text-primary' />
@@ -390,6 +390,7 @@ export default function SearchPage() {
                       src={item.image}
                       alt={item.term}
                       fill
+                      sizes="208px"
                       className='object-cover brightness-50 group-hover:brightness-65 group-hover:scale-110 transition-all duration-700'
                     />
                   ) : (
@@ -448,6 +449,7 @@ export default function SearchPage() {
                     src={cat.image} 
                     alt={cat.label} 
                     fill 
+                    sizes="(max-width: 768px) 50vw, 33vw"
                     className='object-cover opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700'
                   />
                   <div className='absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent transition-opacity duration-500 group-hover:from-black/90' />
@@ -574,7 +576,7 @@ export default function SearchPage() {
                   title='Featured Playlists'
                   items={spotifyPlaylists}
                   isCarousel={true}
-                  onPlayPlaylist={handlePlaySpotifyCollection}
+                  onPlayPlaylist={handlePlayCollection}
                   onImport={handleImportSpotifyPlaylist}
                 />
               )}

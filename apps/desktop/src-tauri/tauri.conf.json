@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Melofy",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "identifier": "com.melofy.desktop",
   "build": {
     "beforeDevCommand": "",
@@ -61,7 +61,14 @@
       "icons/media/media-pause.ico",
       "icons/media/media-next.ico",
       "icons/media/media-next-disabled.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "displayLanguageSelector": false
+      }
+    }
   },
   "plugins": {
     "deep-link": {

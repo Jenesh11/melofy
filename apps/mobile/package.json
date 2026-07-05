@@ -1,6 +1,6 @@
 {
   "name": "mobile",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "description": "Melofy Android/iOS app powered by Capacitor",
   "scripts": {

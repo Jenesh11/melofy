@@ -3,6 +3,7 @@ import { usePlayerStore, Track } from '@/store/usePlayerStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { Capacitor } from '@capacitor/core';
+import { useLibraryStore, type SavedCollection } from '@/store/useLibraryStore';
 
 interface PersistedPlayerState {
   currentTrack?: Track | null;
@@ -14,7 +15,8 @@ interface PersistedPlayerState {
   currentTime?: number;
   activePlaylistContext?: Track[] | null;
   activeCollectionId?: string | null;
-  activeCollectionType?: 'spotify' | 'custom' | null;
+  activeCollectionType?: 'spotify' | 'custom' | 'youtube' | null;
+  recentPlaylists?: SavedCollection[];
   partyId?: string | null;
   hostName?: string | null;
   isPartyHost?: boolean;
@@ -28,6 +30,7 @@ export function usePlayerSync(
   const { user } = useAuth();
   const [isHydrated, setIsHydrated] = useState(false);
   const stateSyncTimer = useRef<NodeJS.Timeout | null>(null);
+  const recentPlaylists = useLibraryStore((state) => state.recentPlaylists);
 
   const {
     currentTrack,
@@ -120,6 +123,10 @@ export function usePlayerSync(
           volume: state.volume ?? (Capacitor.isNativePlatform() ? 1 : 0.8),
         });
 
+        if (state.recentPlaylists) {
+          useLibraryStore.setState({ recentPlaylists: state.recentPlaylists });
+        }
+
         if (audioRef.current && state.currentTime) {
           audioRef.current.currentTime = state.currentTime;
           setLocalTime(state.currentTime);
@@ -147,6 +154,7 @@ export function usePlayerSync(
       activePlaylistContext,
       activeCollectionId,
       activeCollectionType,
+      recentPlaylists,
       partyId: usePlayerStore.getState().partyId,
       isPartyHost: usePlayerStore.getState().isPartyHost,
       listenersCanControl: usePlayerStore.getState().listenersCanControl,
@@ -179,6 +187,7 @@ export function usePlayerSync(
     activePlaylistContext,
     activeCollectionId,
     activeCollectionType,
+    recentPlaylists,
     getAuthHeader,
     audioRef,
   ]);
