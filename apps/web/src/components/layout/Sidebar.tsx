@@ -55,25 +55,31 @@ export function Sidebar() {
 
   useEffect(() => {
     if (!user) {
+      setFirebasePlaylists([]);
       return;
     }
 
     const q = query(
       collection(db, 'playlists'),
       where('userId', '==', user.uid),
-      orderBy('createdAt', 'desc'),
     );
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const fetchedPlaylists = snapshot.docs.map(
-          (doc) =>
-            ({
-              id: doc.id,
-              ...doc.data(),
-            }) as Playlist,
-        );
+        const fetchedPlaylists = snapshot.docs
+          .map(
+            (doc) =>
+              ({
+                id: doc.id,
+                ...doc.data(),
+              }) as Playlist,
+          )
+          .sort((a, b) => {
+            const timeA = (a.createdAt as any)?.seconds || 0;
+            const timeB = (b.createdAt as any)?.seconds || 0;
+            return timeB - timeA;
+          });
         setFirebasePlaylists(fetchedPlaylists);
       },
       (error) => {

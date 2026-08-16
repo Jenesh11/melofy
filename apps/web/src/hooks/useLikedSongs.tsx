@@ -41,7 +41,7 @@ export function useLikedSongs() {
   } = useLikedStore();
 
   const isLiked = useCallback((trackId: string) => {
-    return likedTracks.some(t => t.info.identifier === trackId);
+    return likedTracks.some(t => (t.info?.identifier || (t as any).id || (t as any).identifier) === trackId);
   }, [likedTracks]);
 
   const toggleLike = useCallback(async (track: PlayerTrack) => {
@@ -77,7 +77,7 @@ export function useLikedSongs() {
 
         if (targetPlaylistId) {
           const docRef = doc(db, 'playlists', targetPlaylistId);
-          const trackToRemove = likedTracks.find(t => t.info.identifier === track.id);
+          const trackToRemove = likedTracks.find(t => (t.info?.identifier || (t as any).id || (t as any).identifier) === track.id);
           if (trackToRemove) {
             await updateDoc(docRef, {
               tracks: arrayRemove(trackToRemove),

@@ -90,13 +90,18 @@ export async function getUserPlaylists(userId: string): Promise<Playlist[]> {
     const q = query(
       collection(db, 'playlists'), 
       where('userId', '==', userId),
-      orderBy('createdAt', 'desc')
     );
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Playlist));
+    return querySnapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Playlist))
+      .sort((a, b) => {
+        const timeA = (a.createdAt as any)?.seconds || 0;
+        const timeB = (b.createdAt as any)?.seconds || 0;
+        return timeB - timeA;
+      });
   } catch (error) {
     console.error('Error getting playlists:', error);
     return [];
