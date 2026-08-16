@@ -12,9 +12,9 @@ RUN git clone --depth 1 https://github.com/PerformanC/NodeLink.git /app
 
 WORKDIR /app
 
-RUN cp config.default.js config.js
+RUN cp config.default.js config.js && \
+    node -e "import fs from 'node:fs'; let c = fs.readFileSync('config.default.js', 'utf8'); c = c.replace(/enableTrackStreamEndpoint:\s*false/g, 'enableTrackStreamEndpoint: true'); if (!c.includes('enableTrackStreamEndpoint: true')) { c = c.replace(/export\s+default\s*\{/, 'export default {\n  enableTrackStreamEndpoint: true,'); } fs.writeFileSync('config.js', c);"
 
-# --ignore-scripts disables the prepare (husky) lifecycle script that causes exit code 127
 RUN npm install --ignore-scripts
 
 ENV NODELINK_SERVER_PORT=2333 \
