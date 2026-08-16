@@ -50,10 +50,13 @@ WORKDIR /app
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S node-web -u 1001
 
-# Copy standalone output from builder
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+# Copy standalone output from builder with proper ownership
+COPY --from=builder --chown=node-web:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=node-web:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=node-web:nodejs /app/public ./public
+
+# Create cache directory and grant write permissions to node-web
+RUN mkdir -p .next/cache && chown -R node-web:nodejs /app
 
 # Set default environment variables
 ENV NODE_ENV=production \
