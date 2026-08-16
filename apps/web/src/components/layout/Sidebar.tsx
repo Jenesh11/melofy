@@ -31,6 +31,7 @@ import {
   renamePlaylist,
 } from '@/lib/firebase/playlists';
 import { useLibraryStore } from '@/store/useLibraryStore';
+import { useLikedStore } from '@/store/useLikedStore';
 import { db } from '@/lib/firebase/config';
 import {
   collection,
@@ -43,6 +44,7 @@ import {
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
+  const likedPlaylistId = useLikedStore((state) => state.likedPlaylistId);
   const [firebasePlaylists, setFirebasePlaylists] = useState<Playlist[]>([]);
   const savedPlaylists = useLibraryStore((state) => state.savedPlaylists);
   const removePlaylist = useLibraryStore((state) => state.removePlaylist);
@@ -85,24 +87,28 @@ export function Sidebar() {
   // Combine Firebase lists and locally stored Spotify lists, ensuring single Liked Songs is on top.
   const allPlaylists = useMemo(() => {
     const combined = [...(user ? firebasePlaylists : []), ...savedPlaylists];
-    const seenLiked = new Set<string>();
-    const filtered = combined.filter((p) => {
-      const isLiked = p.isLikedSongs || p.name === 'Liked Songs';
-      if (isLiked) {
-        if (seenLiked.has('liked_songs')) return false;
-        seenLiked.add('liked_songs');
-      }
-      return true;
-    });
+    
+    // Find all liked songs playlists
+    const likedPlaylists = combined.filter((p) => p.isLikedSongs || p.name === 'Liked Songs');
+    const otherPlaylists = combined.filter((p) => !p.isLikedSongs && p.name !== 'Liked Songs');
 
-    return filtered.sort((a, b) => {
-      const aIsLiked = a.isLikedSongs || a.name === 'Liked Songs';
-      const bIsLiked = b.isLikedSongs || b.name === 'Liked Songs';
-      if (aIsLiked && !bIsLiked) return -1;
-      if (!aIsLiked && bIsLiked) return 1;
-      return 0;
-    });
-  }, [firebasePlaylists, savedPlaylists, user]);
+    // Pick the best liked songs playlist: prefer likedPlaylistId from store, then the one with the most tracks
+    let canonicalLiked: (Playlist | (typeof savedPlaylists)[number]) | null = null;
+    if (likedPlaylists.length > 0) {
+      if (likedPlaylistId) {
+        canonicalLiked = likedPlaylists.find((p) => p.id === likedPlaylistId) || null;
+      }
+      if (!canonicalLiked) {
+        canonicalLiked = [...likedPlaylists].sort((a, b) => {
+          const countA = (a.tracks?.length) || a.trackCount || 0;
+          const countB = (b.tracks?.length) || b.trackCount || 0;
+          return countB - countA;
+        })[0];
+      }
+    }
+
+    return canonicalLiked ? [canonicalLiked, ...otherPlaylists] : otherPlaylists;
+  }, [firebasePlaylists, savedPlaylists, user, likedPlaylistId]);
   const savedPlaylistIds = useMemo(
     () => new Set(savedPlaylists.map((playlist) => playlist.id)),
     [savedPlaylists],

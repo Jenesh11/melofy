@@ -9,6 +9,7 @@ import {
   Playlist,
 } from '@/lib/firebase/playlists';
 import { useLibraryStore } from '@/store/useLibraryStore';
+import { useLikedStore } from '@/store/useLikedStore';
 import { toast } from 'sonner';
 import { ImportPlaylistCard } from '@/components/library/ImportPlaylistCard';
 import { LibraryPlaylistGrid } from '@/components/library/LibraryPlaylistGrid';
@@ -16,6 +17,7 @@ import { RenamePlaylistModal } from '@/components/library/RenamePlaylistModal';
 
 export default function LibraryPage() {
   const { user } = useAuth();
+  const likedPlaylistId = useLikedStore((state) => state.likedPlaylistId);
   const [firebasePlaylists, setFirebasePlaylists] = useState<Playlist[]>([]);
   const savedPlaylists = useLibraryStore((state) => state.savedPlaylists);
   const removeSavedPlaylist = useLibraryStore((state) => state.removePlaylist);
@@ -49,24 +51,28 @@ export default function LibraryPage() {
   const allPlaylists = useMemo(() => {
     // Combine Firebase lists and locally stored Spotify lists, ensuring single Liked Songs is on top.
     const combined = [...firebasePlaylists, ...savedPlaylists];
-    const seenLiked = new Set<string>();
-    const filtered = combined.filter((p) => {
-      const isLiked = p.isLikedSongs || p.name === 'Liked Songs';
-      if (isLiked) {
-        if (seenLiked.has('liked_songs')) return false;
-        seenLiked.add('liked_songs');
-      }
-      return true;
-    });
+    
+    // Find all liked songs playlists
+    const likedPlaylists = combined.filter((p) => p.isLikedSongs || p.name === 'Liked Songs');
+    const otherPlaylists = combined.filter((p) => !p.isLikedSongs && p.name !== 'Liked Songs');
 
-    return filtered.sort((a, b) => {
-      const aIsLiked = a.isLikedSongs || a.name === 'Liked Songs';
-      const bIsLiked = b.isLikedSongs || b.name === 'Liked Songs';
-      if (aIsLiked && !bIsLiked) return -1;
-      if (!aIsLiked && bIsLiked) return 1;
-      return 0;
-    });
-  }, [firebasePlaylists, savedPlaylists]);
+    // Pick the best liked songs playlist: prefer likedPlaylistId from store, then the one with the most tracks
+    let canonicalLiked: (Playlist | (typeof savedPlaylists)[number]) | null = null;
+    if (likedPlaylists.length > 0) {
+      if (likedPlaylistId) {
+        canonicalLiked = likedPlaylists.find((p) => p.id === likedPlaylistId) || null;
+      }
+      if (!canonicalLiked) {
+        canonicalLiked = [...likedPlaylists].sort((a, b) => {
+          const countA = (a.tracks?.length) || a.trackCount || 0;
+          const countB = (b.tracks?.length) || b.trackCount || 0;
+          return countB - countA;
+        })[0];
+      }
+    }
+
+    return canonicalLiked ? [canonicalLiked, ...otherPlaylists] : otherPlaylists;
+  }, [firebasePlaylists, savedPlaylists, likedPlaylistId]);
 
   const savedPlaylistIds = useMemo(
     () => new Set(savedPlaylists.map((playlist) => playlist.id)),

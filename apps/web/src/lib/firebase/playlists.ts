@@ -4,6 +4,7 @@ import {
   query, 
   where, 
   getDocs, 
+  getDoc,
   deleteDoc, 
   doc,
   serverTimestamp,
@@ -107,18 +108,15 @@ export async function getUserPlaylists(userId: string): Promise<Playlist[]> {
  */
 export async function getPlaylistById(playlistId: string): Promise<Playlist | null> {
   try {
-    const docSnap = await getDocs(query(collection(db, 'playlists'), where('__name__', '==', playlistId)));
-    
-    if (docSnap.empty) return null;
-    
-    const data = docSnap.docs[0].data();
+    const snap = await getDoc(doc(db, 'playlists', playlistId));
+    if (!snap.exists()) return null;
     return {
-      id: docSnap.docs[0].id,
-      ...data
+      id: snap.id,
+      ...snap.data(),
     } as Playlist;
   } catch (error) {
     console.error('Error getting playlist by ID:', error);
-    throw error;
+    return null;
   }
 }
 

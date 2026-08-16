@@ -9,14 +9,50 @@ import { useLikedStore } from '@/store/useLikedStore';
 
 const LIKED_SONGS_PLAYLIST_NAME = 'Liked Songs';
 
-function deduplicateFirebaseTracks(tracks: FirebaseTrack[]): FirebaseTrack[] {
+function normalizeToFirebaseTrack(track: any): FirebaseTrack {
+  if (track.info && typeof track.info === 'object') {
+    return {
+      encoded: track.encoded || track.url || '',
+      info: {
+        identifier: track.info.identifier || track.info.id || track.id || 'unknown',
+        title: track.info.title || track.title || 'Unknown Title',
+        author: track.info.author || track.info.artist || track.artist || track.author || 'Unknown Artist',
+        duration: track.info.duration || track.info.length || track.duration || 0,
+        artworkUrl: track.info.artworkUrl || track.artworkUrl || '',
+        uri: track.info.uri || `spotify:track:${track.info.identifier || track.id || 'track'}`,
+        sourceName: track.info.sourceName || 'spotify',
+        isSeekable: true,
+        isStream: false,
+      },
+    };
+  }
+
+  return {
+    encoded: track.encoded || track.url || '',
+    info: {
+      identifier: track.id || track.identifier || 'unknown',
+      title: track.title || 'Unknown Title',
+      author: track.artist || track.author || 'Unknown Artist',
+      duration: track.duration || track.length || 0,
+      artworkUrl: track.artworkUrl || '',
+      uri: `spotify:track:${track.id || track.identifier || 'track'}`,
+      sourceName: 'spotify',
+      isSeekable: true,
+      isStream: false,
+    },
+  };
+}
+
+function deduplicateFirebaseTracks(tracks: any[]): FirebaseTrack[] {
   const seen = new Set<string>();
   const result: FirebaseTrack[] = [];
-  for (const t of tracks) {
-    const key = t.info.identifier || `${t.info.title}_${t.info.author}`;
+  for (const raw of tracks) {
+    if (!raw) continue;
+    const normalized = normalizeToFirebaseTrack(raw);
+    const key = normalized.info.identifier || `${normalized.info.title}_${normalized.info.author}`;
     if (!seen.has(key)) {
       seen.add(key);
-      result.push(t);
+      result.push(normalized);
     }
   }
   return result;
@@ -42,7 +78,8 @@ export function LikedSongsSync() {
       lastUserId.current = user.uid;
     }
 
-    // Query to find, merge duplicates, and listen to the single canonical liked songs playlist
+    let unsubMasterDoc: (() => void) | undefined;
+
     const findAndMergeLikedPlaylists = async () => {
       try {
         const q = query(
@@ -71,19 +108,27 @@ export function LikedSongsSync() {
           setLikedTracks([]);
           setIsLoading(false);
 
-          return onSnapshot(doc(db, 'playlists', newDocRef.id), (docSnapshot) => {
+          unsubMasterDoc = onSnapshot(doc(db, 'playlists', newDocRef.id), (docSnapshot) => {
             if (docSnapshot.exists()) {
               const data = docSnapshot.data() as Playlist;
-              setLikedTracks(data.tracks || []);
+              const normalized = (data.tracks || []).map(normalizeToFirebaseTrack);
+              setLikedTracks(normalized);
             }
             setIsLoading(false);
           });
+          return;
         }
 
-        // Primary master playlist is the first one
+        // Sort so the document with the most tracks is selected as the primary master
+        likedDocs.sort((a, b) => {
+          const countA = (a.data().tracks?.length) || a.data().trackCount || 0;
+          const countB = (b.data().tracks?.length) || b.data().trackCount || 0;
+          return countB - countA;
+        });
+
         const masterDoc = likedDocs[0];
         const masterData = masterDoc.data() as Playlist;
-        let allTracks: FirebaseTrack[] = [...(masterData.tracks || [])];
+        let allTracks: any[] = [...(masterData.tracks || [])];
 
         // If there are duplicate liked songs playlists, merge tracks and delete duplicates
         if (likedDocs.length > 1) {
@@ -110,15 +155,17 @@ export function LikedSongsSync() {
           await updateDoc(doc(db, 'playlists', masterDoc.id), { isLikedSongs: true });
         }
 
+        const normalizedMasterTracks = deduplicateFirebaseTracks(allTracks);
         setLikedPlaylistId(masterDoc.id);
-        setLikedTracks(deduplicateFirebaseTracks(allTracks));
+        setLikedTracks(normalizedMasterTracks);
         setIsLoading(false);
 
         // Set up the real-time listener for the master doc
-        return onSnapshot(doc(db, 'playlists', masterDoc.id), (docSnapshot) => {
+        unsubMasterDoc = onSnapshot(doc(db, 'playlists', masterDoc.id), (docSnapshot) => {
           if (docSnapshot.exists()) {
             const data = docSnapshot.data() as Playlist;
-            setLikedTracks(data.tracks || []);
+            const normalized = (data.tracks || []).map(normalizeToFirebaseTrack);
+            setLikedTracks(normalized);
           }
           setIsLoading(false);
         });
@@ -128,13 +175,10 @@ export function LikedSongsSync() {
       }
     };
 
-    let unsubscribe: (() => void) | undefined;
-    findAndMergeLikedPlaylists().then((unsub) => {
-      if (unsub) unsubscribe = unsub;
-    });
+    void findAndMergeLikedPlaylists();
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      if (unsubMasterDoc) unsubMasterDoc();
     };
   }, [user, setLikedTracks, setLikedPlaylistId, setIsLoading]);
 

@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation';
 import { Play, Music2, Loader2, ChevronLeft, Heart, Check } from 'lucide-react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase/config';
 import { getPlaylistById } from '@/lib/firebase/playlists';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
@@ -74,61 +76,40 @@ export default function PlaylistPage() {
   );
 
   useEffect(() => {
-    async function fetchPlaylist() {
-      if (!id) return;
+    if (!id) return;
 
-      setIsLoading(true);
+    setIsLoading(true);
+    let cancelled = false;
+    let unsubFirestore: (() => void) | undefined;
 
-      let dbPlaylist = null;
-      try {
-        dbPlaylist = await getPlaylistById(id);
-      } catch {
-        console.log('Firebase lookup failed, proceeding to Spotify fallback');
-      }
-
-      if (dbPlaylist) {
-        setPlaylist(dbPlaylist);
-        setIsSpotifySource(false);
-        setIsLoading(false);
-        return;
-      }
+    async function fetchExternal(targetId: string) {
+      if (cancelled) return;
 
       // Handle YouTube fallback
-      if (id.startsWith('youtube:')) {
-        const ytId = id.replace('youtube:', '');
+      if (targetId.startsWith('youtube:')) {
+        const ytId = targetId.replace('youtube:', '');
         try {
           const authHeaders = await getFirebaseAuthHeaders(user);
-          // Use the full URL to ensure NodeLink identifies it as a playlist
           const targetUrl = ytId.startsWith('http') ? ytId : `https://www.youtube.com/playlist?list=${ytId}`;
           const res = await fetch(`/api/search?q=${encodeURIComponent(targetUrl)}`, {
             headers: authHeaders,
           });
 
-          if (res.ok) {
+          if (res.ok && !cancelled) {
             const ytData = await res.json();
             if (ytData.loadType === 'playlist' && ytData.tracks) {
               const mapped: CustomPlaylistData = {
                 name: ytData.playlistInfo?.name || 'YouTube Playlist',
                 artworkUrl: ytData.tracks?.[0]?.info?.artworkUrl || `https://img.youtube.com/vi/${ytData.tracks?.[0]?.info?.identifier}/mqdefault.jpg`,
-                tracks: ytData.tracks.map((t: {
+                tracks: ytData.tracks.map((t: any) => ({
                   info: {
-                    identifier: string;
-                    title: string;
-                    author: string;
-                    artworkUrl?: string;
-                    duration?: number;
-                    length?: number;
-                  };
-                  encoded: string;
-                }) => ({
-                  info: {
-                    identifier: t.info.identifier,
-                    title: t.info.title,
-                    author: t.info.author,
-                    artworkUrl: t.info.artworkUrl,
-                    duration: t.info.duration || t.info.length || 0,
+                    identifier: t.info?.identifier || t.id,
+                    title: t.info?.title || t.title,
+                    author: t.info?.author || t.author || t.artist,
+                    artworkUrl: t.info?.artworkUrl || t.artworkUrl,
+                    duration: t.info?.duration || t.duration || 0,
                   },
-                  encoded: t.encoded
+                  encoded: t.encoded || t.url || '',
                 }))
               };
               setPlaylist(mapped);
@@ -140,53 +121,68 @@ export default function PlaylistPage() {
           }
         } catch (error) {
           console.error('Error fetching YouTube playlist:', error);
-          setPlaylist(null);
+          if (!cancelled) setPlaylist(null);
         } finally {
-          setIsLoading(false);
+          if (!cancelled) setIsLoading(false);
         }
         return;
       }
 
+      // Handle Spotify fallback
       try {
         const authHeaders = await getFirebaseAuthHeaders(user);
-        // Clean up Spotify ID if it has prefixes
-        const cleanSpotifyId = id.replace('spotify:playlist:', '').replace('spotify:album:', '');
+        const cleanSpotifyId = targetId.replace('spotify:playlist:', '').replace('spotify:album:', '');
         const res = await fetch(`/api/spotify/playlists/${cleanSpotifyId}`, {
           headers: authHeaders,
         });
 
-        if (res.ok) {
+        if (res.ok && !cancelled) {
           const spotifyData = (await res.json()) as SpotifyPlaylistData;
           setPlaylist(spotifyData);
           setIsSpotifySource(true);
           setIsYoutubeSource(false);
-        } else if (id.length === 22) {
-          // One more try for albums if playlist failed
-          const albumRes = await fetch(`/api/spotify/albums/${cleanSpotifyId}/tracks`, {
-            headers: authHeaders,
-          });
-          if (albumRes.ok) {
-             // Handle album data structure... (keep it simple for now or assume its a playlist mostly)
-             setPlaylist(null); 
-          } else {
-            setPlaylist(null);
-          }
         } else {
-          setPlaylist(null);
+          if (!cancelled) setPlaylist(null);
         }
       } catch (error) {
         console.error('Error fetching Spotify playlist:', error);
-        setPlaylist(null);
+        if (!cancelled) setPlaylist(null);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
 
-    void fetchPlaylist();
+    // Try listening to Firebase Firestore document in real-time
+    try {
+      const docRef = doc(db, 'playlists', id);
+      unsubFirestore = onSnapshot(docRef, (docSnap) => {
+        if (cancelled) return;
+        if (docSnap.exists()) {
+          const data = { id: docSnap.id, ...docSnap.data() } as CustomPlaylistData;
+          setPlaylist(data);
+          setIsSpotifySource(false);
+          setIsYoutubeSource(false);
+          setIsLoading(false);
+        } else {
+          // If document doesn't exist in Firestore, try external providers
+          void fetchExternal(id);
+        }
+      }, (err) => {
+        console.warn('Firestore playlist snapshot skipped:', err);
+        void fetchExternal(id);
+      });
+    } catch {
+      void fetchExternal(id);
+    }
+
+    return () => {
+      cancelled = true;
+      if (unsubFirestore) unsubFirestore();
+    };
   }, [id, user]);
 
   const trackItems: TrackItem[] = useMemo(() => {
-    if (!playlist?.tracks) return [];
+    if (!playlist?.tracks || !Array.isArray(playlist.tracks)) return [];
 
     if (isSpotifySource) {
       const spotifyTracks = playlist.tracks as SpotifyTrackLike[];
@@ -200,17 +196,27 @@ export default function PlaylistPage() {
       });
     }
 
-    const customTracks = playlist.tracks as CustomPlaylistTrack[];
-    return customTracks.map((track) => ({
-      id: track.info.identifier,
-      identifier: track.info.identifier,
-      title: track.info.title,
-      artist: track.info.author,
-      artworkUrl: track.info.artworkUrl || '',
-      duration: track.info.duration,
-      album: track.info.author,
-      encoded: track.encoded,
-    }));
+    const customTracks = playlist.tracks as Array<any>;
+    return customTracks.map((track) => {
+      const info = track.info || track;
+      const identifier = info.identifier || info.id || track.identifier || track.id || 'unknown';
+      const title = info.title || track.title || 'Unknown Title';
+      const artist = info.author || info.artist || track.author || track.artist || 'Unknown Artist';
+      const artworkUrl = info.artworkUrl || track.artworkUrl || playlist.artworkUrl || '';
+      const duration = info.duration || info.length || track.duration || 0;
+      const encoded = track.encoded || track.url || '';
+
+      return {
+        id: identifier,
+        identifier,
+        title,
+        artist,
+        artworkUrl,
+        duration,
+        album: artist,
+        encoded,
+      };
+    });
   }, [isSpotifySource, playlist]);
 
   const totalDurationMs = useMemo(() => {
