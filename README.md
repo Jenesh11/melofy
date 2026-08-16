@@ -179,7 +179,7 @@ melofy/
 ### 1️⃣ Clone & Fuel Up
 
 ```bash
-git clone https://github.com/lazyshrey/melofy.git
+git clone https://github.com/Jenesh11/melofy.git
 cd melofy
 npm install
 ```
@@ -208,31 +208,7 @@ npm run dev
 
 ---
 
-## 🤝 Community & Support
-
-Join our Discord server to get updates, report bugs, or just hang out with the devs!
-
 <div align="center">
-  <a href="https://discord.gg/ZVCB8EnRX2">
-    <img src="https://img.shields.io/discord/951909987838468116?color=%237289DA&label=Lazy%20Devs&logo=discord&logoColor=white&style=for-the-badge" alt="Join Discord" />
-  </a>
-</div>
-
-<br />
-
-### Support the Project 💖
-
-If you appreciate the work and want to support the development of Melofy, consider buying me a coffee!
-
-<div align="center">
-  <a href="https://payments.cashfree.com/forms/shrey">
-    <img src="https://img.shields.io/badge/Donate-Buy%20Me%20A%20Coffee-a3d4ec?style=for-the-badge&logo=coffee&logoColor=black" alt="Buy me a coffee" />
-  </a>
-</div>
-
----
-
-<div align="center">
-  <p>Built with 💖 and ☕ by <b><a href="https://github.com/lazyshrey">lazyshrey</a></b></p>
+  <p>Built with 💖 and ☕ by <b><a href="https://github.com/Jenesh11">Jenesh11</a></b></p>
   <p><i>© 2026 Melofy. Licensed under the MIT License.</i></p>
 </div>

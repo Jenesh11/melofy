@@ -107,7 +107,7 @@ export default function SettingsPage() {
       }
       setLocalVersion(currentVersion);
 
-      const res = await fetch('https://api.github.com/repos/lazyshrey/melofy/releases/latest');
+      const res = await fetch('https://api.github.com/repos/Jenesh11/melofy/releases/latest');
       if (!res.ok) throw new Error('GitHub Releases API error');
       
       const release = await res.json();
@@ -211,7 +211,7 @@ export default function SettingsPage() {
   ];
 
   const exeAsset = latestRelease?.assets?.find((a) => a.name.endsWith('.exe'));
-  const exeUrl = exeAsset?.browser_download_url || 'https://github.com/lazyshrey/melofy/releases/latest/download/Melofy_x64-setup.exe';
+  const exeUrl = exeAsset?.browser_download_url || 'https://github.com/Jenesh11/melofy/releases/latest/download/Melofy_x64-setup.exe';
 
   if (!user) return null;
 
@@ -565,7 +565,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <a
-                  href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy_x64.msi'
+                  href='https://github.com/Jenesh11/melofy/releases/latest/download/Melofy_x64.msi'
                   target='_blank'
                   rel='noopener noreferrer'
                   className='self-start xs:self-auto shrink-0'
@@ -599,7 +599,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <a
-                  href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy.apk'
+                  href='https://github.com/Jenesh11/melofy/releases/latest/download/Melofy.apk'
                   target='_blank'
                   rel='noopener noreferrer'
                   className='self-start xs:self-auto shrink-0'

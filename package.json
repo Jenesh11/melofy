@@ -5,17 +5,17 @@
   "description": "A premium cross-platform music streaming platform with desktop, mobile, and web applications.",
   "packageManager": "npm@10.8.2",
   "author": {
-    "name": "Shrey Jaiswal",
-    "url": "https://github.com/lazyshrey"
+    "name": "Jenesh",
+    "url": "https://github.com/Jenesh11"
   },
   "license": "MIT",
-  "homepage": "https://github.com/lazyshrey/melofy#readme",
+  "homepage": "https://github.com/Jenesh11/melofy#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lazyshrey/melofy.git"
+    "url": "git+https://github.com/Jenesh11/melofy.git"
   },
   "bugs": {
-    "url": "https://github.com/lazyshrey/melofy/issues"
+    "url": "https://github.com/Jenesh11/melofy/issues"
   },
   "workspaces": [
     "apps/*",

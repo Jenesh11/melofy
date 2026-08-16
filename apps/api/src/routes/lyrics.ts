@@ -301,7 +301,7 @@ async function fetchFromLrclib(
   albumName: string | null,
   duration: string | null,
 ): Promise<Record<string, unknown> | null> {  // eslint-disable-line
-  const UA = { 'User-Agent': 'Melofy (https://github.com/lazyshrey/melofy)' };
+  const UA = { 'User-Agent': 'Melofy (https://github.com/Jenesh11/melofy)' };
 
   // --- 1. Exact match via /api/get ---
   try {

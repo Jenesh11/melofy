@@ -29,24 +29,22 @@ Examples of unacceptable behavior include:
 ## Scope
 
 This Code of Conduct applies within all official Melofy spaces, including:
-* The GitHub repository (`lazyshrey/melofy`)
+* The GitHub repository (`Jenesh11/melofy`)
 * Pull request reviews, issue discussions, and project boards
-* The **Lazy Devs Discord Server** (`https://discord.gg/ZVCB8EnRX2`)
 * Any official Melofy social media accounts or online events
 
 ## Enforcement Responsibilities
 
-Community leaders (especially Shrey Jaiswal) are responsible for clarifying and enforcing our standards of acceptable behavior and will take appropriate and fair corrective action in response to any behavior that they deem inappropriate, threatening, offensive, or harmful.
+Community leaders and maintainers are responsible for clarifying and enforcing our standards of acceptable behavior and will take appropriate and fair corrective action in response to any behavior that they deem inappropriate, threatening, offensive, or harmful.
 
 Maintainers have the right and responsibility to remove, edit, or reject comments, commits, code, wiki edits, issues, and other contributions that are not aligned to this Code of Conduct, and will communicate reasons for moderation decisions when appropriate.
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported directly to **Shrey Jaiswal** or our community moderators. 
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported directly to **Jenesh** or our community moderators. 
 
 You can reach us through:
-- **Discord**: Direct Message to maintainers in the [Lazy Devs Discord](https://discord.gg/ZVCB8EnRX2).
-- **GitHub Issues**: Open a moderation flag issue on the repository.
+- **GitHub Issues**: Open a moderation flag issue on the repository (`https://github.com/Jenesh11/melofy/issues`).
 
 All complaints will be reviewed and investigated promptly and fairly. Maintainers are obligated to respect the privacy and security of the reporter of any incident.
 

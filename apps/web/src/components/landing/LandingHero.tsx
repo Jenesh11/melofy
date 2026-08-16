@@ -352,7 +352,7 @@ export function LandingHero() {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isNative, setIsNative] = useState(false);
   const [isTauri, setIsTauri] = useState(false);
-  const [winDownloadUrl, setWinDownloadUrl] = useState('https://github.com/lazyshrey/melofy/releases/latest/download/Melofy_x64-setup.exe');
+  const [winDownloadUrl, setWinDownloadUrl] = useState('https://github.com/Jenesh11/melofy/releases/latest/download/Melofy_x64-setup.exe');
 
   useEffect(() => {
     const isCapacitorNative = typeof window !== 'undefined' && (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
@@ -366,7 +366,7 @@ export function LandingHero() {
 
     const fetchLatestRelease = async () => {
       try {
-        const res = await fetch('https://api.github.com/repos/lazyshrey/melofy/releases/latest');
+        const res = await fetch('https://api.github.com/repos/Jenesh11/melofy/releases/latest');
         if (res.ok) {
           const data = await res.json() as { assets?: { name: string; browser_download_url: string }[] };
           const exeAsset = data.assets?.find((a) => a.name.endsWith('.exe'));
@@ -453,7 +453,7 @@ export function LandingHero() {
                 </a>
                 
                 <a
-                  href='https://github.com/lazyshrey/melofy/releases/latest/download/Melofy.apk'
+                  href='https://github.com/Jenesh11/melofy/releases/latest/download/Melofy.apk'
                   target='_blank'
                   rel='noopener noreferrer'
                   className='group'
