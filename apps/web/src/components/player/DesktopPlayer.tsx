@@ -88,7 +88,12 @@ export function DesktopPlayer({
   const [pipAvailable, setPipAvailable] = useState(false);
   const [direction, setDirection] = useState(1); // 1 = next, -1 = prev
   const [isMobile, setIsMobile] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setImageError(false);
+  }, [currentTrack.id, currentTrack.artworkUrl]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -176,13 +181,21 @@ export function DesktopPlayer({
           >
             <div className='flex items-center gap-3 overflow-hidden py-2 px-1'>
               <div className='h-10 w-10 md:h-14 md:w-14 rounded-md bg-muted overflow-hidden shrink-0 relative'>
-                <Image
-                  src={currentTrack.artworkUrl}
-                  alt={currentTrack.title}
-                  width={56}
-                  height={56}
-                  className='h-full w-full object-cover group-hover/info:scale-105 transition-transform duration-500'
-                />
+                {currentTrack.artworkUrl && !imageError ? (
+                  <Image
+                    src={currentTrack.artworkUrl}
+                    alt={currentTrack.title}
+                    width={56}
+                    height={56}
+                    className='h-full w-full object-cover group-hover/info:scale-105 transition-transform duration-500'
+                    onError={() => setImageError(true)}
+                    unoptimized
+                  />
+                ) : (
+                  <div className='h-full w-full flex items-center justify-center bg-secondary/50'>
+                    <Music2 className='h-6 w-6 text-muted-foreground' />
+                  </div>
+                )}
               </div>
               <div className='flex flex-col min-w-0'>
                 <p className='text-sm font-semibold text-foreground truncate group-hover/info:underline decoration-1 underline-offset-4'>

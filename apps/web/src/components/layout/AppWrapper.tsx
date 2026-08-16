@@ -312,10 +312,24 @@ const titleBarBtnStyle: React.CSSProperties = {
 };
 
 function AppContent({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const [timedOut, setTimedOut] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const mainRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!authLoading) {
+      setTimedOut(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setTimedOut(true);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [authLoading]);
+
+  const loading = authLoading && !timedOut;
 
   useEffect(() => {
     if (mainRef.current) {

@@ -17,39 +17,11 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'i.scdn.co',
+        hostname: '**',
       },
       {
-        protocol: 'https',
-        hostname: 'image-cdn-ak.spotifycdn.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'image-cdn-fa.spotifycdn.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images-ak.spotifycdn.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'mosaic.scdn.co',
-      },
-      {
-        protocol: 'https',
-        hostname: 'lh3.googleusercontent.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'i.ytimg.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'img.youtube.com',
+        protocol: 'http',
+        hostname: '**',
       },
     ],
   },

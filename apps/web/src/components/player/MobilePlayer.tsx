@@ -222,6 +222,7 @@ export function MobilePlayer({
                   width={400}
                   height={400}
                   className='w-full h-full object-cover shadow-2xl pointer-events-none'
+                  unoptimized
                 />
               ) : (
                 <div className='w-full h-full flex items-center justify-center'>

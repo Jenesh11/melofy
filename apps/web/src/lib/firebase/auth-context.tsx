@@ -62,31 +62,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
+      setLoading(false);
 
-      // Auto-sync user to Firestore on login
+      // Auto-sync user to Firestore on login in background without blocking UI
       if (user) {
-        const userRef = doc(db, 'users', user.uid);
-        const userSnap = await getDoc(userRef);
+        try {
+          const userRef = doc(db, 'users', user.uid);
+          const userSnap = await getDoc(userRef);
 
-        if (!userSnap.exists()) {
-          await setDoc(userRef, {
-            email: user.email,
-            displayName: user.displayName,
-            photoURL: user.photoURL,
-            createdAt: new Date().toISOString(),
-          });
+          if (!userSnap.exists()) {
+            await setDoc(userRef, {
+              email: user.email,
+              displayName: user.displayName,
+              photoURL: user.photoURL,
+              createdAt: new Date().toISOString(),
+            });
 
-          // Generate initial "Liked Songs" playlist
-          await addPlaylist(user.uid, {
-            name: 'Liked Songs',
-            trackCount: 0,
-            tracks: [],
-            isLikedSongs: true,
-          });
+            // Generate initial "Liked Songs" playlist
+            await addPlaylist(user.uid, {
+              name: 'Liked Songs',
+              trackCount: 0,
+              tracks: [],
+              isLikedSongs: true,
+            });
+          }
+        } catch (err) {
+          console.warn('[Auth] Firestore user profile sync skipped:', err);
         }
       }
-
-      setLoading(false);
     });
 
     // ── Tauri Deep Link Listener ──────────────────────────────────────────
