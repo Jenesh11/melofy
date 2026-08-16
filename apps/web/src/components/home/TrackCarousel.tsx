@@ -30,7 +30,7 @@ export function TrackCarousel({
   onPlayAll,
   className,
 }: TrackCarouselProps) {
-  const playInContext = usePlayerStore((state) => state.playInContext);
+  const play = usePlayerStore((state) => state.play);
   const currentTrack = usePlayerStore((state) => state.currentTrack);
   const isPlaying = usePlayerStore((state) => state.isPlaying);
   const pause = usePlayerStore((state) => state.pause);
@@ -81,11 +81,9 @@ export function TrackCarousel({
         return;
       }
 
-      const nextContextTracks = [...contextTracks];
-      nextContextTracks.splice(index, 1, resolved);
-      playInContext(resolved, nextContextTracks);
+      play(resolved);
     },
-    [contextTracks, currentTrack?.title, isPlaying, pause, playInContext, resume, trackItems],
+    [currentTrack?.title, isPlaying, pause, play, resume, trackItems],
   );
 
   const addToQueue = usePlayerStore((state) => state.addToQueue);

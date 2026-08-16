@@ -45,7 +45,7 @@ export function PlaylistGrid({
   onImport,
   className,
 }: PlaylistGridProps) {
-  const playInContext = usePlayerStore((state) => state.playInContext);
+  const play = usePlayerStore((state) => state.play);
   const currentTrack = usePlayerStore((state) => state.currentTrack);
   const isPlaying = usePlayerStore((state) => state.isPlaying);
   const pause = usePlayerStore((state) => state.pause);
@@ -105,14 +105,9 @@ export function PlaylistGrid({
         return;
       }
 
-      const nextContextTracks = [...albumContextTracks];
-      if (index >= 0 && index < nextContextTracks.length) {
-        nextContextTracks.splice(index, 1, resolved);
-      }
-
-      playInContext(resolved, nextContextTracks);
+      play(resolved);
     },
-    [albumContextTracks, currentTrack?.title, isAlbum, isPlaying, onPlayPlaylist, pause, playInContext, resume],
+    [currentTrack?.title, isAlbum, isPlaying, onPlayPlaylist, pause, play, resume],
   );
 
   if (!items || items.length === 0) return null;
