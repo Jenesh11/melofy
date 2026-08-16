@@ -9,7 +9,7 @@ interface DonateButtonProps {
   variant?: 'default' | 'minimal';
 }
 
-const DONATION_URL = process.env.NEXT_PUBLIC_DONATION_URL || 'https://rzp.io/l/melofy';
+const DONATION_URL = process.env.NEXT_PUBLIC_DONATION_URL || 'https://rzp.io/rzp/mnlglbmA';
 
 export const DonateButton: React.FC<DonateButtonProps> = ({ 
   className, 

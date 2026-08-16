@@ -37,4 +37,4 @@ Refer to this chart to decide where to ask your questions:
 
 ## 💖 Support Melofy Development
 Melofy is built and maintained with ☕ and 🎵 by **Jenesh**. If you love the platform and want to contribute to its growth, please consider supporting the project:
-* **Support Melofy**: [Razorpay Donation](https://rzp.io/l/melofy)
+* **Support Melofy**: [Razorpay Donation](https://rzp.io/rzp/mnlglbmA)
