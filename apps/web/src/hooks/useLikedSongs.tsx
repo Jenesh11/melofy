@@ -2,7 +2,7 @@
 import { useCallback } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { db } from '@/lib/firebase/config';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, arrayRemove, collection, query, where, getDocs } from 'firebase/firestore';
 import { addPlaylist, Track as FirebaseTrack } from '@/lib/firebase/playlists';
 import { Track as PlayerTrack } from '@/store/usePlayerStore';
 import { useLikedStore } from '@/store/useLikedStore';
@@ -58,8 +58,25 @@ export function useLikedSongs() {
         // Optimistic update
         removeLikedTrack(track.id);
         
-        if (likedPlaylistId) {
-          const docRef = doc(db, 'playlists', likedPlaylistId);
+        let targetPlaylistId = likedPlaylistId;
+        if (!targetPlaylistId) {
+          const q = query(
+            collection(db, 'playlists'),
+            where('userId', '==', user.uid)
+          );
+          const snap = await getDocs(q);
+          const existing = snap.docs.find(d => {
+            const data = d.data();
+            return data.isLikedSongs === true || data.name === LIKED_SONGS_PLAYLIST_NAME;
+          });
+          if (existing) {
+            targetPlaylistId = existing.id;
+            setLikedPlaylistId(existing.id);
+          }
+        }
+
+        if (targetPlaylistId) {
+          const docRef = doc(db, 'playlists', targetPlaylistId);
           const trackToRemove = likedTracks.find(t => t.info.identifier === track.id);
           if (trackToRemove) {
             await updateDoc(docRef, {
@@ -87,11 +104,29 @@ export function useLikedSongs() {
         // Optimistic update
         addLikedTrack(firebaseTrack);
 
-        if (likedPlaylistId) {
-          const docRef = doc(db, 'playlists', likedPlaylistId);
+        let targetPlaylistId = likedPlaylistId;
+        if (!targetPlaylistId) {
+          const q = query(
+            collection(db, 'playlists'),
+            where('userId', '==', user.uid)
+          );
+          const snap = await getDocs(q);
+          const existing = snap.docs.find(d => {
+            const data = d.data();
+            return data.isLikedSongs === true || data.name === LIKED_SONGS_PLAYLIST_NAME;
+          });
+          if (existing) {
+            targetPlaylistId = existing.id;
+            setLikedPlaylistId(existing.id);
+          }
+        }
+
+        if (targetPlaylistId) {
+          const docRef = doc(db, 'playlists', targetPlaylistId);
           await updateDoc(docRef, {
             tracks: arrayUnion(firebaseTrack),
-            trackCount: likedTracks.length + 1
+            trackCount: likedTracks.length + 1,
+            isLikedSongs: true,
           });
         } else {
           // Create new Liked Songs playlist

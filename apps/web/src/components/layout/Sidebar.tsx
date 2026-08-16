@@ -82,10 +82,20 @@ export function Sidebar() {
     return () => unsubscribe();
   }, [user]);
 
-  // Combine Firebase lists and locally stored Spotify lists, ensuring Liked Songs is on top.
+  // Combine Firebase lists and locally stored Spotify lists, ensuring single Liked Songs is on top.
   const allPlaylists = useMemo(() => {
     const combined = [...(user ? firebasePlaylists : []), ...savedPlaylists];
-    return combined.sort((a, b) => {
+    const seenLiked = new Set<string>();
+    const filtered = combined.filter((p) => {
+      const isLiked = p.isLikedSongs || p.name === 'Liked Songs';
+      if (isLiked) {
+        if (seenLiked.has('liked_songs')) return false;
+        seenLiked.add('liked_songs');
+      }
+      return true;
+    });
+
+    return filtered.sort((a, b) => {
       const aIsLiked = a.isLikedSongs || a.name === 'Liked Songs';
       const bIsLiked = b.isLikedSongs || b.name === 'Liked Songs';
       if (aIsLiked && !bIsLiked) return -1;
