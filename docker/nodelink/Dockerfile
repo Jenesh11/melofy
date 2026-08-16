@@ -6,6 +6,8 @@ RUN apk add --no-cache git python3 make g++
 
 RUN git clone --depth 1 https://github.com/PerformanC/NodeLink.git .
 
+RUN cp config.default.js config.js
+
 RUN npm install --production
 
 ENV NODELINK_SERVER_PORT=2333 \

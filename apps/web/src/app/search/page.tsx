@@ -160,13 +160,12 @@ export default function SearchPage() {
         } else {
           setSpotifyTracks([]);
           setSpotifyPlaylists([]);
-          setDetectedPlaylist(null);
-          return;
         }
 
         if (ytData) {
-          if (ytData.loadType === 'playlist' && ytData.tracks) {
-            const mapped: TrackItem[] = ytData.tracks.map((track) => ({
+          const rawTracks = ytData.tracks || (ytData as any).data || [];
+          if (ytData.loadType === 'playlist' && rawTracks.length > 0) {
+            const mapped: TrackItem[] = rawTracks.map((track: any) => ({
               id: track.info?.identifier || 'unknown',
               identifier: track.info?.identifier || 'unknown',
               title: track.info?.title || 'Unknown Title',
@@ -188,10 +187,10 @@ export default function SearchPage() {
                          (debouncedQuery.includes('spotify.com') ? debouncedQuery.match(/\/([a-zA-Z0-9]{22})/)?.[1] : undefined),
               youtubeId: debouncedQuery.match(/[&?]list=([a-zA-Z0-9_-]{18,34})/)?.[1]
             });
-          } else if (ytData.tracks && ytData.tracks.length > 0) {
-            const mapped: TrackItem[] = ytData.tracks
+          } else if (rawTracks.length > 0) {
+            const mapped: TrackItem[] = rawTracks
               .filter(Boolean)
-              .map((track) => {
+              .map((track: any) => {
                 const identifier = track.info?.identifier;
                 return {
                   id: identifier || 'unknown',
@@ -200,13 +199,15 @@ export default function SearchPage() {
                   artist: track.info?.author || 'Unknown Artist',
                   artworkUrl: track.info?.artworkUrl || '',
                   duration: track.info?.duration || track.info?.length || 0,
-                  album: track.info?.author || '',
+                  album: track.info?.author || 'YouTube',
                   encoded: track.encoded,
+                  source: track.info?.sourceName || 'youtube',
                 };
               });
             setResults(mapped);
             setDetectedPlaylist(null);
           } else {
+            setResults([]);
             setDetectedPlaylist(null);
           }
 

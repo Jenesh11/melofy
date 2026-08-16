@@ -46,10 +46,13 @@ export function useTrackDiscovery() {
           });
           const data = await res.json();
           if (cancelled) return;
-          if (data?.tracks?.length > 0) {
-            const found = data.tracks[0];
+          const rawTracks = (data?.tracks || data?.data || (Array.isArray(data) ? data : [])) as Array<any>;
+          if (rawTracks.length > 0) {
+            const found = rawTracks.find((t) => t?.encoded) || rawTracks[0];
             if (found?.encoded) {
-              updateTrackUrl(currentTrack.id, found.encoded, found.info.identifier, found.info.length);
+              const identifier = found.info?.identifier || found.id || currentTrack.id;
+              const length = found.info?.length || found.info?.duration || found.duration || 0;
+              updateTrackUrl(currentTrack.id, found.encoded, identifier, length);
               success = true;
             }
           }

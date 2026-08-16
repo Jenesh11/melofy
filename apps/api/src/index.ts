@@ -151,6 +151,9 @@ export const lavalink = new LavalinkManager({
       id: process.env.LAVALINK_NAME!
     },
   ],
+  playerOptions: {
+    defaultSearchPlatform: 'ytmsearch',
+  },
   sendToShard: () => {},
   client: {
     id: '123456789012345678',
@@ -327,10 +330,26 @@ app.get('/api/search', requireFirebaseAuth, privateRateLimit, async (req, res) =
       }
 
       if (!searchResult) {
+        const isUrlOrPrefix = /^(https?:\/\/|[a-z0-9_]+:)/i.test(trimmedQuery);
+        const primaryQuery = isUrlOrPrefix ? trimmedQuery : `ytmsearch:${trimmedQuery}`;
+
         searchResult = await node.search(
-          { query: trimmedQuery },
+          { query: primaryQuery },
           { id: req.user?.uid || 'MelofyInternal' },
         );
+
+        if (
+          (!searchResult ||
+            searchResult.loadType === 'empty' ||
+            searchResult.loadType === 'error' ||
+            !searchResult.tracks?.length) &&
+          !isUrlOrPrefix
+        ) {
+          searchResult = await node.search(
+            { query: `ytsearch:${trimmedQuery}` },
+            { id: req.user?.uid || 'MelofyInternal' },
+          );
+        }
       }
 
       // Filter out unavailable tracks from general search result if they exist
