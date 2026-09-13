@@ -31,15 +31,7 @@ async function resolvePlayableTrack(
   item: TrackItem,
 ): Promise<PlayerTrack | null> {
   if (item.encoded) {
-    return {
-      id: item.id,
-      identifier: item.identifier,
-      title: item.title,
-      artist: item.artist,
-      artworkUrl: item.artworkUrl,
-      duration: item.duration,
-      url: item.encoded,
-    };
+    return mapTrackItemToPlayerTrack(item);
   }
 
   try {
@@ -52,12 +44,13 @@ async function resolvePlayableTrack(
     if (data?.tracks?.length > 0) {
       const found = data.tracks[0];
       return {
+        ...mapTrackItemToPlayerTrack(item),
         id: item.id,
         identifier: found.info.identifier,
         title: item.title,
         artist: item.artist,
         artworkUrl: item.artworkUrl,
-        duration: item.duration || found.info.length || 0,
+        duration: item.duration || found.info.duration || found.info.length || 0,
         url: found.encoded,
       };
     }

@@ -1,0 +1,16 @@
+export const collection = (...args) => args;
+export const query = (...args) => args;
+export const where = (...args) => args;
+export const orderBy = (...args) => args;
+export const doc = (...args) => args;
+export const serverTimestamp = () => 'fixture-time';
+export const getDocs = async () => ({ empty: true, docs: [] });
+export const getDoc = async () => ({ exists: () => true, data: () => window.fixturePlaylist || {} });
+export const addDoc = async (ref, data) => { (window.fixtureWrites ||= []).push({ ref, data }); return { id: 'imported-playlist' }; };
+export const updateDoc = async (ref, data) => window.fixtureUpdate ? window.fixtureUpdate(ref, data) : undefined;
+export const deleteDoc = async ref => { (window.fixtureDeletes ||= []).push(ref); };
+export const arrayUnion = (...args) => args;
+export const arrayRemove = (...args) => args;
+export const onSnapshot = (_query, callback) => { window.fixtureSnapshot = callback; return () => {}; };
+export const Timestamp = class {};
+export const FieldValue = class {};

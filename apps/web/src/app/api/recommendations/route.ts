@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildBackendUrl } from '@/lib/server/backend-url';
 
+export async function POST(req: NextRequest) {
+  const authorization = req.headers.get('authorization');
+  if (!authorization) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const body = await req.text();
+    if (body.length > 200000) return NextResponse.json({ error: 'Request too large' }, { status: 413 });
+    const response = await fetch(buildBackendUrl('/api/recommendations'), {
+      method: 'POST', headers: { Authorization: authorization, 'Content-Type': 'application/json' },
+      body, signal: AbortSignal.any([req.signal, AbortSignal.timeout(25000)]),
+    });
+    return NextResponse.json(await response.json(), { status: response.status, headers: { 'Cache-Control': 'private, no-store' } });
+  } catch { return NextResponse.json({ error: 'Recommendations unavailable' }, { status: 503 }); }
+}
+
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
   const trackId = searchParams.get('trackId');

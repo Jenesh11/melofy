@@ -6,6 +6,7 @@ import {
   spotifyGet, 
   fetchFullSpotifyPlaylist 
 } from '../lib/spotify';
+import { optionalCache } from '../lib/optionalCache';
 import { lavalink } from '../index';
 
 const router = Router();
@@ -13,10 +14,10 @@ const router = Router();
 // All Spotify routes require authentication
 router.use(requireFirebaseAuth);
 
-const redis = new Redis({
+const redis = optionalCache(new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL || '',
   token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
-});
+}));
 
 /**
  * GET /api/spotify/trending
@@ -38,7 +39,7 @@ router.get('/trending', async (req, res) => {
         '[Spotify] Playlist fallback — using search API for trending',
       );
       const data = await spotifyGet(
-        `/search?q=year:2024-2025&type=track&limit=50&market=US`,
+        `/search?q=year:${new Date().getFullYear() - 1}-${new Date().getFullYear()}&type=track&limit=10&market=US`,
       );
       // Transform to match the {track} shape expected by frontend
       res.json(data.tracks.items.map((track: any) => ({ track })));
@@ -78,6 +79,10 @@ router.get('/new-releases', async (req, res) => {
     const formatted = rawTracks.slice(0, 10).map((track: any) => ({
       id: track.info.identifier,
       name: track.info.title,
+      identifier: track.info.identifier,
+      encoded: track.encoded,
+      source: track.info.sourceName,
+      duration_ms: track.info.duration || track.info.length || 0,
       artists: [{ name: track.info.author }],
       album: {
         id: track.info.identifier,
@@ -385,8 +390,8 @@ router.get('/playlists/:id/tracks', async (req, res) => {
   const id = validateSpotifyId(req.params.id);
   if (!id) return res.status(400).json({ error: 'Invalid Spotify playlist ID' });
   try {
-    const data = await spotifyGet(`/playlists/${id}/tracks?limit=50`);
-    res.json(data);
+    const data = await fetchFullSpotifyPlaylist(id);
+    res.json(data.tracks);
   } catch (error: any) {
     console.error(
       '[Spotify] Playlist tracks error:',
@@ -406,7 +411,7 @@ router.get('/playlists/:id', async (req, res) => {
   if (!id) return res.status(400).json({ error: 'Invalid Spotify playlist ID' });
   try {
     // 1. Check Redis Cache First
-    const cacheKey = `spotify:playlist:${id}`;
+    const cacheKey = `spotify:playlist:v2:${id}`;
     const cachedData = await redis.get(cacheKey);
 
     if (cachedData) {

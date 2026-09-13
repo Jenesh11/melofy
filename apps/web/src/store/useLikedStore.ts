@@ -1,8 +1,11 @@
+import { libraryTrackId } from '@/lib/library-tracks';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Track as FirebaseTrack } from '@/lib/firebase/playlists';
 
 interface LikedStore {
+  userId: string | null;
+  bindUser: (userId: string | null) => void;
   likedTracks: FirebaseTrack[];
   likedPlaylistId: string | null;
   isLoading: boolean;
@@ -16,23 +19,25 @@ interface LikedStore {
 export const useLikedStore = create<LikedStore>()(
   persist(
     (set) => ({
+      userId: null,
+      bindUser: (userId) => set(state => state.userId === userId ? state : ({ userId, likedTracks: [], likedPlaylistId: null, isLoading: !!userId })),
       likedTracks: [],
       likedPlaylistId: null,
       isLoading: false,
       setLikedTracks: (tracks) => set({ likedTracks: tracks }),
       setLikedPlaylistId: (id) => set({ likedPlaylistId: id }),
       setIsLoading: (loading) => set({ isLoading: loading }),
-      addLikedTrack: (track) => 
+      addLikedTrack: (track) =>
         set((state) => {
-          const trackId = track.info?.identifier || (track as any).id || (track as any).identifier;
-          if (state.likedTracks.some(t => (t.info?.identifier || (t as any).id || (t as any).identifier) === trackId)) {
+          const trackId = libraryTrackId(track);
+          if (state.likedTracks.some(t => libraryTrackId(t) === trackId)) {
             return state;
           }
           return { likedTracks: [...state.likedTracks, track] };
         }),
-      removeLikedTrack: (trackId) => 
-        set((state) => ({ 
-          likedTracks: state.likedTracks.filter(t => (t.info?.identifier || (t as any).id || (t as any).identifier) !== trackId) 
+      removeLikedTrack: (trackId) =>
+        set((state) => ({
+          likedTracks: state.likedTracks.filter(t => libraryTrackId(t) !== trackId)
         })),
     }),
     {

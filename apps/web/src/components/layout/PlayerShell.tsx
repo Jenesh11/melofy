@@ -46,7 +46,8 @@ export function PlayerShell() {
 
   const { user } = useAuth();
   const refreshStreamSrc = useCallback(async () => {
-    const encodedTrack = usePlayerStore.getState().currentTrack?.url;
+    const requestedTrack = usePlayerStore.getState().currentTrack;
+    const encodedTrack = requestedTrack?.url;
     if (!encodedTrack || !user) {
       setStreamSrc(undefined);
       setStreamTrackId(null);
@@ -55,13 +56,14 @@ export function PlayerShell() {
     }
 
     const url = await buildStreamUrl(encodedTrack, user);
+    if (usePlayerStore.getState().currentTrack !== requestedTrack) return null;
     setStreamSrc(url ?? undefined);
     setStreamTrackId(usePlayerStore.getState().currentTrack?.id ?? null);
     setStreamSrcIssuedAt(url ? Date.now() : 0);
     return url;
   }, [user]);
 
-  const playback = useAudioPlayback(streamSrc, {
+  const { audioRef, ...playback } = useAudioPlayback(streamSrc, {
     refreshStreamSrc,
     streamSrcIssuedAt,
     streamTrackId,
@@ -74,7 +76,8 @@ export function PlayerShell() {
   const channelRef = useRef<BroadcastChannel | null>(null);
   const latestStateRef = useRef<PipState | null>(null);
 
-  latestStateRef.current = {
+  useEffect(() => {
+    latestStateRef.current = {
     currentTrack: playback.currentTrack,
     isPlaying: playback.isPlaying,
     isBuffering: playback.isBuffering,
@@ -86,6 +89,7 @@ export function PlayerShell() {
     isRepeat: playback.isRepeat,
     volume: playback.volume,
   };
+  }, [playback, isLiked]);
 
   useEffect(() => {
     const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -244,7 +248,7 @@ export function PlayerShell() {
   return (
     <>
       <audio
-        ref={playback.audioRef}
+        ref={audioRef}
         src={Capacitor.isNativePlatform() ? undefined : (streamTrackId === playback.currentTrack?.id ? streamSrc : undefined)}
         onLoadedData={(e) => {
           e.currentTarget.volume = Capacitor.isNativePlatform() ? 1 : playback.volume;

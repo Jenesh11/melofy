@@ -1,0 +1,1 @@
+export const toast = Object.assign((...args) => window.fixtureToasts?.push(args), Object.fromEntries(['error','info','success','loading','dismiss'].map(key => [key, (...args) => window.fixtureToasts?.push([key,...args])])));

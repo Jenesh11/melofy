@@ -35,11 +35,9 @@ export default function PlayingPage() {
   const { toggleLike, isLiked } = useLikedSongs();
   const isPanelOpen = useLyricsPanelStore((s) => s.isOpen);
   const [isMobile, setIsMobile] = useState(false);
-  const [imageError, setImageError] = useState(false);
+  const [failedArtwork, setFailedArtwork] = useState<string | null>(null);
+  const imageError = failedArtwork === currentTrack?.artworkUrl;
 
-  useEffect(() => {
-    setImageError(false);
-  }, [currentTrack?.id, currentTrack?.artworkUrl]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -190,7 +188,7 @@ export default function PlayingPage() {
                         width={400}
                         height={400}
                         className='w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105'
-                        onError={() => setImageError(true)}
+                        onError={() => setFailedArtwork(currentTrack.artworkUrl)}
                         unoptimized
                       />
                     ) : (

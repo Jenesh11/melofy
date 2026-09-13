@@ -29,6 +29,7 @@ export default function TrendingPage() {
   );
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchTrending = async () => {
       if (!user) {
         setTracks([]);
@@ -39,10 +40,11 @@ export default function TrendingPage() {
       try {
         setIsLoading(true);
         const authHeaders = await getFirebaseAuthHeaders(user);
-        const res = await fetch('/api/spotify/trending', {
-          headers: authHeaders,
+        const res = await fetch('/api/discovery/trending', {
+          headers: authHeaders, signal: controller.signal,
         });
 
+        if (controller.signal.aborted) return;
         if (!res.ok) {
           setTracks([]);
           return;
@@ -53,15 +55,16 @@ export default function TrendingPage() {
           .filter((item): item is { track: SpotifyTrackLike } => Boolean(item?.track))
           .map((item) => mapSpotifyTrackToTrackItem(item.track));
 
-        setTracks(mapped);
+        if (!controller.signal.aborted) setTracks(mapped);
       } catch (error) {
-        console.error('Failed to fetch trending:', error);
+        if (!controller.signal.aborted) console.error('Failed to fetch trending:', error);
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) setIsLoading(false);
       }
     };
 
     void fetchTrending();
+    return () => controller.abort();
   }, [user]);
 
   return (
@@ -73,17 +76,17 @@ export default function TrendingPage() {
 
         <div className='flex flex-col gap-2'>
           <p className='text-primary font-bold tracking-widest text-[10px] uppercase'>
-            Chart
+            Discovery
           </p>
           <h1 className='text-5xl md:text-7xl font-bold text-foreground tracking-tighter mb-2'>
-            Top 50 Global
+            Popular Discoveries
           </h1>
           <div className='flex items-center gap-2 text-muted-foreground text-sm font-light'>
-            <span className='font-semibold text-foreground'>Spotify</span>
+            <span className='font-semibold text-foreground'>Melofy Discovery</span>
             <span>&middot;</span>
             <span>{tracks.length} tracks</span>
             <span>&middot;</span>
-            <span>Updated daily</span>
+            <span>Popular music search</span>
           </div>
         </div>
       </header>
@@ -98,7 +101,7 @@ export default function TrendingPage() {
           <Play className='h-6 w-6 fill-current' />
         </Button>
         <p className='text-muted-foreground text-sm font-light italic'>
-          Play the weekly top charts
+          Play popular discoveries
         </p>
       </div>
 
@@ -106,7 +109,7 @@ export default function TrendingPage() {
         <div className='flex flex-col items-center justify-center py-32 gap-4'>
           <Loader2 className='h-10 w-10 text-primary animate-spin' />
           <p className='text-muted-foreground animate-pulse'>
-            Loading global charts...
+            Loading discoveries...
           </p>
         </div>
       ) : tracks.length > 0 ? (

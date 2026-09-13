@@ -42,9 +42,13 @@ export default function LibraryPage() {
 
   useEffect(() => {
     if (user) {
-      fetchPlaylists();
+      queueMicrotask(() => {
+        void fetchPlaylists();
+      });
     } else {
-      setIsLoading(false);
+      queueMicrotask(() => {
+        setIsLoading(false);
+      });
     }
   }, [user, fetchPlaylists]);
 

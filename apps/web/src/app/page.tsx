@@ -1,18 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { motion } from 'framer-motion';
-import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LandingPage } from '@/components/layout/LandingPage';
 import { TrackCarousel } from '@/components/home/TrackCarousel';
 import { PlaylistGrid } from '@/components/home/PlaylistGrid';
-import { Track, usePlayerStore } from '@/store/usePlayerStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
 import Link from 'next/link';
 import { HeroPlaylistCard } from '@/components/home/HeroPlaylistCard';
 import { useSpotifyCollection } from '@/hooks/useSpotifyCollection';
-import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
+import { useHomeDiscovery } from '@/hooks/useHomeDiscovery';
 import {
   mapSpotifyTrackToPlayerTrack,
   type SpotifyTrackLike,
@@ -26,6 +26,7 @@ export default function Home() {
   const playPlaylist = usePlayerStore((state) => state.playPlaylist);
 
   const {
+    userId: homeUserId,
     trending,
     newReleases,
     recommendations,
@@ -33,17 +34,8 @@ export default function Home() {
     editorsPicks,
     discoveryMixes,
     featuredPlaylists,
-    hasFetched,
-    setTrending,
-    setNewReleases,
-    setRecommendations,
-    setMixes,
-    setEditorsPicks,
-    setDiscoveryMixes,
-    setFeaturedPlaylists,
-    setHasFetched,
   } = useHomeStore();
-  const [isFetching, setIsFetching] = useState(!hasFetched);
+  const { isFetching, refresh, unavailable, genre, language, setGenre, setLanguage } = useHomeDiscovery();
 
   const { handlePlayCollection, handleImportSpotifyPlaylist } = useSpotifyCollection();
   const recentPlaylists = useLibraryStore((state) => state.recentPlaylists) || [];
@@ -67,12 +59,7 @@ export default function Home() {
   );
 
   const newReleasesAsTracks = useMemo(() => {
-    return newReleases.map((track: SpotifyTrackLike) => ({
-      id: track.id,
-      name: track.name,
-      artists: track.artists || [{ name: 'Unknown' }],
-      album: track.album,
-    } as SpotifyTrackLike));
+    return newReleases as SpotifyTrackLike[];
   }, [newReleases]);
 
   const newReleasesTracksToPlay = useMemo(
@@ -126,96 +113,13 @@ export default function Home() {
     return () => clearInterval(intervalId);
   }, [featuredPlaylists]);
 
-  // Use a ref so we can access current history inside the fetch without
-  // including it in the dependency array (history changes on every song play,
-  // which would re-trigger the entire dashboard fetch unnecessarily).
-  const historyRef = useRef(history);
-  useEffect(() => { historyRef.current = history; }, [history]);
-
-  useEffect(() => {
-    if (!user) return;
-    if (hasFetched) {
-      setIsFetching(false);
-      return;
-    }
-
-    // Abort controller tied to this effect's lifetime — cancels on unmount
-    // or when deps change (e.g. user logs out), preventing the AbortError
-    // that occurred when the fetch outlived the component render cycle.
-    const controller = new AbortController();
-
-    const fetchDashboardData = async () => {
-      try {
-        setIsFetching(true);
-        const authHeaders = await getFirebaseAuthHeaders(user);
-        if (controller.signal.aborted) return;
-
-        const fetchOptions = { headers: authHeaders, signal: controller.signal };
-
-        const [trendRes, newRes, mixRes, editorsPicksRes, featuredRes] = await Promise.all([
-          fetch('/api/spotify/trending', fetchOptions),
-          fetch('/api/spotify/new-releases', fetchOptions),
-          fetch('/api/spotify/mixes', fetchOptions),
-          fetch('/api/spotify/editors-picks', fetchOptions),
-          fetch('/api/spotify/featured-playlists', fetchOptions),
-        ]);
-
-        if (trendRes.ok) setTrending(await trendRes.json());
-        if (newRes.ok) setNewReleases(await newRes.json());
-        if (mixRes.ok) setMixes(await mixRes.json());
-        if (editorsPicksRes.ok) setEditorsPicks(await editorsPicksRes.json());
-        if (featuredRes.ok) setFeaturedPlaylists(await featuredRes.json());
-
-        // Fetch Discovery Mixes based on current history (via ref, not deps)
-        const currentHistory = historyRef.current;
-        if (currentHistory.length > 0) {
-          const artists = currentHistory.map(t => t.artist).filter(Boolean);
-          const discRes = await fetch('/api/spotify/discovery', {
-            method: 'POST',
-            headers: { ...authHeaders, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ artists }),
-            signal: controller.signal,
-          });
-          if (discRes.ok) setDiscoveryMixes(await discRes.json());
-        }
-
-        const genres = ['pop', 'hip-hop', 'r&b', 'indie', 'electronic', 'soul'];
-        const randomGenre = genres[Math.floor(Math.random() * genres.length)];
-        const recRes = await fetch(
-          `/api/spotify/recommendations?genre=${randomGenre}`,
-          fetchOptions,
-        );
-
-        if (recRes.ok) setRecommendations(await recRes.json());
-
-        setHasFetched(true);
-      } catch (error: unknown) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          // Expected: unmount cleanup or user logout — not an error
-          console.log('[Dashboard] Fetch was aborted (unmount or user change).');
-          return;
-        }
-        console.error('Failed to fetch dashboard data:', error);
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsFetching(false);
-        }
-      }
-    };
-
-    void fetchDashboardData();
-
-    return () => {
-      // Abort in-flight requests when the component unmounts or user changes
-      controller.abort();
-    };
-  }, [user, hasFetched, setTrending, setNewReleases, setMixes, setEditorsPicks, setDiscoveryMixes, setRecommendations, setFeaturedPlaylists, setHasFetched]);
-
   if (loading) return <div className='min-h-screen bg-background' />;
 
   if (!user) {
     return <LandingPage />;
   }
+
+  if (homeUserId !== user.uid) return <div className='p-4'><HomePageSkeleton /></div>;
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -247,11 +151,21 @@ export default function Home() {
         </motion.h1>
       </header>
 
-      {isFetching ? (
+      <div className='flex flex-wrap items-center gap-3'>
+        <label className='text-sm'>Genre <select aria-label='Discovery genre' className='ml-2 rounded-md border bg-background p-2' value={genre} onChange={e => setGenre(e.target.value)}>
+          {['pop', 'rock', 'indie', 'hip-hop', 'r&b', 'electronic', 'acoustic', 'jazz', 'classical', 'lofi'].map(value => <option key={value}>{value}</option>)}
+        </select></label>
+        <label className='text-sm'>Language <select aria-label='Discovery language' className='ml-2 rounded-md border bg-background p-2' value={language} onChange={e => setLanguage(e.target.value)}>
+          {['all', 'English', 'Hindi', 'Tamil', 'Telugu', 'Malayalam', 'Punjabi', 'Spanish', 'Korean', 'Japanese'].map(value => <option key={value} value={value}>{value === 'all' ? 'Any language' : value}</option>)}
+        </select></label>
+        <Button variant='outline' onClick={refresh} disabled={isFetching}>Refresh discovery</Button>
+        {unavailable.length > 0 && <p role='status' className='text-sm text-muted-foreground'>Some music is temporarily unavailable. You can retry with Refresh discovery.</p>}
+      </div>
+      {isFetching && !recommendations.length && !trending.length ? (
         <HomePageSkeleton />
       ) : (
         <>
-          <section className='relative group/hero'>
+          {featuredPlaylists.length > 0 && <section className='relative group/hero'>
             <div className='flex items-center justify-between mb-6 px-1'>
               <h2 className='text-zinc-500 font-bold uppercase tracking-wider text-[10px]'>
                 Featured Collections
@@ -297,7 +211,7 @@ export default function Home() {
                 />
               ))}
             </div>
-          </section>
+          </section>}
 
           <div className='flex flex-col gap-10'>
             {uniqueHistory.length > 0 && (
@@ -335,7 +249,7 @@ export default function Home() {
             )}
 
             <PlaylistGrid
-              title="Editor's Picks"
+              title='Explore More'
               items={editorsPicks}
               onPlayPlaylist={handlePlayCollection}
               onImport={handleImportSpotifyPlaylist}
@@ -346,7 +260,7 @@ export default function Home() {
               <div className='flex items-center justify-between mb-6'>
                 <Link href='/trending' className='group flex items-center gap-2'>
                   <h3 className='text-3xl font-bold text-foreground group-hover:text-primary transition-colors'>
-                    Trending Right Now
+                    Popular Discoveries
                   </h3>
                   <ChevronRight className='h-6 w-6 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all' />
                 </Link>
@@ -368,14 +282,14 @@ export default function Home() {
             </section>
 
             <TrackCarousel
-              title='Because You Like Music'
+              title='Recommended For You'
               tracks={recommendations}
               onPlayAll={handlePlayRecommendations}
               className='mt-0'
             />
 
             <TrackCarousel
-              title='New Releases'
+              title='Fresh Finds'
               tracks={newReleasesAsTracks}
               onPlayAll={handlePlayNewReleases}
               className='mt-0'

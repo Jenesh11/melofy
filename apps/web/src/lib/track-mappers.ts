@@ -20,6 +20,11 @@ export interface SpotifyTrackLike {
   artists?: SpotifyArtistLike[];
   album?: SpotifyAlbumLike;
   duration_ms?: number;
+  identifier?: string;
+  encoded?: string;
+  source?: string;
+  uri?: string;
+  recordingMbid?: string;
 }
 
 function mapArtists(artists?: SpotifyArtistLike[]): string {
@@ -37,6 +42,11 @@ export function mapSpotifyTrackToTrackItem(track: SpotifyTrackLike): TrackItem {
     artworkUrl: track.album?.images?.[0]?.url || '',
     duration: track.duration_ms || 0,
     album: track.album?.name || artist,
+    identifier: track.identifier,
+    encoded: track.encoded,
+    source: track.source,
+    uri: track.uri,
+    recordingMbid: track.recordingMbid,
   };
 }
 
@@ -49,6 +59,9 @@ export function mapTrackItemToPlayerTrack(track: TrackItem): Track {
     artworkUrl: track.artworkUrl,
     duration: track.duration,
     url: track.encoded || '',
+    source: track.source,
+    uri: track.uri,
+    recordingMbid: track.recordingMbid,
   };
 }
 

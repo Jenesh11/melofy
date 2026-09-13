@@ -14,6 +14,9 @@ import lyricsRouter from './routes/lyrics';
 import playerRouter from './routes/player';
 import { LavalinkManager } from 'lavalink-client';
 import { requireFirebaseAuth, verifyFirebaseIdToken } from './lib/firebaseAuth';
+import { optionalCache } from './lib/optionalCache';
+import { nodeLinkDiscoveryLoader } from './lib/nodeLinkDiscovery';
+import { createDiscoveryRouter } from './routes/discovery';
 import { registerJamHandlers } from './sockets/jam';
 
 const app = express();
@@ -245,13 +248,14 @@ app.get('/health', async (_req, res) => {
 });
 
 app.use('/api', streamRouter);
-app.use('/api/spotify', privateRateLimit, spotifyRouter);
+app.use('/api/spotify', requireFirebaseAuth, privateRateLimit, spotifyRouter);
 app.use('/api/lyrics', requireFirebaseAuth, privateRateLimit, lyricsRouter);
-app.use('/api', privateRateLimit, playerRouter);
+app.use('/api/player-state', requireFirebaseAuth, privateRateLimit);
+app.use('/api', playerRouter);
 
 app.get('/api/search', requireFirebaseAuth, privateRateLimit, async (req, res) => {
-  const query = req.query.q as string;
-  if (!query) return res.status(400).json({ error: 'Missing query' });
+  const query = req.query.q;
+  if (typeof query !== 'string' || !query) return res.status(400).json({ error: 'Missing query' });
 
   const trimmedQuery = query.trim();
   if (trimmedQuery.length < 2 || trimmedQuery.length > 500) {
@@ -262,7 +266,7 @@ app.get('/api/search', requireFirebaseAuth, privateRateLimit, async (req, res) =
 
   try {
     // Try to get from cache
-    const cached = await redis.get(cacheKey);
+    const cached = await optionalCache(redis).get(cacheKey);
     if (cached) {
       console.log(`[SearchCache] Hit for: ${trimmedQuery}`);
       return res.json(cached);
@@ -368,7 +372,7 @@ app.get('/api/search', requireFirebaseAuth, privateRateLimit, async (req, res) =
 
       // Cache the result for 24 hours
       if (searchResult && searchResult.loadType !== 'error' && searchResult.loadType !== 'empty') {
-        await redis.set(cacheKey, searchResult, { ex: 86400 });
+        await optionalCache(redis).set(cacheKey, searchResult, { ex: 86400 });
       }
 
       return searchResult;
@@ -385,102 +389,11 @@ app.get('/api/search', requireFirebaseAuth, privateRateLimit, async (req, res) =
   }
 });
 
-app.get(
-  '/api/recommendations',
-  requireFirebaseAuth,
-  privateRateLimit,
-  async (req, res) => {
-    const { videoId, spotifyId, query, trackId } = req.query as {
-      videoId?: string;
-      spotifyId?: string;
-      query?: string;
-      trackId?: string;
-    };
-
-    // Determine seed criteria. Prioritize Spotify for recommendations if available and valid (length 22).
-    const isSpotifyId = (id?: string) => typeof id === 'string' && id.length === 22;
-    const isVideoId = (id?: string) => typeof id === 'string' && id.length === 11;
-
-    const effectiveSpotifyId = isSpotifyId(spotifyId)
-      ? spotifyId
-      : (isSpotifyId(trackId) ? trackId : undefined);
-
-    const effectiveVideoId = isVideoId(videoId)
-      ? videoId
-      : (isVideoId(spotifyId)
-        ? spotifyId
-        : (isVideoId(trackId) ? trackId : undefined));
-
-    const effectiveQuery = query || trackId;
-
-    if (!effectiveSpotifyId && !effectiveVideoId && !effectiveQuery) {
-      return res.status(400).json({ error: 'Missing seed identifier' });
-    }
-
-    // NodeLink sprec: hits Spotify recommendations, ytrec: hits YouTube recommendations
-    const identifier = effectiveSpotifyId
-      ? `sprec:${effectiveSpotifyId}`
-      : effectiveVideoId
-        ? `ytrec:${effectiveVideoId}`
-        : `ytrec:${effectiveQuery}`;
-
-    const recCacheKey = `recs:${identifier}`;
-
-    try {
-      // Check cache first
-      const cached = await redis.get(recCacheKey);
-      if (cached) {
-        return res.json(cached);
-      }
-
-      const node = lavalink.nodeManager.leastUsedNodes()[0];
-      if (!node)
-        return res.status(500).json({ error: 'No NodeLink nodes available' });
-
-      const result = await node.search(
-        { query: identifier },
-        { id: req.user?.uid || 'MelofyAutoplay' },
-      );
-
-      if (result.loadType === 'empty' || result.loadType === 'error') {
-        return res.json({ tracks: [] });
-      }
-
-      const rawTracks = (result as any).tracks || (result as any).data || [];
-      const tracks = rawTracks.map((track: any) => ({
-        encoded: track.encoded,
-        id: track.info.identifier,
-        title: track.info.title,
-        artist: track.info.author,
-        duration: track.info.length,
-        artwork: track.info.artworkUrl,
-        uri: track.info.uri,
-        isrc: track.info.isrc,
-        source: track.info.sourceName,
-      }));
-
-      // Filter out the seed track to ensure autoplay moves forward
-      const filtered = tracks.filter(
-        (t: any) =>
-          t.id !== effectiveVideoId &&
-          t.id !== effectiveSpotifyId &&
-          t.title.toLowerCase() !== effectiveQuery?.toLowerCase(),
-      );
-
-      const response = { tracks: filtered.length > 0 ? filtered : tracks };
-
-      // Cache recommendations for 6 hours
-      if (response.tracks.length > 0) {
-        await redis.set(recCacheKey, response, { ex: 21600 });
-      }
-
-      res.json(response);
-    } catch (error: any) {
-      console.error('Recommendations error:', error);
-      res.status(500).json({ error: 'Failed to fetch recommendations' });
-    }
-  },
-);
+app.use('/api', requireFirebaseAuth, privateRateLimit, createDiscoveryRouter({
+  cache: optionalCache(redis),
+  listenBrainz: process.env.LISTENBRAINZ_ENABLED !== 'false',
+  load: nodeLinkDiscoveryLoader(() => lavalink.nodeManager.leastUsedNodes().find(node => node.connected)),
+}));
 
 io.use(async (socket, next) => {
   const token = socket.handshake.auth?.token as string | undefined;

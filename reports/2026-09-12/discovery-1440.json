@@ -1,0 +1,13 @@
+{
+  "errors": [],
+  "failedRequests": [],
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "mockedBoundaries": [
+    "Firebase auth/storage",
+    "discovery HTTP data",
+    "navigation"
+  ]
+}

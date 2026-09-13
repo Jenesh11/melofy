@@ -1,0 +1,42 @@
+{
+  "sourceCommit": "eb9e918",
+  "kind": "offline-source-functions-with-mocks",
+  "results": [
+    {
+      "name": "Installed client sends ytmsearch:ytrec: instead of the YouTube radio prefix",
+      "reproduced": true
+    },
+    {
+      "name": "Spotify seed wins over valid YouTube ID; empty result has no fallback",
+      "reproduced": true
+    },
+    {
+      "name": "Cache read failure prevents recommendation provider from running",
+      "reproduced": true
+    },
+    {
+      "name": "Cache write failure discards successful recommendation results",
+      "reproduced": true
+    },
+    {
+      "name": "Seed-only provider response puts the seed back into recommendations",
+      "reproduced": true
+    },
+    {
+      "name": "Delayed autoplay overwrites manual selection and clears its queue",
+      "reproduced": true
+    },
+    {
+      "name": "Dashboard marks all HTTP 500 responses as fetched",
+      "reproduced": true
+    },
+    {
+      "name": "Client-normalized track duration is lost by the recommendations route",
+      "reproduced": true
+    },
+    {
+      "name": "Native playback at 90 seconds is persisted as zero from the unused HTML audio element",
+      "reproduced": true
+    }
+  ]
+}

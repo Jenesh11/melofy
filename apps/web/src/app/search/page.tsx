@@ -1,4 +1,5 @@
 'use client';
+import type { SearchTrack } from '@/lib/track-types';
 
 import { useState, useEffect } from 'react';
 import { Search as SearchIcon, Loader2, X, Clock } from 'lucide-react';
@@ -70,7 +71,8 @@ export default function SearchPage() {
     const savedHistory = localStorage.getItem('melofy_search_history');
     if (savedHistory) {
       try {
-        setSearchHistory(JSON.parse(savedHistory));
+        const parsed = JSON.parse(savedHistory);
+        queueMicrotask(() => setSearchHistory(parsed));
       } catch (e) {
         console.error('Failed to parse search history', e);
       }
@@ -131,18 +133,8 @@ export default function SearchPage() {
 
         let ytData: {
           loadType?: string;
-          tracks?: Array<{
-            encoded: string;
-            info?: {
-              identifier?: string;
-              title?: string;
-              author?: string;
-              artworkUrl?: string;
-              duration?: number;
-              length?: number;
-              sourceName?: string;
-            };
-          }>;
+          tracks?: SearchTrack[];
+          data?: SearchTrack[];
           playlistInfo?: { name?: string };
         } | null = null;
         if (ytRes.status === 'fulfilled' && ytRes.value.ok) {
@@ -163,9 +155,9 @@ export default function SearchPage() {
         }
 
         if (ytData) {
-          const rawTracks = ytData.tracks || (ytData as any).data || [];
+          const rawTracks = ytData.tracks || ytData.data || [];
           if (ytData.loadType === 'playlist' && rawTracks.length > 0) {
-            const mapped: TrackItem[] = rawTracks.map((track: any) => ({
+            const mapped: TrackItem[] = rawTracks.map((track: SearchTrack) => ({
               id: track.info?.identifier || 'unknown',
               identifier: track.info?.identifier || 'unknown',
               title: track.info?.title || 'Unknown Title',
@@ -190,7 +182,7 @@ export default function SearchPage() {
           } else if (rawTracks.length > 0) {
             const mapped: TrackItem[] = rawTracks
               .filter(Boolean)
-              .map((track: any) => {
+              .map((track: SearchTrack) => {
                 const identifier = track.info?.identifier;
                 return {
                   id: identifier || 'unknown',

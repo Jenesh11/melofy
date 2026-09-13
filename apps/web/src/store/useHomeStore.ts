@@ -21,6 +21,13 @@ export interface SpotifyCollectionSummary {
 }
 
 interface HomeStore {
+  genre: string;
+  language: string;
+  setGenre: (genre: string) => void;
+  setLanguage: (language: string) => void;
+  userId: string | null;
+  unavailable: string[];
+  resetForUser: (userId: string | null) => void;
   trending: SpotifyTrendingItem[];
   newReleases: SpotifyCollectionSummary[];
   recommendations: SpotifyTrackLike[];
@@ -41,6 +48,13 @@ interface HomeStore {
 }
 
 export const useHomeStore = create<HomeStore>((set) => ({
+  genre: 'pop',
+  language: 'all',
+  setGenre: (genre) => set({ genre }),
+  setLanguage: (language) => set({ language }),
+  userId: null,
+  unavailable: [],
+  resetForUser: (userId) => set({ userId, genre: 'pop', language: 'all', trending: [], newReleases: [], recommendations: [], mixes: [], editorsPicks: [], discoveryMixes: [], featuredPlaylists: [], hasFetched: false, unavailable: [] }),
   trending: [],
   newReleases: [],
   recommendations: [],

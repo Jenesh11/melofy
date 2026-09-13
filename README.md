@@ -212,3 +212,10 @@ npm run dev
   <p>Built with 💖 and ☕ by <b><a href="https://github.com/Jenesh11">Jenesh11</a></b></p>
   <p><i>© 2026 Melofy. Licensed under the MIT License.</i></p>
 </div>
+
+
+## Spotify-free recommendations
+
+Home discovery and autoplay use NodeLink YouTube radio/search, optional public ListenBrainz similarity, and Melofy's history/likes ranking. Spotify credentials are only needed for the retained optional Spotify import/search integration.
+
+See [recommendation setup and behavior](docs/recommendations.md) for configuration, API routes, fallback behavior and regression commands. Run `npm run test --workspace api` for backend tests and `npm run test:browser` for the Chrome regression suite.

@@ -43,6 +43,7 @@ const nextConfig: NextConfig = {
         source: '/api/socket.io/:path*',
         destination: `${backendBaseUrl}/api/socket.io/:path*`,
       },
+      { source: '/api/discovery/:path*', destination: `${backendBaseUrl}/api/discovery/:path*` },
       {
         source: '/api/spotify/:path*',
         destination: `${backendBaseUrl}/api/spotify/:path*`,

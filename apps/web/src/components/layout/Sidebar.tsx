@@ -37,7 +37,6 @@ import {
   collection,
   query,
   where,
-  orderBy,
   onSnapshot,
 } from 'firebase/firestore';
 
@@ -45,7 +44,8 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
   const likedPlaylistId = useLikedStore((state) => state.likedPlaylistId);
-  const [firebasePlaylists, setFirebasePlaylists] = useState<Playlist[]>([]);
+  const [playlistSnapshot, setPlaylistSnapshot] = useState<{ uid: string; playlists: Playlist[] } | null>(null);
+  const firebasePlaylists = useMemo(() => playlistSnapshot?.uid === user?.uid ? playlistSnapshot?.playlists || [] : [], [playlistSnapshot, user?.uid]);
   const savedPlaylists = useLibraryStore((state) => state.savedPlaylists);
   const removePlaylist = useLibraryStore((state) => state.removePlaylist);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -54,10 +54,7 @@ export function Sidebar() {
   const { isCollapsed, toggle: toggleSidebar } = useSidebarStore();
 
   useEffect(() => {
-    if (!user) {
-      setFirebasePlaylists([]);
-      return;
-    }
+    if (!user) return;
 
     const q = query(
       collection(db, 'playlists'),
@@ -76,11 +73,11 @@ export function Sidebar() {
               }) as Playlist,
           )
           .sort((a, b) => {
-            const timeA = (a.createdAt as any)?.seconds || 0;
-            const timeB = (b.createdAt as any)?.seconds || 0;
+            const timeA = (a.createdAt && 'seconds' in a.createdAt ? a.createdAt.seconds : 0);
+            const timeB = (b.createdAt && 'seconds' in b.createdAt ? b.createdAt.seconds : 0);
             return timeB - timeA;
           });
-        setFirebasePlaylists(fetchedPlaylists);
+        setPlaylistSnapshot({ uid: user.uid, playlists: fetchedPlaylists });
       },
       (error) => {
         console.error('Error listening to playlists:', error);

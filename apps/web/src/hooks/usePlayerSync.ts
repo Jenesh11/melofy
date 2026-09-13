@@ -28,7 +28,8 @@ export function usePlayerSync(
   setLocalTime: (time: number) => void
 ) {
   const { user } = useAuth();
-  const [isHydrated, setIsHydrated] = useState(false);
+  const [hydratedUid, setHydratedUid] = useState<string | null>(null);
+  const isHydrated = !!user && hydratedUid === user.uid;
   const stateSyncTimer = useRef<NodeJS.Timeout | null>(null);
   const recentPlaylists = useLibraryStore((state) => state.recentPlaylists);
 
@@ -64,80 +65,62 @@ export function usePlayerSync(
     return { Authorization: `Bearer ${token}` };
   }, [user]);
 
-  // Tracks user to handle resets correctly
   const lastUidRef = useRef(user?.uid);
-  if (lastUidRef.current !== user?.uid) {
-    lastUidRef.current = user?.uid;
-    resetStore();
-    // Setting state during render is specifically allowed for 'reset' logic
-    setIsHydrated(false);
-  }
-
-  // Hydration
   useEffect(() => {
-    if (!user?.uid) return;
-
-    // Skip database hydration if an active party session is already loaded in-memory (e.g. joined a session or started hosting)
-    const { partyId } = usePlayerStore.getState();
-    if (partyId) {
-      console.log(`[PlayerSync] Active party session detected (${partyId}). Skipping database hydration to prevent state override.`);
-      setTimeout(() => setIsHydrated(true), 0);
-      return;
+    if (lastUidRef.current !== user?.uid) {
+      lastUidRef.current = user?.uid;
+      resetStore();
+      useLibraryStore.setState({ recentPlaylists: [] });
     }
-
-    getAuthHeader()
-      .then((headers) => {
-        if (!headers) {
-          setIsHydrated(true);
-          return null;
+    if (!user) return;
+    const uid = user.uid;
+    const controller = new AbortController();
+    const initialRevision = usePlayerStore.getState().playbackRevision;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let attempt = 0;
+    async function hydrate() {
+      let deadline: ReturnType<typeof setTimeout> | undefined;
+      const requestController = new AbortController();
+      const abort = () => requestController.abort();
+      controller.signal.addEventListener('abort', abort, { once: true });
+      try {
+        const headers = await getAuthHeader();
+        if (!headers || controller.signal.aborted) return;
+        if (usePlayerStore.getState().partyId) { setHydratedUid(uid); return; }
+        deadline = setTimeout(abort, 10000);
+        const response = await fetch('/api/player-state', { headers, signal: requestController.signal });
+        if (!response.ok) throw new Error('State fetch failed');
+        const data = await response.json();
+        if (controller.signal.aborted) return;
+        const state: PersistedPlayerState | null = typeof data.state === 'string' ? JSON.parse(data.state) : data.state;
+        const live = usePlayerStore.getState();
+        // Never replace a new local selection or a party joined while loading.
+        if (state && !live.partyId && live.playbackRevision === initialRevision) {
+          hydrateState({
+            ...state, queue: Array.isArray(state.queue) ? state.queue : [],
+            history: Array.isArray(state.history) ? state.history : [],
+            isShuffle: !!state.isShuffle, isRepeat: !!state.isRepeat,
+            volume: state.volume ?? (Capacitor.isNativePlatform() ? 1 : 0.8),
+          });
+          if (Array.isArray(state.recentPlaylists)) useLibraryStore.setState({ recentPlaylists: state.recentPlaylists });
+          const time = typeof state.currentTime === 'number' && Number.isFinite(state.currentTime) ? Math.max(0, state.currentTime) : 0;
+          setLocalTime(time);
+          if (!Capacitor.isNativePlatform() && audioRef.current) audioRef.current.currentTime = time;
         }
-        return fetch('/api/player-state', { headers });
-      })
-      .then((res) => {
-        if (res === null) return;
-        if (!res.ok) throw new Error('Failed to fetch player state');
-        return res.json();
-      })
-      .then((data) => {
-        if (!data?.state) {
-          setIsHydrated(true);
-          return;
+        setHydratedUid(uid);
+      } catch {
+        if (!controller.signal.aborted) {
+          // Keep saves disabled until the read succeeds; never overwrite saved state with defaults.
+          timer = setTimeout(() => { void hydrate(); }, Math.min(30000, 1000 * 2 ** Math.min(attempt++, 5)));
         }
-
-        let state: PersistedPlayerState = data.state;
-        if (typeof state === 'string') {
-          try {
-            state = JSON.parse(state) as PersistedPlayerState;
-          } catch {
-            console.error('[PlayerState] Failed to parse state string');
-            return;
-          }
-        }
-
-        hydrateState({
-          ...state,
-          queue: state.queue || [],
-          history: state.history || [],
-          isShuffle: state.isShuffle || false,
-          isRepeat: state.isRepeat || false,
-          volume: state.volume ?? (Capacitor.isNativePlatform() ? 1 : 0.8),
-        });
-
-        if (state.recentPlaylists) {
-          useLibraryStore.setState({ recentPlaylists: state.recentPlaylists });
-        }
-
-        if (audioRef.current && state.currentTime) {
-          audioRef.current.currentTime = state.currentTime;
-          setLocalTime(state.currentTime);
-        }
-
-        setIsHydrated(true);
-      })
-      .catch((err) => {
-        console.error('[PlayerState] Hydration failed:', err);
-      });
-  }, [user?.uid, getAuthHeader, hydrateState, setLocalTime, audioRef]);
+      } finally {
+        if (deadline) clearTimeout(deadline);
+        controller.signal.removeEventListener('abort', abort);
+      }
+    }
+    void hydrate();
+    return () => { controller.abort(); if (timer) clearTimeout(timer); setHydratedUid(null); };
+  }, [user, getAuthHeader, hydrateState, resetStore, setLocalTime, audioRef]);
 
   const syncStateToServer = useCallback(async () => {
     if (!user?.uid || !isHydrated) return;
@@ -150,7 +133,7 @@ export function usePlayerSync(
       isShuffle,
       isRepeat,
       volume,
-      currentTime: audioRef.current?.currentTime || 0,
+      currentTime: Capacitor.isNativePlatform() ? usePlayerStore.getState().progress / 1000 : audioRef.current?.currentTime || 0,
       activePlaylistContext,
       activeCollectionId,
       activeCollectionType,
@@ -164,7 +147,7 @@ export function usePlayerSync(
       const authHeaders = await getAuthHeader();
       if (!authHeaders) return;
 
-      await fetch('/api/player-state', {
+      const response = await fetch('/api/player-state', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -172,6 +155,7 @@ export function usePlayerSync(
         },
         body: JSON.stringify({ state: stateToSave }),
       });
+      if (!response.ok) throw new Error('State save failed');
     } catch (error) {
       console.error('[PlayerState] Sync failed:', error);
     }

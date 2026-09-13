@@ -1,3 +1,4 @@
+import { libraryTrackId } from '@/lib/library-tracks';
 /* eslint-disable @next/next/no-img-element */
 import { useCallback } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
@@ -21,8 +22,8 @@ export function mapPlayerTrackToFirebaseTrack(track: PlayerTrack): FirebaseTrack
       author: track.artist,
       duration: track.duration,
       artworkUrl: track.artworkUrl,
-      uri: `spotify:track:${track.id}`, // Fallback
-      sourceName: 'spotify',
+      uri: track.uri || (/^[\w-]{11}$/.test(track.identifier || track.id) ? 'https://www.youtube.com/watch?v=' + (track.identifier || track.id) : `spotify:track:${track.id}`),
+      sourceName: track.source || (/^[\w-]{11}$/.test(track.identifier || track.id) ? 'youtube' : 'spotify'),
       isSeekable: true,
       isStream: false,
     }
@@ -41,7 +42,7 @@ export function useLikedSongs() {
   } = useLikedStore();
 
   const isLiked = useCallback((trackId: string) => {
-    return likedTracks.some(t => (t.info?.identifier || (t as any).id || (t as any).identifier) === trackId);
+    return likedTracks.some(t => libraryTrackId(t) === trackId);
   }, [likedTracks]);
 
   const toggleLike = useCallback(async (track: PlayerTrack) => {
@@ -50,6 +51,8 @@ export function useLikedSongs() {
       return;
     }
 
+    const ownsAccount = () => useLikedStore.getState().userId === user.uid;
+    if (!ownsAccount()) return;
     try {
       const currentlyLiked = isLiked(track.id);
       const firebaseTrack = mapPlayerTrackToFirebaseTrack(track);
@@ -65,6 +68,7 @@ export function useLikedSongs() {
             where('userId', '==', user.uid)
           );
           const snap = await getDocs(q);
+          if (!ownsAccount()) return;
           const existing = snap.docs.find(d => {
             const data = d.data();
             return data.isLikedSongs === true || data.name === LIKED_SONGS_PLAYLIST_NAME;
@@ -77,7 +81,7 @@ export function useLikedSongs() {
 
         if (targetPlaylistId) {
           const docRef = doc(db, 'playlists', targetPlaylistId);
-          const trackToRemove = likedTracks.find(t => (t.info?.identifier || (t as any).id || (t as any).identifier) === track.id);
+          const trackToRemove = likedTracks.find(t => libraryTrackId(t) === track.id);
           if (trackToRemove) {
             await updateDoc(docRef, {
               tracks: arrayRemove(trackToRemove),
@@ -111,6 +115,7 @@ export function useLikedSongs() {
             where('userId', '==', user.uid)
           );
           const snap = await getDocs(q);
+          if (!ownsAccount()) return;
           const existing = snap.docs.find(d => {
             const data = d.data();
             return data.isLikedSongs === true || data.name === LIKED_SONGS_PLAYLIST_NAME;
@@ -136,6 +141,7 @@ export function useLikedSongs() {
             tracks: [firebaseTrack],
             isLikedSongs: true,
           });
+          if (!ownsAccount()) return;
           setLikedPlaylistId(res.id);
         }
         toast('Added to Liked Songs', {
@@ -155,6 +161,7 @@ export function useLikedSongs() {
         });
       }
     } catch (error) {
+      if (!ownsAccount()) return;
       console.error('[useLikedSongs] Error toggling like:', error);
       toast.error('Failed to update Liked Songs. Your changes might not be saved.');
     }

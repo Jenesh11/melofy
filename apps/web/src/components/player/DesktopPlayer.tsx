@@ -89,12 +89,10 @@ export function DesktopPlayer({
   const [pipAvailable, setPipAvailable] = useState(false);
   const [direction, setDirection] = useState(1); // 1 = next, -1 = prev
   const [isMobile, setIsMobile] = useState(false);
-  const [imageError, setImageError] = useState(false);
+  const [failedArtwork, setFailedArtwork] = useState<string | null>(null);
+  const imageError = failedArtwork === currentTrack?.artworkUrl;
   const router = useRouter();
 
-  useEffect(() => {
-    setImageError(false);
-  }, [currentTrack.id, currentTrack.artworkUrl]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -189,7 +187,7 @@ export function DesktopPlayer({
                     width={56}
                     height={56}
                     className='h-full w-full object-cover group-hover/info:scale-105 transition-transform duration-500'
-                    onError={() => setImageError(true)}
+                    onError={() => setFailedArtwork(currentTrack.artworkUrl)}
                     unoptimized
                   />
                 ) : (

@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { Play, Music2, Loader2, ChevronLeft, Heart, Check } from 'lucide-react';
+import { Play, Music2, ChevronLeft, Heart, Check } from 'lucide-react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
-import { getPlaylistById } from '@/lib/firebase/playlists';
+import { normalizeToFirebaseTrack } from '@/lib/library-tracks';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,8 @@ interface CustomPlaylistTrack {
     author: string;
     artworkUrl?: string;
     duration: number;
+    sourceName?: string;
+    uri?: string;
   };
   encoded?: string;
 }
@@ -67,6 +69,11 @@ export default function PlaylistPage() {
 
   const [playlist, setPlaylist] = useState<PlaylistData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [prevId, setPrevId] = useState(id);
+  if (prevId !== id) {
+    setPrevId(id);
+    setIsLoading(true);
+  }
   const [isSpotifySource, setIsSpotifySource] = useState(false);
   const [isYoutubeSource, setIsYoutubeSource] = useState(false);
 
@@ -78,13 +85,31 @@ export default function PlaylistPage() {
   useEffect(() => {
     if (!id) return;
 
-    setIsLoading(true);
     let cancelled = false;
     let unsubFirestore: (() => void) | undefined;
 
     async function fetchExternal(targetId: string) {
       if (cancelled) return;
 
+      if (targetId.startsWith('mix:')) {
+        try {
+          const headers = await getFirebaseAuthHeaders(user);
+          const response = await fetch('/api/discovery/mixes/' + encodeURIComponent(targetId), { headers });
+          if (!response.ok) throw new Error('Mix unavailable');
+          const mix = await response.json();
+          if (cancelled) return;
+          setPlaylist({ ...mix, artworkUrl: mix.images?.[0]?.url, trackCount: mix.tracks.total,
+            tracks: mix.tracks.items.map((track: SpotifyTrackLike) => ({
+              encoded: track.encoded || '',
+              info: { identifier: track.id || '', title: track.name || '', author: track.artists?.map(a => a.name).join(', ') || '',
+                duration: track.duration_ms || 0, artworkUrl: track.album?.images?.[0]?.url || '', sourceName: track.source, uri: track.uri }
+            })) });
+          setIsSpotifySource(false);
+          setIsYoutubeSource(false);
+        } catch { if (!cancelled) setPlaylist(null); }
+        finally { if (!cancelled) setIsLoading(false); }
+        return;
+      }
       // Handle YouTube fallback
       if (targetId.startsWith('youtube:')) {
         const ytId = targetId.replace('youtube:', '');
@@ -101,16 +126,7 @@ export default function PlaylistPage() {
               const mapped: CustomPlaylistData = {
                 name: ytData.playlistInfo?.name || 'YouTube Playlist',
                 artworkUrl: ytData.tracks?.[0]?.info?.artworkUrl || `https://img.youtube.com/vi/${ytData.tracks?.[0]?.info?.identifier}/mqdefault.jpg`,
-                tracks: ytData.tracks.map((t: any) => ({
-                  info: {
-                    identifier: t.info?.identifier || t.id,
-                    title: t.info?.title || t.title,
-                    author: t.info?.author || t.author || t.artist,
-                    artworkUrl: t.info?.artworkUrl || t.artworkUrl,
-                    duration: t.info?.duration || t.duration || 0,
-                  },
-                  encoded: t.encoded || t.url || '',
-                }))
+                tracks: ytData.tracks.map(normalizeToFirebaseTrack)
               };
               setPlaylist(mapped);
               setIsYoutubeSource(true);
@@ -150,6 +166,11 @@ export default function PlaylistPage() {
       } finally {
         if (!cancelled) setIsLoading(false);
       }
+    }
+
+    if (id.startsWith('mix:')) {
+      void fetchExternal(id);
+      return () => { cancelled = true; };
     }
 
     // Try listening to Firebase Firestore document in real-time
@@ -196,27 +217,18 @@ export default function PlaylistPage() {
       });
     }
 
-    const customTracks = playlist.tracks as Array<any>;
-    return customTracks.map((track) => {
-      const info = track.info || track;
-      const identifier = info.identifier || info.id || track.identifier || track.id || 'unknown';
-      const title = info.title || track.title || 'Unknown Title';
-      const artist = info.author || info.artist || track.author || track.artist || 'Unknown Artist';
-      const artworkUrl = info.artworkUrl || track.artworkUrl || playlist.artworkUrl || '';
-      const duration = info.duration || info.length || track.duration || 0;
-      const encoded = track.encoded || track.url || '';
-
-      return {
-        id: identifier,
-        identifier,
-        title,
-        artist,
-        artworkUrl,
-        duration,
-        album: artist,
-        encoded,
-      };
-    });
+    return playlist.tracks.map(normalizeToFirebaseTrack).map(track => ({
+      id: track.info.identifier,
+      identifier: track.info.identifier,
+      title: track.info.title,
+      artist: track.info.author,
+      artworkUrl: track.info.artworkUrl || playlist.artworkUrl || '',
+      duration: track.info.duration,
+      album: track.info.author,
+      encoded: track.encoded,
+      source: track.info.sourceName,
+      uri: track.info.uri,
+    }));
   }, [isSpotifySource, playlist]);
 
   const totalDurationMs = useMemo(() => {

@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { libraryToTrack } from '@/lib/discovery';
+import { normalizeToFirebaseTrack } from '@/lib/library-tracks';
+import { useState, useEffect, useRef } from 'react';
 import { usePlayerStore, type Track } from '@/store/usePlayerStore';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/firebase/auth-context';
@@ -7,7 +9,7 @@ import {
   mapSpotifyTrackToPlayerTrack,
   type SpotifyTrackLike,
 } from '@/lib/track-mappers';
-import { addPlaylist, getPlaylistById } from '@/lib/firebase/playlists';
+import { addPlaylist, getPlaylistById, type Playlist } from '@/lib/firebase/playlists';
 import { useLibraryStore } from '@/store/useLibraryStore';
 
 interface SpotifyCollection {
@@ -27,19 +29,30 @@ export function useSpotifyCollection() {
   const [isPlayingCollection, setIsPlayingCollection] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const { user } = useAuth();
+  const requestRevision = useRef(0);
+  useEffect(() => () => { requestRevision.current++; }, [user]);
 
   const handlePlayCollection = async (collection: SpotifyCollection) => {
+    const request = ++requestRevision.current;
+    const playbackRevision = usePlayerStore.getState().playbackRevision;
     try {
       setIsPlayingCollection(true);
       if (!user) throw new Error('User is not authenticated');
 
       const colType = collection.type || 'spotify';
       let tracks: Track[] = [];
-      let dbPlaylist: any = null;
+      let dbPlaylist: Playlist | null = null;
 
-      const isSpotify = colType === 'spotify' || colType === 'playlist' || colType === 'album';
+      const isMix = collection.id.startsWith('mix:');
+      const isSpotify = !isMix && (colType === 'spotify' || colType === 'playlist' || colType === 'album');
 
-      if (isSpotify) {
+      if (isMix) {
+        const headers = await getFirebaseAuthHeaders(user);
+        const response = await fetch('/api/discovery/mixes/' + encodeURIComponent(collection.id), { headers });
+        if (!response.ok) throw new Error('Mix unavailable');
+        const mix = await response.json();
+        tracks = (mix.tracks?.items || []).map(mapSpotifyTrackToPlayerTrack);
+      } else if (isSpotify) {
         const isAlbum = colType === 'album';
         const endpoint = isAlbum
           ? `/api/spotify/albums/${collection.id}/tracks`
@@ -77,33 +90,18 @@ export function useSpotifyCollection() {
         if (res.ok) {
           const ytData = await res.json();
           if (ytData.loadType === 'playlist' && ytData.tracks) {
-            tracks = ytData.tracks.map((t: any) => ({
-              id: t.info.identifier,
-              identifier: t.info.identifier,
-              title: t.info.title,
-              artist: t.info.author,
-              artworkUrl: t.info.artworkUrl || `https://img.youtube.com/vi/${t.info.identifier}/mqdefault.jpg`,
-              duration: t.info.duration || t.info.length || 0,
-              url: t.encoded || '',
-            }));
+            tracks = ytData.tracks.map(normalizeToFirebaseTrack).map(libraryToTrack);
           }
         }
       } else {
         // Custom/Firebase playlist
         dbPlaylist = await getPlaylistById(collection.id);
         if (dbPlaylist && dbPlaylist.tracks) {
-          tracks = dbPlaylist.tracks.map((track: any) => ({
-            id: track.info.identifier,
-            identifier: track.info.identifier,
-            title: track.info.title,
-            artist: track.info.author,
-            artworkUrl: track.info.artworkUrl || '',
-            duration: track.info.duration,
-            url: track.encoded || '',
-          }));
+          tracks = dbPlaylist.tracks.map(libraryToTrack);
         }
       }
 
+      if (request !== requestRevision.current || playbackRevision !== usePlayerStore.getState().playbackRevision) return;
       if (tracks.length > 0) {
         const playSource = isSpotify ? 'spotify' : colType === 'youtube' ? 'youtube' : 'custom';
         playPlaylist(tracks, collection.id, playSource);
@@ -126,7 +124,7 @@ export function useSpotifyCollection() {
       console.error('Failed to play collection:', error);
       toast.error('Failed to play this collection');
     } finally {
-      setIsPlayingCollection(false);
+      if (request === requestRevision.current) setIsPlayingCollection(false);
     }
   };
 
@@ -141,24 +139,27 @@ export function useSpotifyCollection() {
     const toastId = toast.loading(`Importing ${playlistName}...`);
     try {
       const authHeaders = await getFirebaseAuthHeaders(user);
-      const res = await fetch(`/api/spotify/playlists/${playlist.id}`, {
+      const isMix = playlist.id.startsWith('mix:');
+      const endpoint = isMix ? '/api/discovery/mixes/' + encodeURIComponent(playlist.id) : '/api/spotify/playlists/' + playlist.id;
+      const res = await fetch(endpoint, {
         headers: authHeaders,
       });
 
       if (!res.ok) throw new Error('Failed to fetch playlist details');
 
-      const fullData = await res.json();
-      const tracksForDb = (fullData.tracks || []).map((t: any) => ({
-        encoded: '', // Will be resolved on playback
+      const responseData = await res.json();
+      const fullData = isMix ? { ...responseData, tracks: responseData.tracks.items, trackCount: responseData.tracks.total, artworkUrl: responseData.images?.[0]?.url } : responseData;
+      const tracksForDb = (fullData.tracks || []).map((t: SpotifyTrackLike & { external_ids?: { isrc?: string } }) => ({
+        encoded: t.encoded || '', // Spotify metadata still resolves on playback
         info: {
           identifier: t.id,
           title: t.name,
           author:
-            t.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist',
+            t.artists?.map((a) => a.name).join(', ') || 'Unknown Artist',
           duration: t.duration_ms || 0,
           artworkUrl: t.album?.images?.[0]?.url || '',
-          uri: `https://open.spotify.com/track/${t.id}`,
-          sourceName: 'spotify',
+          uri: t.uri || `https://open.spotify.com/track/${t.id}`,
+          sourceName: t.source || 'spotify',
           isSeekable: true,
           isStream: false,
           isrc: t.external_ids?.isrc || null,

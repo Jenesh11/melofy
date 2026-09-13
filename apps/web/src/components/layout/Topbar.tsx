@@ -59,7 +59,7 @@ export function Topbar() {
   useEffect(() => {
     if (authLoading) return;
     if (!debouncedQuery.trim()) {
-      setResults([]);
+      queueMicrotask(() => setResults([]));
       return;
     }
     const fetchResults = async () => {

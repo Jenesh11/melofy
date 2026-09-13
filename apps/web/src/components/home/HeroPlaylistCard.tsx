@@ -139,6 +139,7 @@ export function HeroPlaylistCard({
             <div className='relative shrink-0'>
               <Button
                 size='icon'
+                aria-label={`Play ${playlist.name || 'mix'}`}
                 className='h-8 w-8 md:h-11 md:w-11 rounded-full bg-primary text-primary-foreground shadow-xl scale-95 group-hover:scale-105 active:scale-95 transition-all duration-300 border-none relative z-10'
                 onClick={(e) => {
                   e.preventDefault();

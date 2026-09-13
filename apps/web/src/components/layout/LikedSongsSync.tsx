@@ -1,72 +1,30 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { db } from '@/lib/firebase/config';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Playlist, Track as FirebaseTrack } from '@/lib/firebase/playlists';
+import { Playlist } from '@/lib/firebase/playlists';
 import { useLikedStore } from '@/store/useLikedStore';
 
 const LIKED_SONGS_PLAYLIST_NAME = 'Liked Songs';
 
-export function normalizeToFirebaseTrack(track: any): FirebaseTrack {
-  if (track.info && typeof track.info === 'object') {
-    return {
-      encoded: track.encoded || track.url || '',
-      info: {
-        identifier: track.info.identifier || track.info.id || track.id || 'unknown',
-        title: track.info.title || track.title || 'Unknown Title',
-        author: track.info.author || track.info.artist || track.artist || track.author || 'Unknown Artist',
-        duration: track.info.duration || track.info.length || track.duration || 0,
-        artworkUrl: track.info.artworkUrl || track.artworkUrl || '',
-        uri: track.info.uri || `spotify:track:${track.info.identifier || track.id || 'track'}`,
-        sourceName: track.info.sourceName || 'spotify',
-        isSeekable: true,
-        isStream: false,
-      },
-    };
-  }
-
-  return {
-    encoded: track.encoded || track.url || '',
-    info: {
-      identifier: track.id || track.identifier || 'unknown',
-      title: track.title || 'Unknown Title',
-      author: track.artist || track.author || 'Unknown Artist',
-      duration: track.duration || track.length || 0,
-      artworkUrl: track.artworkUrl || '',
-      uri: `spotify:track:${track.id || track.identifier || 'track'}`,
-      sourceName: 'spotify',
-      isSeekable: true,
-      isStream: false,
-    },
-  };
-}
-
-export function deduplicateFirebaseTracks(tracks: any[]): FirebaseTrack[] {
-  const seen = new Set<string>();
-  const result: FirebaseTrack[] = [];
-  for (const raw of tracks) {
-    if (!raw) continue;
-    const normalized = normalizeToFirebaseTrack(raw);
-    const key = normalized.info.identifier || `${normalized.info.title}_${normalized.info.author}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(normalized);
-    }
-  }
-  return result;
-}
+export { normalizeToFirebaseTrack, deduplicateFirebaseTracks } from '@/lib/library-tracks';
+import { deduplicateFirebaseTracks } from '@/lib/library-tracks';
 
 export function LikedSongsSync() {
   const { user } = useAuth();
   const { setLikedTracks, setLikedPlaylistId, setIsLoading } = useLikedStore();
-  const isSyncing = useRef(false);
 
   useEffect(() => {
+    useLikedStore.getState().bindUser(user?.uid || null);
     if (!user) {
       return;
     }
+
+    let active = true;
+    let syncing = false;
+    const ownsAccount = () => active && useLikedStore.getState().userId === user.uid;
 
     // Listen to all playlists belonging to user in real time (single field query = instant)
     const q = query(
@@ -77,7 +35,8 @@ export function LikedSongsSync() {
     const unsubscribe = onSnapshot(
       q,
       async (snapshot) => {
-        if (isSyncing.current) return;
+        if (!ownsAccount()) return;
+        if (syncing) return;
 
         try {
           const likedDocs = snapshot.docs.filter((docSnap) => {
@@ -89,7 +48,7 @@ export function LikedSongsSync() {
             // Check if we have cached liked tracks in local store that need to be synced to Firestore
             const cachedLikedTracks = useLikedStore.getState().likedTracks;
             if (cachedLikedTracks && cachedLikedTracks.length > 0) {
-              isSyncing.current = true;
+              syncing = true;
               const newDocRef = await addDoc(collection(db, 'playlists'), {
                 userId: user.uid,
                 name: LIKED_SONGS_PLAYLIST_NAME,
@@ -98,8 +57,9 @@ export function LikedSongsSync() {
                 isLikedSongs: true,
                 createdAt: serverTimestamp(),
               });
+              if (!ownsAccount()) return;
               setLikedPlaylistId(newDocRef.id);
-              isSyncing.current = false;
+              syncing = false;
             }
             setIsLoading(false);
             return;
@@ -114,11 +74,11 @@ export function LikedSongsSync() {
 
           const masterDoc = likedDocs[0];
           const masterData = masterDoc.data() as Playlist;
-          let allTracks: any[] = [...(masterData.tracks || [])];
+          let allTracks: unknown[] = [...(masterData.tracks || [])];
 
           // If there are duplicate liked songs playlists, merge tracks and delete duplicates
           if (likedDocs.length > 1) {
-            isSyncing.current = true;
+            syncing = true;
             console.log(`[LikedSongsSync] Found ${likedDocs.length} Liked Songs playlists. Merging into master ${masterDoc.id}...`);
             for (let i = 1; i < likedDocs.length; i++) {
               const dupDoc = likedDocs[i];
@@ -126,8 +86,7 @@ export function LikedSongsSync() {
               if (dupData.tracks && Array.isArray(dupData.tracks)) {
                 allTracks.push(...dupData.tracks);
               }
-              // Delete duplicate playlist document from Firestore
-              deleteDoc(doc(db, 'playlists', dupDoc.id)).catch(console.error);
+
             }
 
             const mergedUnique = deduplicateFirebaseTracks(allTracks);
@@ -137,29 +96,36 @@ export function LikedSongsSync() {
               isLikedSongs: true,
               name: LIKED_SONGS_PLAYLIST_NAME,
             });
+            // Delete duplicates only after the complete merged master was saved.
+            if (!ownsAccount()) return;
+            await Promise.all(likedDocs.slice(1).map(duplicate => deleteDoc(doc(db, 'playlists', duplicate.id))));
             allTracks = mergedUnique;
-            isSyncing.current = false;
+            syncing = false;
           } else if (!masterData.isLikedSongs) {
             await updateDoc(doc(db, 'playlists', masterDoc.id), { isLikedSongs: true });
           }
 
+          if (!ownsAccount()) return;
           const normalizedMasterTracks = deduplicateFirebaseTracks(allTracks);
           setLikedPlaylistId(masterDoc.id);
           setLikedTracks(normalizedMasterTracks);
           setIsLoading(false);
         } catch (err) {
+          if (!ownsAccount()) return;
           console.error('[LikedSongsSync] Sync error:', err);
           setIsLoading(false);
-          isSyncing.current = false;
+          syncing = false;
         }
       },
       (error) => {
+        if (!ownsAccount()) return;
         console.error('[LikedSongsSync] Snapshot error:', error);
         setIsLoading(false);
       }
     );
 
     return () => {
+      active = false;
       unsubscribe();
     };
   }, [user, setLikedTracks, setLikedPlaylistId, setIsLoading]);

@@ -187,7 +187,9 @@ export default function SettingsPage() {
     }
 
     if (isTauriEnv || isCapacitorNative) {
-      void checkForUpdates();
+      queueMicrotask(() => {
+        void checkForUpdates();
+      });
     }
   }, [checkForUpdates]);
 

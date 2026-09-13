@@ -1,0 +1,97 @@
+{
+  "tests": [
+    {
+      "name": "Fresh autoplay starts a playable recommendation and sends metadata without audio payloads",
+      "passed": true
+    },
+    {
+      "name": "Delayed autoplay cannot overwrite play",
+      "passed": true
+    },
+    {
+      "name": "Delayed autoplay cannot overwrite queue",
+      "passed": true
+    },
+    {
+      "name": "Delayed autoplay cannot overwrite pause",
+      "passed": true
+    },
+    {
+      "name": "Delayed autoplay cannot overwrite party",
+      "passed": true
+    },
+    {
+      "name": "Delayed autoplay cannot overwrite account",
+      "passed": true
+    },
+    {
+      "name": "Seed-only and empty radio results stop cleanly without looping",
+      "passed": true
+    },
+    {
+      "name": "Cancelled track resolution can revisit the same song and preserve normalized duration",
+      "passed": true
+    },
+    {
+      "name": "Track resolution preserves the legacy flat-array response contract",
+      "passed": true
+    },
+    {
+      "name": "Home retains successful sections and retries a failed section",
+      "passed": true
+    },
+    {
+      "name": "Initial home network failure retries instead of permanently marking fetched",
+      "passed": true
+    },
+    {
+      "name": "Account switch clears personalized home/likes and ignores an older home response",
+      "passed": true
+    },
+    {
+      "name": "Home preferences feed both discovery and autoplay",
+      "passed": true
+    },
+    {
+      "name": "Hydration retries a failed read and uses native playback progress when saving",
+      "passed": true
+    },
+    {
+      "name": "Delayed hydration preserves a manual selection",
+      "passed": true
+    },
+    {
+      "name": "Hydration is disabled again after switching accounts",
+      "passed": true
+    },
+    {
+      "name": "Signing back into the same account waits for a new hydration read",
+      "passed": true
+    },
+    {
+      "name": "A delayed mix cannot replace a newer manual selection",
+      "passed": true
+    },
+    {
+      "name": "Generated mixes play, save their collection context and import without Spotify",
+      "passed": true
+    },
+    {
+      "name": "Existing playlist queue, previous, repeat, shuffle and locked party behavior remain intact",
+      "passed": true
+    },
+    {
+      "name": "Source and duration survive legacy library normalization and UI mapping",
+      "passed": true
+    },
+    {
+      "name": "Failed liked-song merge preserves duplicate documents instead of losing songs",
+      "passed": true
+    },
+    {
+      "name": "Delayed liked-song snapshot cannot update another account",
+      "passed": true
+    }
+  ],
+  "pageErrors": []
+}

@@ -130,9 +130,10 @@ export function useAudioPlayback(streamSrc?: string, options: AudioPlaybackOptio
       }
       return;
     }
+    const seed = usePlayerStore.getState().currentTrack;
     playNext();
-    if (!usePlayerStore.getState().isPlaying) {
-      await triggerAutoplay();
+    if (seed && !usePlayerStore.getState().isPlaying) {
+      await triggerAutoplay(seed);
     }
   }, [playNext, triggerAutoplay, isRepeat, canControlPlayback, socket]);
 
@@ -164,39 +165,6 @@ export function useAudioPlayback(streamSrc?: string, options: AudioPlaybackOptio
       return { track: q[idx], mode: 'queue' };
     }
     return null;
-  }, []);
-
-  // Apply the transition the native player already performed, WITHOUT
-  // re-triggering playback (the service is already playing the armed track).
-  const handleNativeAdvanced = useCallback((advancedId: string | null) => {
-    const state = usePlayerStore.getState();
-    if (state.partyId && !state.isPartyHost) return; // party listeners follow the host
-    const armed = armedNextRef.current;
-    armedNextRef.current = null;
-
-    if (!armed || (advancedId && armed.track.id !== advancedId)) {
-      // We don't know what was armed (renderer was killed before we re-armed).
-      // Fall back to reconciling from the native snapshot.
-      void reconcileWithNative();
-      return;
-    }
-
-    if (armed.mode === 'repeat') {
-      usePlayerStore.setState({ progress: 0, isPlaying: true });
-      return;
-    }
-
-    const { queue: q, currentTrack: cur, history } = usePlayerStore.getState();
-    const idx = q.findIndex((t) => t.id === armed.track.id);
-    const newQueue = idx >= 0 ? [...q.slice(0, idx), ...q.slice(idx + 1)] : q;
-    usePlayerStore.setState({
-      history: cur ? [...history, cur] : history,
-      currentTrack: armed.track,
-      queue: newQueue,
-      isPlaying: true,
-      progress: 0,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Reconcile the store with native state after the renderer was frozen/killed
@@ -235,6 +203,38 @@ export function useAudioPlayback(streamSrc?: string, options: AudioPlaybackOptio
       console.error('[useAudioPlayback] Native reconcile failed:', error);
     }
   }, []);
+
+  // Apply the transition the native player already performed, WITHOUT
+  // re-triggering playback (the service is already playing the armed track).
+  const handleNativeAdvanced = useCallback((advancedId: string | null) => {
+    const state = usePlayerStore.getState();
+    if (state.partyId && !state.isPartyHost) return; // party listeners follow the host
+    const armed = armedNextRef.current;
+    armedNextRef.current = null;
+
+    if (!armed || (advancedId && armed.track.id !== advancedId)) {
+      // We don't know what was armed (renderer was killed before we re-armed).
+      // Fall back to reconciling from the native snapshot.
+      void reconcileWithNative();
+      return;
+    }
+
+    if (armed.mode === 'repeat') {
+      usePlayerStore.setState({ progress: 0, isPlaying: true });
+      return;
+    }
+
+    const { queue: q, currentTrack: cur, history } = usePlayerStore.getState();
+    const idx = q.findIndex((t) => t.id === armed.track.id);
+    const newQueue = idx >= 0 ? [...q.slice(0, idx), ...q.slice(idx + 1)] : q;
+    usePlayerStore.setState({
+      history: cur ? [...history, cur] : history,
+      currentTrack: armed.track,
+      queue: newQueue,
+      isPlaying: true,
+      progress: 0,
+    });
+  }, [reconcileWithNative]);
 
   // 3. MediaSession Interface
   useMediaSession({

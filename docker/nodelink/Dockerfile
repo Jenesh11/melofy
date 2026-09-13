@@ -8,7 +8,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone --depth 1 https://github.com/PerformanC/NodeLink.git /app
+# Pin the radio/streaming contract instead of changing it on every rebuild.
+ARG NODELINK_REVISION=f6f526f3875ed5c36afd245f1ff5e5c59356ec40
+RUN git init /app && cd /app && \
+    git remote add origin https://github.com/PerformanC/NodeLink.git && \
+    git fetch --depth 1 origin "$NODELINK_REVISION" && \
+    git checkout --detach FETCH_HEAD
 
 WORKDIR /app
 

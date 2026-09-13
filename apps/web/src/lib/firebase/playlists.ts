@@ -8,7 +8,6 @@ import {
   deleteDoc, 
   doc,
   serverTimestamp,
-  orderBy,
   updateDoc,
   Timestamp,
   FieldValue
@@ -98,8 +97,8 @@ export async function getUserPlaylists(userId: string): Promise<Playlist[]> {
         ...doc.data()
       } as Playlist))
       .sort((a, b) => {
-        const timeA = (a.createdAt as any)?.seconds || 0;
-        const timeB = (b.createdAt as any)?.seconds || 0;
+        const timeA = (a.createdAt && 'seconds' in a.createdAt ? a.createdAt.seconds : 0);
+        const timeB = (b.createdAt && 'seconds' in b.createdAt ? b.createdAt.seconds : 0);
         return timeB - timeA;
       });
   } catch (error) {

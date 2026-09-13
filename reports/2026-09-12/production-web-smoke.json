@@ -1,0 +1,15 @@
+{
+  "title": "Melofy - Stream High-Fidelity Music & Port Spotify Playlists",
+  "status": {
+    "unauthenticatedRecommendationPost": 401,
+    "unauthenticatedRecommendationGet": 401
+  },
+  "errors": [],
+  "failedRequests": [
+    {
+      "resourceType": "fetch",
+      "error": "net::ERR_ABORTED"
+    }
+  ],
+  "scope": "Built Next.js app, new anonymous Chrome context; no signed-in or audio acceptance"
+}

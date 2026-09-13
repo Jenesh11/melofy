@@ -9,6 +9,9 @@ export interface Track {
   artworkUrl: string;
   duration: number; // in milliseconds
   url?: string; // NodeLink encoded track string
+  source?: string;
+  uri?: string;
+  recordingMbid?: string;
 }
 
 export interface PartyListener {
@@ -22,6 +25,7 @@ export interface LyricsData {
 }
 
 interface PlayerState {
+  playbackRevision: number;
   currentTrack: Track | null;
   isPlaying: boolean;
   volume: number;
@@ -80,6 +84,7 @@ interface PlayerState {
 import { Capacitor } from '@capacitor/core';
 
 const initialState = {
+  playbackRevision: 0,
   currentTrack: null,
   isPlaying: false,
   volume: Capacitor.isNativePlatform() ? 1 : 0.8,
@@ -116,6 +121,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   play: (track, force = false) => {
     if (!force && !get().canControlPlayback()) return;
     set((state) => ({
+      playbackRevision: state.playbackRevision + 1,
       history: state.currentTrack
         ? [...state.history, state.currentTrack]
         : state.history,
@@ -136,6 +142,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     );
     const remaining = trackIndex >= 0 ? allTracks.slice(trackIndex + 1) : [];
     set((state) => ({
+      playbackRevision: state.playbackRevision + 1,
       history: state.currentTrack
         ? [...state.history, state.currentTrack]
         : state.history,
@@ -151,20 +158,21 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   pause: (force = false) => {
     if (!force && !get().canControlPlayback()) return;
-    set({ isPlaying: false });
+    set({ isPlaying: false, playbackRevision: get().playbackRevision + 1 });
   },
   resume: (force = false) => {
     if (!force && !get().canControlPlayback()) return;
-    set({ isPlaying: true });
+    set({ isPlaying: true, playbackRevision: get().playbackRevision + 1 });
   },
   setVolume: (volume) => set({ volume }),
   setProgress: (progress) => set({ progress }),
-  addToQueue: (track) => set((state) => ({ queue: [...state.queue, track] })),
-  setQueue: (tracks) => set({ queue: tracks }),
+  addToQueue: (track) => set((state) => ({ queue: [...state.queue, track], playbackRevision: state.playbackRevision + 1 })),
+  setQueue: (tracks) => set({ queue: tracks, playbackRevision: get().playbackRevision + 1 }),
   playPlaylist: (tracks, collectionId, collectionType, force = false) => {
     if (!force && !get().canControlPlayback()) return;
     if (tracks.length === 0) return;
     set((state) => ({
+      playbackRevision: state.playbackRevision + 1,
       history: state.currentTrack
         ? [...state.history, state.currentTrack]
         : state.history,
@@ -186,6 +194,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const skippedTracks = queue.slice(0, index);
 
     set({
+      playbackRevision: get().playbackRevision + 1,
       history: currentTrack ? [...history, currentTrack, ...skippedTracks] : [...history, ...skippedTracks],
       currentTrack: nextTrack,
       queue: queue.slice(index + 1),
@@ -216,6 +225,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       newQueue.splice(nextTrackIndex, 1);
 
       set({
+        playbackRevision: get().playbackRevision + 1,
         history: currentTrack ? [...history, currentTrack] : history,
         currentTrack: nextTrack,
         queue: newQueue,
@@ -256,6 +266,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       }
 
       set({
+        playbackRevision: get().playbackRevision + 1,
         history: currentTrack ? [...history, currentTrack] : history,
         currentTrack: null,
         isPlaying: false,
@@ -269,6 +280,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     if (history.length > 0) {
       const previousTrack = history[history.length - 1];
       set({
+        playbackRevision: get().playbackRevision + 1,
         currentTrack: previousTrack,
         history: history.slice(0, -1),
         queue: currentTrack ? [currentTrack, ...queue] : queue,
@@ -322,6 +334,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     set((state) => ({
       ...state,
       ...newState,
+      playbackRevision: state.playbackRevision + 1,
       isPlaying: false,
       partyId: newState.partyId || null,
       hostName: newState.hostName || null,
@@ -329,7 +342,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       listenersCanControl: newState.listenersCanControl || false,
     })),
   setPlaying: (isPlaying) => set({ isPlaying }),
-  reset: () => set(initialState),
+  reset: () => set({ ...initialState, playbackRevision: get().playbackRevision + 1 }),
   setParty: (partyId, isHost, hostName) => set({ partyId, isPartyHost: isHost, hostName: hostName || null }),
   clearParty: () => set({ partyId: null, hostName: null, isPartyHost: false, listenersCanControl: false, partyListeners: [] }),
   setListenersCanControl: (canControl) => set({ listenersCanControl: canControl }),

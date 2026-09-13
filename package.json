@@ -34,9 +34,12 @@
     "build:api": "turbo run build --filter=api",
     "start": "turbo run start",
     "lint": "turbo run lint",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "test:browser": "playwright test -c tests/browser/playwright.config.cjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "esbuild": "0.25.12",
     "turbo": "^2.9.15",
     "typescript": "^5.0.0"
   }

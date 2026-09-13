@@ -12,6 +12,9 @@ import {
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { app, db } from '@/lib/firebase/config';
 import { getAuth } from 'firebase/auth';
+import { useHomeStore } from '@/store/useHomeStore';
+import { useLikedStore } from '@/store/useLikedStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
 import { addPlaylist } from '@/lib/firebase/playlists';
 
 const auth = getAuth(app);
@@ -61,6 +64,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (useHomeStore.getState().userId !== (user?.uid || null)) {
+        useHomeStore.getState().resetForUser(user?.uid || null);
+        usePlayerStore.getState().reset();
+      }
+      useLikedStore.getState().bindUser(user?.uid || null);
       setUser(user);
       setLoading(false);
 

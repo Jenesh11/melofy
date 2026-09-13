@@ -1,15 +1,14 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 
-import { useMemo, useCallback } from 'react';
+import { useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Disc, Play, Plus } from 'lucide-react';
 import { usePlayerStore } from '@/store/usePlayerStore';
-import { resolvePlayableTrack, TrackItem } from '@/components/ui/TrackList';
+import { resolvePlayableTrack, type TrackItem } from '@/components/ui/TrackList';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { mapTrackItemToPlayerTrack } from '@/lib/track-mappers';
 import { cn } from '@/lib/utils';
 
 interface PlaylistGridItem {
@@ -52,27 +51,8 @@ export function PlaylistGrid({
   const resume = usePlayerStore((state) => state.resume);
   const router = useRouter();
 
-  const albumContextTracks = useMemo(
-    () =>
-      (items || []).map((item) => {
-        const trackItem: TrackItem = {
-          id: item.id,
-          identifier: item.identifier,
-          title: item.name || 'Unknown Title',
-          artist: item.artists?.[0]?.name || 'Unknown',
-          artworkUrl: item.images?.[0]?.url || '',
-          duration: item.duration_ms || 0,
-          album: item.name || 'Unknown Album',
-          encoded: item.encoded || '',
-        };
-
-        return mapTrackItemToPlayerTrack(trackItem);
-      }),
-    [items],
-  );
-
   const handlePlayItem = useCallback(
-    async (item: PlaylistGridItem, index: number) => {
+    async (item: PlaylistGridItem) => {
       if (onPlayPlaylist) {
         onPlayPlaylist(item);
         return;
@@ -156,10 +136,11 @@ export function PlaylistGrid({
               <div className='absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-10'>
                 <Button
                   size='icon'
+                  aria-label={`Play ${item.name || 'mix'}`}
                   className='h-14 w-14 rounded-full bg-primary text-primary-foreground hover:scale-110 transition-all shadow-2xl'
                   onClick={(event) => {
                     event.stopPropagation();
-                    void handlePlayItem(item, index);
+                    void handlePlayItem(item);
                   }}
                 >
                   <Play className='h-7 w-7 fill-current transition-colors ml-1' />
@@ -168,6 +149,7 @@ export function PlaylistGrid({
                   <Button
                     size='icon'
                     variant='outline'
+                    aria-label={`Save ${item.name || 'mix'} to library`}
                     className='h-14 w-14 rounded-full border-white/10 bg-white/5 hover:bg-white/10 text-white hover:scale-110 transition-all shadow-2xl'
                     onClick={(event) => {
                       event.stopPropagation();
@@ -210,7 +192,7 @@ export function PlaylistGrid({
                   ? item.artists?.[0]?.name
                   : item.owner?.display_name ||
                     item.description ||
-                    'Spotify Mix'}
+                    (item.id.startsWith('mix:') ? 'Melofy Mix' : 'Spotify Mix')}
               </p>
             </div>
           </motion.div>

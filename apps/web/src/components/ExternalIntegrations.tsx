@@ -40,7 +40,9 @@ export function ExternalIntegrations() {
 
   // Fresh state reference for the auto-recovery retry loop
   const latestStateRef = useRef({ currentTrack, isPlaying, progress, partyId });
-  latestStateRef.current = { currentTrack, isPlaying, progress, partyId };
+  useEffect(() => {
+    latestStateRef.current = { currentTrack, isPlaying, progress, partyId };
+  }, [currentTrack, isPlaying, progress, partyId]);
 
   const [taskbarInitialized, setTaskbarInitialized] = useState(false);
 

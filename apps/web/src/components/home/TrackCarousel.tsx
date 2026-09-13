@@ -49,6 +49,9 @@ export function TrackCarousel({
             duration: track.duration,
             album: track.title,
             encoded: track.url,
+            source: track.source,
+            uri: track.uri,
+            recordingMbid: track.recordingMbid,
           };
         }
         return mapSpotifyTrackToTrackItem(track as SpotifyTrackLike);

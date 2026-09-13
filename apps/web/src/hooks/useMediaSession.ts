@@ -176,7 +176,7 @@ export function useMediaSession({
         }
       }
     };
-  }, [resume, pause, playPrevious, handleSkipNext, audioRef]);
+  }, [resume, pause, playPrevious, handleSkipNext, audioRef, currentTrack?.duration]);
 
   // Synchronize audio state directly with MediaSession and React state
   useEffect(() => {
