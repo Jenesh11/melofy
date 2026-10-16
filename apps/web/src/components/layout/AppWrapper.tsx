@@ -15,6 +15,8 @@ import { LikedSongsSync } from '@/components/layout/LikedSongsSync';
 import { LyricsPanel } from '@/components/layout/LyricsPanel';
 import { OfflineScreen } from '@/components/layout/OfflineScreen';
 import { App } from '@capacitor/app';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import { useAmbientColor } from '@/hooks/useAmbientColor';
 import { Capacitor } from '@capacitor/core';
 
 // Import primary tab page components for always-mounted rendering on mobile.
@@ -322,6 +324,8 @@ function AppContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const mainRef = useRef<HTMLDivElement>(null);
+  const artworkUrl = usePlayerStore((state) => state.currentTrack?.artworkUrl);
+  useAmbientColor(user ? artworkUrl : null);
 
   useEffect(() => {
     if (!authLoading) return;
@@ -394,14 +398,16 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className='h-screen w-full flex flex-col items-center justify-center bg-background gap-4'>
+      <div className='h-screen w-full flex flex-col items-center justify-center bg-canvas gap-5'>
         <div className='relative'>
-          <Music2 className='h-16 w-16 text-primary animate-pulse' />
-          <div className='absolute inset-0 bg-primary/20 blur-2xl rounded-full' />
+          <div className='absolute inset-0 bg-primary/30 blur-3xl rounded-full' />
+          <div className='relative h-16 w-16 rounded-2xl bg-card border border-border flex items-center justify-center shadow-2xl'>
+            <Music2 className='h-8 w-8 text-primary' />
+          </div>
         </div>
-        <div className='flex items-center gap-2 text-zinc-500 font-medium'>
+        <div className='flex items-center gap-2 text-sm text-muted-foreground font-medium'>
           <Loader2 className='h-4 w-4 animate-spin' />
-          <span>Setting the stage for you...</span>
+          <span>Tuning in…</span>
         </div>
       </div>
     );
@@ -438,22 +444,24 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div 
-      className='flex flex-col h-svh overflow-hidden bg-background text-foreground'
+      className='flex flex-col h-svh overflow-hidden bg-background md:bg-canvas text-foreground'
       style={{
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)'
       }}
     >
       {showTitleBar && <TitleBar />}
-      <div className='flex flex-1 overflow-hidden'>
+      <div className='flex flex-1 overflow-hidden md:gap-2 md:p-2 md:pb-0'>
         <div className='hidden md:flex h-full'>
           <Sidebar />
         </div>
 
         <main
           ref={mainRef}
-          className='flex-1 overflow-y-auto custom-scrollbar relative scroll-smooth flex flex-col bg-background'
+          className='flex-1 overflow-y-auto custom-scrollbar relative scroll-smooth flex flex-col bg-background md:rounded-2xl md:border md:border-border isolate'
         >
+          {/* Tinted by the playing track's artwork; scrolls away with content. */}
+          <div aria-hidden className='ambient-wash pointer-events-none absolute inset-x-0 top-0 h-[420px] -z-10' />
           <div className={cn('shrink-0 sticky top-0 z-50', pathname === '/playing' && 'hidden')}>
             <Topbar />
           </div>

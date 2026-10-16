@@ -28,7 +28,7 @@ export function ProgressBar({
   return (
     <div className={className}>
       {showLabels && (
-        <span className='w-10 text-right text-xs text-zinc-400'>
+        <span className='w-10 text-right text-[11px] font-medium tabular-nums text-muted-foreground'>
           {currentDisplayTime}
         </span>
       )}
@@ -43,7 +43,7 @@ export function ProgressBar({
         className='flex-1 group-slider'
       />
       {showLabels && (
-        <span className='w-10 text-xs text-zinc-400'>{durationTime}</span>
+        <span className='w-10 text-[11px] font-medium tabular-nums text-muted-foreground'>{durationTime}</span>
       )}
     </div>
   );

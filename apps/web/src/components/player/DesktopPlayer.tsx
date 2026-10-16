@@ -127,7 +127,9 @@ export function DesktopPlayer({
         }
       }}
       className={cn(
-        'relative h-14 md:h-20 border-t border-border bg-background md:bg-background/60 backdrop-blur-3xl px-2 md:px-4 flex items-center justify-between w-full mx-auto md:max-w-none rounded-md md:rounded-none mb-16 md:mb-0 shadow-lg md:shadow-none transition-all',
+        'relative h-[60px] md:h-[84px] px-2 md:px-4 flex items-center justify-between overflow-hidden md:overflow-visible',
+        'mx-2 md:mx-0 mb-[72px] md:mb-0 rounded-xl md:rounded-none border border-border md:border-0 shadow-[0_12px_32px_-8px_rgb(0_0_0/0.6)] md:shadow-none',
+        'bg-[color-mix(in_oklch,var(--ambient)_22%,var(--card))] md:bg-canvas transition-[background-color] duration-700',
         'cursor-pointer md:cursor-default touch-none',
       )}
       onTap={(e) => {
@@ -153,7 +155,7 @@ export function DesktopPlayer({
           <motion.div
             key={currentTrack.artworkUrl}
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.15 }}
+            animate={{ opacity: isMobile ? 0 : 0.22 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 1 }}
             className='absolute inset-0 z-0 pointer-events-none'
@@ -179,7 +181,7 @@ export function DesktopPlayer({
             className='relative z-10 flex-1 min-w-0'
           >
             <div className='flex items-center gap-3 overflow-hidden py-2 px-1'>
-              <div className='h-10 w-10 md:h-14 md:w-14 rounded-md bg-muted overflow-hidden shrink-0 relative'>
+              <div className='h-10 w-10 md:h-14 md:w-14 rounded-lg bg-muted overflow-hidden shrink-0 relative shadow-[0_8px_24px_-6px_color-mix(in_oklch,var(--ambient)_60%,transparent)]'>
                 {currentTrack.artworkUrl && !imageError ? (
                   <Image
                     src={currentTrack.artworkUrl}
@@ -197,7 +199,7 @@ export function DesktopPlayer({
                 )}
               </div>
               <div className='flex flex-col min-w-0'>
-                <p className='text-sm font-semibold text-foreground truncate group-hover/info:underline decoration-1 underline-offset-4'>
+                <p className='text-[13px] md:text-sm font-semibold text-foreground truncate group-hover/info:underline decoration-1 underline-offset-4'>
                   {currentTrack.title}
                 </p>
                 <p 
@@ -223,10 +225,13 @@ export function DesktopPlayer({
             size='icon'
             className={cn(
               'hidden md:inline-flex h-8 w-8 transition-colors',
+              'relative',
               isShuffle
-                ? 'text-primary bg-primary/10'
+                ? 'text-primary after:absolute after:bottom-0 after:h-1 after:w-1 after:rounded-full after:bg-primary'
                 : 'text-muted-foreground hover:text-foreground',
             )}
+            aria-label='Shuffle'
+            aria-pressed={isShuffle}
             onClick={(e) => {
               e.stopPropagation();
               toggleShuffle();
@@ -238,6 +243,7 @@ export function DesktopPlayer({
             variant='ghost'
             size='icon'
             className='hidden md:inline-flex h-8 w-8 text-muted-foreground hover:text-foreground'
+            aria-label='Previous'
             onClick={(e) => {
               e.stopPropagation();
               setDirection(-1);
@@ -270,7 +276,8 @@ export function DesktopPlayer({
           <Button
             variant='default'
             size='icon'
-            className='h-9 w-9 md:h-8 md:w-8 rounded-full bg-primary text-primary-foreground hover:scale-105 transition-transform mx-1 md:mx-0'
+            aria-label={isPlaying ? 'Pause' : 'Play'}
+            className='h-9 w-9 rounded-full bg-transparent md:bg-foreground text-foreground md:text-background hover:bg-foreground/10 md:hover:bg-foreground md:hover:scale-105 active:scale-95 transition-transform mx-0 md:mx-1 shadow-none md:shadow-lg'
             onClick={(e) => {
               e.stopPropagation();
               handleTogglePlay();
@@ -289,6 +296,7 @@ export function DesktopPlayer({
             variant='ghost'
             size='icon'
             className='hidden md:inline-flex h-8 w-8 text-muted-foreground hover:text-foreground'
+            aria-label='Next'
             onClick={(e) => {
               e.stopPropagation();
               setDirection(1);
@@ -302,10 +310,13 @@ export function DesktopPlayer({
             size='icon'
             className={cn(
               'hidden md:inline-flex h-8 w-8 transition-colors',
+              'relative',
               isRepeat
-                ? 'text-primary bg-primary/10'
+                ? 'text-primary after:absolute after:bottom-0 after:h-1 after:w-1 after:rounded-full after:bg-primary'
                 : 'text-muted-foreground hover:text-foreground',
             )}
+            aria-label='Repeat'
+            aria-pressed={isRepeat}
             onClick={(e) => {
               e.stopPropagation();
               toggleRepeat();
@@ -334,9 +345,9 @@ export function DesktopPlayer({
       </div>
 
       {/* Mobile Thin Progress Bar at bottom */}
-      <div className='md:hidden absolute bottom-0 left-0 right-0 h-0.5 bg-muted/30 no-nav'>
+      <div className='md:hidden absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-foreground/15 no-nav'>
         <div
-          className='absolute left-0 top-0 bottom-0 bg-primary rounded-r-full transition-all duration-100 ease-linear'
+          className='absolute left-0 top-0 bottom-0 bg-foreground rounded-full transition-all duration-100 ease-linear'
           style={{ width: `${progressPercent}%` }}
         />
       </div>

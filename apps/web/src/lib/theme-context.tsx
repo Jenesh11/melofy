@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 export type Essence =
+  | 'ember'
   | 'monochrome'
   | 'emerald'
   | 'golden'
@@ -57,9 +58,9 @@ function adjustColor(hexcolor: string, percent: number) {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [essence, setEssenceState] = useState<Essence>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('melofy-essence') as Essence) || 'monochrome';
+      return (localStorage.getItem('melofy-essence') as Essence) || 'ember';
     }
-    return 'monochrome';
+    return 'ember';
   });
 
   const [mode, setModeState] = useState<Mode>(() => {

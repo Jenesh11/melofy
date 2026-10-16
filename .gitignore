@@ -48,7 +48,20 @@ next-env.d.ts
 # Firebase service account key
 serviceAccountKey.json
 /graphify-out
-
 # Browser regression output
 /test-results/
 /playwright-report/
+
+# MeshCrew MCP configs (contain API key)
+opencode.json
+.mcp.json
+.gemini/settings.json
+.qwen/settings.json
+.cursor/mcp.json
+.kiro/settings/mcp.json
+.grok/config.toml
+.agents/mcp_config.json
+meshmcp.local.ps1
+crush.json
+.factory/mcp.json
+.mimo-code.json

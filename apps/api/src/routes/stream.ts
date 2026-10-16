@@ -12,6 +12,13 @@ import {
   verifyFirebaseIdToken,
 } from '../lib/firebaseAuth';
 import { issueStreamTicket, verifyStreamTicket } from '../lib/streamTicket';
+import {
+  FALLBACK_SOURCES,
+  fallbackQueries,
+  pickBestCandidate,
+  type FallbackCandidate,
+  type FallbackTrackInfo,
+} from '../lib/sourceFallback';
 
 const router = Router();
 
@@ -22,6 +29,12 @@ const UPSTREAM_TIMEOUT_MS = 20_000;
 const MAX_RESOLVE_BODY_BYTES = 1_000_000;
 const TRACKSTREAM_URL_CACHE_TTL_MS = 4 * 60 * 1000;
 const MAX_TRACKSTREAM_URL_CACHE_ENTRIES = 500;
+const FALLBACK_LOOKUP_TIMEOUT_MS = 8_000;
+const FALLBACK_HIT_TTL_MS = 30 * 60 * 1000;
+const FALLBACK_MISS_TTL_MS = 10 * 60 * 1000;
+const MAX_FALLBACK_CACHE_ENTRIES = 1000;
+/** Protocols a browser <audio> element can consume as a plain HTTP resource. */
+const PROGRESSIVE_PROTOCOLS = new Set(['http', 'https']);
 const BLOCKED_HOSTNAMES = new Set([
   'localhost',
   'metadata.google.internal',
@@ -32,7 +45,9 @@ const BLOCKED_HOSTNAME_SUFFIXES = ['.localhost', '.local', '.internal'];
 
 const streamRateLimit = rateLimit({
   windowMs: 60 * 1000,
-  max: 30,
+  // Media elements issue a Range request per seek/reconnect, so a single song
+  // can legitimately make many requests. Abuse is still bounded per user.
+  max: 120,
   keyGenerator(req) {
     if (req.user?.uid) return `uid:${req.user.uid}`;
     const ip = req.ip || req.socket.remoteAddress || '';
@@ -70,6 +85,7 @@ interface NodeLike {
 
 interface ResolveResponse {
   url?: string;
+  protocol?: string;
   message?: string;
   error?: string;
   exception?: {
@@ -336,6 +352,7 @@ function requestTrackstreamUrl(
       (response) => {
         const chunks: Buffer[] = [];
         let totalSize = 0;
+        response.on('error', reject);
 
         response.on('data', (chunk) => {
           totalSize += chunk.length;
@@ -375,6 +392,13 @@ function requestTrackstreamUrl(
             return;
           }
 
+          if (parsed?.url && parsed.protocol && !PROGRESSIVE_PROTOCOLS.has(parsed.protocol.toLowerCase())) {
+            // SABR (POST + protobuf) and HLS playlists can never be decoded by
+            // an <audio> element from a plain GET; fail fast so a fallback runs.
+            reject(new ResolveError(`Unsupported stream protocol: ${parsed.protocol}`, 502, true));
+            return;
+          }
+
           if (!parsed?.url) {
             const message =
               parsed?.exception?.message ||
@@ -406,6 +430,130 @@ function requestTrackstreamUrl(
 
   inflightTrackResolves.set(cacheKey, promise);
   return promise;
+}
+
+function nodeLinkJson<T>(node: NodeLike, path: string, timeoutMs: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const protocol = node.options.secure ? 'https' : 'http';
+    const requester = node.options.secure ? https : http;
+    const req = requester.get(
+      `${protocol}://${node.options.host}:${node.options.port}${path}`,
+      { headers: { Authorization: node.options.authorization, Accept: 'application/json' } },
+      (response) => {
+        const chunks: Buffer[] = [];
+        let totalSize = 0;
+        response.on('error', reject);
+        response.on('data', (chunk) => {
+          totalSize += chunk.length;
+          if (totalSize > MAX_RESOLVE_BODY_BYTES) {
+            req.destroy(new Error('NodeLink response too large'));
+            return;
+          }
+          chunks.push(Buffer.from(chunk));
+        });
+        response.on('end', () => {
+          const statusCode = response.statusCode || 500;
+          if (statusCode < 200 || statusCode >= 300) {
+            reject(new ResolveError(`NodeLink ${path.split('?')[0]} failed with status ${statusCode}`, statusCode));
+            return;
+          }
+          try {
+            resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')) as T);
+          } catch {
+            reject(new Error('NodeLink returned non-JSON response'));
+          }
+        });
+      },
+    );
+    req.setTimeout(timeoutMs, () => req.destroy(new Error('NodeLink request timeout')));
+    req.on('error', reject);
+  });
+}
+
+/**
+ * encodedTrack -> encoded track on a fallback source, or null when no
+ * confident match exists. Only populated after the primary source failed, so
+ * a hit also means "skip the primary next time" for seeks and reconnects.
+ */
+const fallbackTracks = new Map<string, { encoded: string | null; expiresAt: number }>();
+const inflightFallbacks = new Map<string, Promise<string | null>>();
+
+function getCachedFallback(encodedTrack: string): string | null | undefined {
+  const cached = fallbackTracks.get(encodedTrack);
+  if (!cached) return undefined;
+  if (cached.expiresAt <= Date.now()) {
+    fallbackTracks.delete(encodedTrack);
+    return undefined;
+  }
+  return cached.encoded;
+}
+
+function cacheFallback(encodedTrack: string, encoded: string | null): void {
+  while (fallbackTracks.size >= MAX_FALLBACK_CACHE_ENTRIES) {
+    const oldestKey = fallbackTracks.keys().next().value;
+    if (!oldestKey) break;
+    fallbackTracks.delete(oldestKey);
+  }
+  fallbackTracks.set(encodedTrack, {
+    encoded,
+    expiresAt: Date.now() + (encoded ? FALLBACK_HIT_TTL_MS : FALLBACK_MISS_TTL_MS),
+  });
+}
+
+async function lookupFallbackTrack(node: NodeLike, encodedTrack: string): Promise<string | null> {
+  const decoded = await nodeLinkJson<{ info?: Partial<FallbackTrackInfo> & { sourceName?: string } }>(
+    node,
+    `/v4/decodetrack?encodedTrack=${encodeURIComponent(encodedTrack)}`,
+    RESOLVE_TIMEOUT_MS,
+  );
+  const info = decoded?.info;
+  if (!info?.title) return null;
+  const source: FallbackTrackInfo = {
+    title: info.title,
+    author: info.author || '',
+    length: Number(info.length) || 0,
+  };
+
+  for (const { prefix, sourceName } of FALLBACK_SOURCES) {
+    if (info.sourceName === sourceName) continue;
+    for (const query of fallbackQueries(source)) {
+      try {
+        const result = await nodeLinkJson<{ loadType?: string; data?: unknown }>(
+          node,
+          `/v4/loadtracks?identifier=${encodeURIComponent(prefix + query)}`,
+          FALLBACK_LOOKUP_TIMEOUT_MS,
+        );
+        const candidates = Array.isArray(result?.data) ? (result.data as FallbackCandidate[]) : [];
+        const match = pickBestCandidate(source, candidates.slice(0, 10));
+        if (match) {
+          console.log(
+            `[Fallback] "${source.title}" by ${source.author} -> ${prefix}"${match.info.title}" by ${match.info.author}`,
+          );
+          return match.encoded;
+        }
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error('Fallback search failed');
+        console.warn(`[Fallback] ${prefix} search failed: ${sanitizeErrorMessage(err.message)}`);
+      }
+    }
+  }
+  console.warn(`[Fallback] No confident match for "${source.title}" by ${source.author}`);
+  return null;
+}
+
+function findFallbackTrack(node: NodeLike, encodedTrack: string): Promise<string | null> {
+  const cached = getCachedFallback(encodedTrack);
+  if (cached !== undefined) return Promise.resolve(cached);
+  const existing = inflightFallbacks.get(encodedTrack);
+  if (existing) return existing;
+  const work = lookupFallbackTrack(node, encodedTrack)
+    .then((encoded) => {
+      cacheFallback(encodedTrack, encoded);
+      return encoded;
+    })
+    .finally(() => inflightFallbacks.delete(encodedTrack));
+  inflightFallbacks.set(encodedTrack, work);
+  return work;
 }
 
 function resolveRedirectUrl(currentUrl: string, location: string): string | null {
@@ -510,42 +658,66 @@ router.get('/stream', requireStreamAccess, streamRateLimit, async (req, res) => 
   }
 
   const requestId = `${Date.now()}-${Math.floor(Math.random() * 10_000)}`;
-  const itagCandidates = getItagCandidates(requestedItag);
-  let itagCursor = 0;
+  const itag = getItagCandidates(requestedItag)[0] ?? null;
+  const clientGone = () => res.destroyed || res.writableEnded;
 
-  const pickNextCandidate = (advance: boolean) => {
-    if (advance) {
-      itagCursor = (itagCursor + 1) % itagCandidates.length;
+  const lookupAlternate = async (budgetMs: number): Promise<string | null> => {
+    try {
+      // A slow lookup keeps running past the budget and lands in the cache,
+      // so the browser's retry for this song can still use it.
+      return await Promise.race([
+        findFallbackTrack(node, trackUrl),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), budgetMs).unref()),
+      ]);
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error('Alternate lookup failed');
+      console.warn(`[Relay:${requestId}] Alternate lookup failed: ${sanitizeErrorMessage(err.message)}`);
+      return null;
     }
-    return itagCandidates[itagCursor];
   };
 
-  const resolveCdnUrl = async (advanceCandidate: boolean, forceRefresh = false): Promise<string> => {
-    let lastError: Error | null = null;
+  // The primary is the exact upload the listener picked. Only when it fails
+  // (e.g. YouTube gating a client's URLs to the first ~1MB without a
+  // proof-of-origin token, which surfaces as a 403 on the open range) do we
+  // switch to the same recording on another source. A cached switch means
+  // seeks and reconnects for this song go straight to the working source.
+  let activeTrack = getCachedFallback(trackUrl) || trackUrl;
 
-    for (let i = 0; i < itagCandidates.length; i++) {
-      const candidate = pickNextCandidate(i > 0 || advanceCandidate);
+  const switchSource = async (cause: Error): Promise<boolean> => {
+    let next: string | null = null;
+    if (activeTrack === trackUrl) next = await lookupAlternate(FALLBACK_LOOKUP_TIMEOUT_MS * 2);
+    else next = trackUrl; // The alternate failed; the primary may still work.
+    if (!next || next === activeTrack) return false;
+    console.log(
+      `[Relay:${requestId}] ${activeTrack === trackUrl ? 'Primary' : 'Alternate'} failed (${sanitizeErrorMessage(cause.message)}); switching source`,
+    );
+    activeTrack = next;
+    return true;
+  };
 
-      try {
-        const resolved = await requestTrackstreamUrl(node, trackUrl, candidate, forceRefresh);
-        console.log(
-          `[Relay:${requestId}] Resolved CDN URL using itag=${candidate === null ? 'auto' : candidate}${forceRefresh ? ' (refresh)' : ''}`,
-        );
-        return resolved;
-      } catch (error) {
-        const err = error instanceof Error ? error : new Error('Unknown resolve error');
-        lastError = err;
-        console.warn(
-          `[Relay:${requestId}] Resolve failed for itag=${candidate === null ? 'auto' : candidate}: ${sanitizeErrorMessage(err.message)}`,
-        );
+  const resolveCdnUrl = async (preferOtherSource: boolean, forceRefresh = false): Promise<string> => {
+    if (preferOtherSource) await switchSource(new Error('Upstream rejected the stream'));
 
-        if (error instanceof ResolveError && error.nonRetryable) {
-          break;
-        }
+    try {
+      const resolved = await requestTrackstreamUrl(
+        node,
+        activeTrack,
+        activeTrack === trackUrl ? itag : null,
+        forceRefresh,
+      );
+      console.log(
+        `[Relay:${requestId}] Resolved CDN URL (${activeTrack === trackUrl ? 'primary' : 'alternate'})${forceRefresh ? ' (refresh)' : ''}`,
+      );
+      return resolved;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error('Unknown resolve error');
+      console.warn(`[Relay:${requestId}] Resolve failed: ${sanitizeErrorMessage(err.message)}`);
+      if (err.message.toLowerCase().includes('runtime contract is incomplete')) throw err;
+      if (await switchSource(err)) {
+        return requestTrackstreamUrl(node, activeTrack, activeTrack === trackUrl ? itag : null, forceRefresh);
       }
+      throw err;
     }
-
-    throw lastError || new Error('Unable to resolve CDN URL');
   };
 
   const proxyWithRedirects = async (
@@ -553,6 +725,7 @@ router.get('/stream', requireStreamAccess, streamRateLimit, async (req, res) => 
     depth: number,
     retryCount: number,
   ): Promise<void> => {
+    if (clientGone()) return;
     if (depth > MAX_REDIRECTS) {
       if (!res.headersSent) res.status(502).send('Too many redirects from upstream');
       return;
@@ -572,6 +745,7 @@ router.get('/stream', requireStreamAccess, streamRateLimit, async (req, res) => 
       return;
     }
 
+    if (clientGone()) return;
     const requester = parsedUrl.protocol === 'https:' ? https : http;
 
     const upstreamReq = requester.request(
@@ -588,6 +762,7 @@ router.get('/stream', requireStreamAccess, streamRateLimit, async (req, res) => 
         },
       },
       (upstreamRes) => {
+        if (clientGone()) { upstreamRes.destroy(); return; }
         const statusCode = upstreamRes.statusCode || 502;
         const contentType = String(upstreamRes.headers['content-type'] || '');
 
@@ -611,9 +786,11 @@ router.get('/stream', requireStreamAccess, streamRateLimit, async (req, res) => 
 
         if (needsRetry && retryCount < MAX_PROXY_RETRIES && !res.headersSent) {
           upstreamRes.resume();
-          const advanceCandidate = isLikelyUnplayableContentType(contentType);
+          // A fresh URL fixes expiry; a second rejection or an undecodable
+          // format means this source will not serve us, so switch sources.
+          const preferFallback = retryCount > 0 || isLikelyUnplayableContentType(contentType);
 
-          void resolveCdnUrl(advanceCandidate, true)
+          void resolveCdnUrl(preferFallback, true)
             .then((freshUrl) => {
               void proxyWithRedirects(freshUrl, 0, retryCount + 1);
             })
@@ -634,7 +811,16 @@ router.get('/stream', requireStreamAccess, streamRateLimit, async (req, res) => 
 
         upstreamRes.on('error', (error) => {
           console.error(`[Relay:${requestId}] Upstream response error: ${sanitizeErrorMessage(error.message)}`);
-          if (!res.headersSent) res.status(502).send('Upstream response error');
+          if (clientGone()) return;
+          if (!res.headersSent) {
+            res.removeHeader('Content-Length');
+            res.removeHeader('Content-Range');
+            res.status(502).send('Upstream response error');
+          } else {
+            // A partial response cannot become a new HTTP error response. Close
+            // it so the player receives a network error and can resume/retry.
+            res.destroy();
+          }
         });
 
         upstreamRes.pipe(res);
@@ -649,14 +835,17 @@ router.get('/stream', requireStreamAccess, streamRateLimit, async (req, res) => 
       upstreamReq.destroy();
     };
 
-    req.on('close', onClientClose);
+    // IncomingMessage.close means the request was read, not that the client
+    // finished receiving this long-lived response. Watch the response instead.
+    res.on('close', onClientClose);
     upstreamReq.on('close', () => {
-      req.off('close', onClientClose);
+      res.off('close', onClientClose);
     });
 
     upstreamReq.on('error', (error) => {
+      if (clientGone()) return;
       if (retryCount < MAX_PROXY_RETRIES && !res.headersSent) {
-        void resolveCdnUrl(false, true)
+        void resolveCdnUrl(retryCount > 0, true)
           .then((freshUrl) => {
             void proxyWithRedirects(freshUrl, 0, retryCount + 1);
           })
@@ -675,6 +864,7 @@ router.get('/stream', requireStreamAccess, streamRateLimit, async (req, res) => 
 
       console.error(`[Relay:${requestId}] CDN proxy error: ${sanitizeErrorMessage(error.message)}`);
       if (!res.headersSent) res.status(502).send('CDN Proxy Error');
+      else res.destroy();
     });
 
     upstreamReq.end();

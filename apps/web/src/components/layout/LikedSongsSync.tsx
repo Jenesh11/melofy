@@ -6,6 +6,7 @@ import { db } from '@/lib/firebase/config';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Playlist } from '@/lib/firebase/playlists';
 import { useLikedStore } from '@/store/useLikedStore';
+import { useTasteStore } from '@/store/useTasteStore';
 
 const LIKED_SONGS_PLAYLIST_NAME = 'Liked Songs';
 
@@ -18,6 +19,7 @@ export function LikedSongsSync() {
 
   useEffect(() => {
     useLikedStore.getState().bindUser(user?.uid || null);
+    useTasteStore.getState().bindUser(user?.uid || null);
     if (!user) {
       return;
     }

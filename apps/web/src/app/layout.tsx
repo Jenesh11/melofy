@@ -1,11 +1,23 @@
 import { AuthProvider } from '@/lib/firebase/auth-context';
 import type { Metadata } from 'next';
-import { Outfit } from 'next/font/google';
+import { Bricolage_Grotesque, Figtree, Outfit } from 'next/font/google';
 import './globals.css';
 
 const outfit = Outfit({
   variable: '--font-outfit',
   subsets: ['latin'],
+});
+
+const figtree = Figtree({
+  variable: '--font-figtree',
+  subsets: ['latin'],
+  display: 'swap',
+});
+
+const bricolage = Bricolage_Grotesque({
+  variable: '--font-bricolage',
+  subsets: ['latin'],
+  display: 'swap',
 });
 
 import { ThemeProvider } from '@/components/theme-provider';
@@ -105,7 +117,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang='en' suppressHydrationWarning>
-      <body className={`${outfit.variable} font-sans antialiased`}>
+      <body className={`${outfit.variable} ${figtree.variable} ${bricolage.variable} font-sans antialiased`}>
         <AuthProvider>
           <ThemeProvider
             attribute='class'
@@ -116,7 +128,7 @@ export default function RootLayout({
             <SocketProvider>
               <ExternalIntegrations />
               <AppWrapper>{children}</AppWrapper>
-              <Toaster richColors position='bottom-right' />
+              <Toaster richColors position='top-center' toastOptions={{ className: 'font-sans' }} />
             </SocketProvider>
           </ThemeProvider>
         </AuthProvider>

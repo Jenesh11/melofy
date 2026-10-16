@@ -16,21 +16,22 @@ const Slider = React.forwardRef<
       orientation={orientation}
       className={cn(
         'relative flex touch-none select-none group',
-        isVertical ? 'flex-col h-full w-4 items-center justify-center' : 'w-full items-center',
+        // Generous hit area around a thin track.
+        isVertical ? 'flex-col h-full w-4 items-center justify-center' : 'w-full items-center py-2 cursor-pointer',
         className,
       )}
       {...props}
     >
       <SliderPrimitive.Track className={cn(
-        'relative rounded-full bg-muted/50 transition-colors',
-        isVertical ? 'h-full w-1.5 grow' : 'h-1.5 w-full grow overflow-hidden'
+        'relative rounded-full bg-foreground/15 transition-colors',
+        isVertical ? 'h-full w-1.5 grow' : 'h-1 w-full grow overflow-hidden'
       )}>
         <SliderPrimitive.Range className={cn(
-          'absolute bg-primary',
+          'absolute rounded-full bg-foreground transition-colors group-hover:bg-primary',
           isVertical ? 'w-full bottom-0' : 'h-full'
         )} />
       </SliderPrimitive.Track>
-      <SliderPrimitive.Thumb className='hidden group-hover:block h-3.5 w-3.5 rounded-full border border-primary/20 bg-foreground shadow-2xl transition-[opacity,transform] focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:scale-125 opacity-0 group-hover:opacity-100 ease-in-out duration-300 cursor-grab active:cursor-grabbing' />
+      <SliderPrimitive.Thumb className='block h-3 w-3 rounded-full bg-foreground shadow-[0_2px_8px_rgb(0_0_0/0.5)] transition-[opacity,transform] duration-200 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-4 focus-visible:ring-primary/30 disabled:pointer-events-none disabled:opacity-50 hover:scale-125 cursor-grab active:cursor-grabbing' />
     </SliderPrimitive.Root>
   );
 });

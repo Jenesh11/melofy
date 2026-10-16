@@ -7,6 +7,12 @@ const backendBaseUrl = (
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  experimental: {
+    // Rewrites proxy /api/stream. The default 30s idle timeout aborts slow
+    // source resolution and paused audio connections, which the browser then
+    // reports as an "unsupported" media error.
+    proxyTimeout: 10 * 60 * 1000,
+  },
   allowedDevOrigins: [
     'http://localhost:3000',
     'http://localhost:3001',
@@ -67,10 +73,6 @@ const nextConfig: NextConfig = {
       {
         source: '/api/jam/:path*',
         destination: `${backendBaseUrl}/api/jam/:path*`,
-      },
-      {
-        source: '/api/health',
-        destination: `${backendBaseUrl}/health`,
       },
     ];
   },

@@ -190,3 +190,39 @@ test('malformed cached candidates are ignored and valid live results are returne
   assert.equal(calls, 1);
   assert.equal(result.tracks.length, 8);
 });
+
+test('filters non-music uploads, down-ranks variants and treats video/audio uploads as one song', () => {
+  const track = (id, title, artist = 'Artist ' + id, duration = 200000) => normalizeTrack({ encoded: 'e-' + id, info: { identifier: id, title, author: artist, length: duration } });
+  const tracks = rankTracks([
+    track('a', 'Tum Hi Ho (Slowed + Reverb)'), track('b', 'Lofi Mashup 2024 | 1 Hour'), track('c', 'Intro', 'X', 30000),
+    track('d', 'Kesariya (Remix)', 'Arijit Singh'), track('e', 'Kesariya (Official Video)', 'Arijit Singh'), track('f', 'Kesariya', 'Arijit Singh'),
+    track('g', 'Raataan Lambiyan', 'Jubin Nautiyal'),
+  ], parseProfile({}));
+  assert.deepEqual(tracks.map(t => t.id), ['e', 'g', 'd']);
+});
+
+test('skips exclude the track and push its artist down', () => {
+  const track = (id, artist) => normalizeTrack(raw(id, artist));
+  const skipped = track('skip1', 'Disliked');
+  const tracks = rankTracks([track('d1', 'Disliked'), skipped, track('n1', 'Neutral')], parseProfile({ skipped: [skipped] }));
+  assert.deepEqual(tracks.map(t => t.id), ['n1', 'd1']);
+});
+
+test('consensus across seed and taste-anchor radios ranks shared songs first, without back-to-back artists', async () => {
+  // The liked anchor shares an artist (C) with the seed radio, so it is in context;
+  // the second anchor (Elsewhere) is not, so its radio must not leak in.
+  const liked = normalizeTrack(raw('likedvideo1', 'C'));
+  const offTopic = normalizeTrack(raw('offtopic123', 'Elsewhere'));
+  const radios = {
+    'ytrec:abcdefghijk': { loadType: 'playlist', data: { tracks: [raw('r1', 'A'), raw('r2', 'A'), raw('shared', 'B'), raw('r3', 'C')] } },
+    'ytrec:likedvideo1': { loadType: 'playlist', data: { tracks: [raw('shared', 'B'), raw('l1', 'D')] } },
+    'ytrec:offtopic123': { loadType: 'playlist', data: { tracks: [raw('leak', 'Z')] } },
+  };
+  const calls = [];
+  const service = createRecommendationService({ listenBrainz: false, load: async id => { calls.push(id); return radios[id] || { loadType: 'empty' }; } });
+  const result = await service.recommend(parseProfile({ seed, liked: [offTopic, liked] }));
+  assert.ok(calls.includes('ytrec:likedvideo1'));
+  assert.equal(result.tracks[0].id, 'shared');
+  assert.ok(!result.tracks.some(t => t.id === 'leak'));
+  for (let i = 1; i < result.tracks.length; i++) assert.notEqual(result.tracks[i].artist, result.tracks[i - 1].artist);
+});

@@ -17,8 +17,8 @@ RUN git init /app && cd /app && \
 
 WORKDIR /app
 
-RUN cp config.default.js config.js && \
-    node -e "import fs from 'node:fs'; let c = fs.readFileSync('config.default.js', 'utf8'); c = c.replace(/enableTrackStreamEndpoint:\s*false/g, 'enableTrackStreamEndpoint: true'); if (!c.includes('enableTrackStreamEndpoint: true')) { c = c.replace(/export\s+default\s*\{/, 'export default {\n  enableTrackStreamEndpoint: true,'); } fs.writeFileSync('config.js', c);"
+COPY configure.mjs /tmp/configure.mjs
+RUN node /tmp/configure.mjs
 
 RUN npm install --ignore-scripts
 

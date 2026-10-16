@@ -211,6 +211,9 @@ export function useMediaSession({
     };
 
     const onTimeUpdate = () => {
+      // A src swap reports t=0 before data loads; don't overwrite the playhead
+      // the reloaded stream is about to resume from.
+      if (audio.readyState < HTMLMediaElement.HAVE_METADATA) return;
       if (!isDraggingSlider) {
         setLocalTime(audio.currentTime);
       }

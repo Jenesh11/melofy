@@ -58,36 +58,98 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 });
 
+export const DEV_USER = {
+  uid: 'dev-user',
+  email: 'dev@melofy.local',
+  displayName: 'Developer',
+  photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
+  emailVerified: true,
+  isAnonymous: false,
+  phoneNumber: null,
+  providerId: 'google.com',
+  tenantId: null,
+  metadata: {
+    creationTime: new Date().toISOString(),
+    lastSignInTime: new Date().toISOString(),
+  },
+  providerData: [],
+  refreshToken: 'dev-refresh-token',
+  delete: async () => {},
+  getIdToken: async () => 'dev-token',
+  getIdTokenResult: async () => ({
+    token: 'dev-token',
+    authTime: new Date().toISOString(),
+    issuedAtTime: new Date().toISOString(),
+    expirationTime: new Date(Date.now() + 3600 * 1000).toISOString(),
+    signInProvider: 'google.com',
+    signInSecondFactor: null,
+    claims: {},
+  }),
+  reload: async () => {},
+  toJSON: () => ({}),
+} as unknown as User;
+
+export function isDevEnvironment(): boolean {
+  if (typeof window === 'undefined') {
+    return process.env.NODE_ENV !== 'production';
+  }
+  return (
+    process.env.NODE_ENV !== 'production' ||
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1'
+  );
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window !== 'undefined' && isDevEnvironment()) {
+      if (localStorage.getItem('melofy_dev_signout') !== 'true') {
+        return DEV_USER;
+      }
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined' && isDevEnvironment()) {
+      return false;
+    }
+    return true;
+  });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (useHomeStore.getState().userId !== (user?.uid || null)) {
-        useHomeStore.getState().resetForUser(user?.uid || null);
+    const isDev = isDevEnvironment();
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      const effectiveUser =
+        firebaseUser ||
+        (isDev && localStorage.getItem('melofy_dev_signout') !== 'true'
+          ? DEV_USER
+          : null);
+
+      if (useHomeStore.getState().userId !== (effectiveUser?.uid || null)) {
+        useHomeStore.getState().resetForUser(effectiveUser?.uid || null);
         usePlayerStore.getState().reset();
       }
-      useLikedStore.getState().bindUser(user?.uid || null);
-      setUser(user);
+      useLikedStore.getState().bindUser(effectiveUser?.uid || null);
+      setUser(effectiveUser);
       setLoading(false);
 
       // Auto-sync user to Firestore on login in background without blocking UI
-      if (user) {
+      if (effectiveUser && effectiveUser !== DEV_USER) {
         try {
-          const userRef = doc(db, 'users', user.uid);
+          const userRef = doc(db, 'users', effectiveUser.uid);
           const userSnap = await getDoc(userRef);
 
           if (!userSnap.exists()) {
             await setDoc(userRef, {
-              email: user.email,
-              displayName: user.displayName,
-              photoURL: user.photoURL,
+              email: effectiveUser.email,
+              displayName: effectiveUser.displayName,
+              photoURL: effectiveUser.photoURL,
               createdAt: new Date().toISOString(),
             });
 
             // Generate initial "Liked Songs" playlist
-            await addPlaylist(user.uid, {
+            await addPlaylist(effectiveUser.uid, {
               name: 'Liked Songs',
               trackCount: 0,
               tracks: [],
@@ -165,6 +227,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     try {
+      if (isDevEnvironment()) {
+        console.log('[Auth] Dev mode active — signing in as Dev User');
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('melofy_dev_signout');
+        }
+        setUser(DEV_USER);
+        if (useHomeStore.getState().userId !== DEV_USER.uid) {
+          useHomeStore.getState().resetForUser(DEV_USER.uid);
+        }
+        useLikedStore.getState().bindUser(DEV_USER.uid);
+        return;
+      }
+
       const isNative = isCapacitorNative();
       console.log('[Auth] signInWithGoogle — isCapacitorNative:', isNative);
 
@@ -201,7 +276,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // ── Browser / Fallback path ────────────────────────────────────────────
-      const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+      const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
 
       if (isTauri) {
         console.log('[Auth] Tauri detected — opening system browser for login');
@@ -217,8 +292,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Determine the URL depending on dev/prod
-        const isDev = window.location.hostname === 'localhost';
-        const baseUrl = isDev ? 'http://localhost:3001' : 'https://melofy.jene.in';
+        const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const baseUrl = isDev ? window.location.origin : 'https://melofy.jene.in';
 
         await openBrowserUrl(`${baseUrl}/desktop-login`);
       } else {
@@ -234,7 +309,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('melofy_dev_signout', 'true');
+      }
       await firebaseSignOut(auth);
+      setUser(null);
+      if (useHomeStore.getState().userId !== null) {
+        useHomeStore.getState().resetForUser(null);
+      }
+      useLikedStore.getState().bindUser(null);
     } catch (error) {
       console.error('Error signing out', error);
     }

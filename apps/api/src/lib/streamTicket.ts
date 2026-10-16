@@ -1,7 +1,9 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
-const DEFAULT_STREAM_TICKET_TTL_SECONDS = 300;
-const MAX_STREAM_TICKET_TTL_SECONDS = 600;
+// Long enough to survive a paused song: an expired ticket on a Range request
+// surfaces as a media error. Tickets stay bound to one user and one track.
+const DEFAULT_STREAM_TICKET_TTL_SECONDS = 30 * 60;
+const MAX_STREAM_TICKET_TTL_SECONDS = 60 * 60;
 
 interface StreamTicketClaims {
   u: string; // uid

@@ -13,6 +13,7 @@ import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
 export async function buildStreamUrl(
   encodedTrack: string | undefined | null,
   user?: User | null,
+  signal?: AbortSignal,
 ): Promise<string | null> {
   if (!encodedTrack || !user) return null;
 
@@ -24,6 +25,7 @@ export async function buildStreamUrl(
       ...authHeaders,
     },
     body: JSON.stringify({ url: encodedTrack }),
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(10000)]) : AbortSignal.timeout(10000),
   });
   if (!ticketRes.ok) {
     throw new Error(`Failed to create stream ticket (${ticketRes.status})`);

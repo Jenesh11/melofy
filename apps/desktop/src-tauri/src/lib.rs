@@ -263,6 +263,7 @@ pub fn run() {
             }
 
             // ── Reconnectivity check: redirect to offline screen if remote server is unreachable ──
+            #[cfg(not(debug_assertions))]
             {
                 use std::net::ToSocketAddrs;
                 let is_reachable = if let Ok(addrs) = "melofy.jene.in:443".to_socket_addrs() {

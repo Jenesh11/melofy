@@ -14,6 +14,7 @@ import { useLibraryStore as library } from '../../apps/web/src/store/useLibraryS
 import { mapSpotifyTrackToPlayerTrack } from '../../apps/web/src/lib/track-mappers';
 import { normalizeToFirebaseTrack } from '../../apps/web/src/lib/library-tracks';
 import Home from '../../apps/web/src/app/page';
+import { PlayerShell } from '../../apps/web/src/components/layout/PlayerShell';
 
 const alice = { uid: 'alice', displayName: 'Alice', getIdToken: async () => 'fixture-alice' };
 const bob = { uid: 'bob', displayName: 'Bob', getIdToken: async () => 'fixture-bob' };
@@ -257,7 +258,19 @@ test('Delayed liked-song snapshot cannot update another account', async () => {
 window.runResults = [];
 window.runComplete = false;
 window.fixtureToasts = [];
-if (location.pathname === '/home') {
+if (location.pathname === '/player') {
+  setUser(alice); home.getState().resetForUser('alice'); likes.getState().bindUser('alice');
+  window.fixtureRequests = [];
+  const realFetch = window.fetch.bind(window);
+  window.fetch = async (url, options) => {
+    if (String(url).startsWith('/api/player-state')) return response({ state: null });
+    return realFetch(url, options);
+  };
+  window.playerStore = player;
+  window.fixtureTracks = { seed: { ...seed, duration: 15000 }, next: { ...next, duration: 15000 }, manual };
+  window.fixtureSetUser = setUser;
+  root.render(<PlayerShell />);
+} else if (location.pathname === '/home') {
   home.getState().resetForUser('alice'); likes.getState().bindUser('alice');
   window.fixtureRequests = [];
   window.fetch = async (url, options) => { window.fixtureRequests.push({ url, body: options?.body ? JSON.parse(options.body) : null }); return response(String(url).includes('/mixes/') ? mix : homeData()); };

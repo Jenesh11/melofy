@@ -1,15 +1,16 @@
 'use client';
-/* eslint-disable @next/next/no-img-element */
+ 
 
 import { useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Disc, Play, Plus } from 'lucide-react';
+import { Play, Plus } from 'lucide-react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { resolvePlayableTrack, type TrackItem } from '@/components/ui/TrackList';
-import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { Artwork } from '@/components/ui/Artwork';
+import { Shelf, SHELF_CARD_WIDTH } from '@/components/home/Shelf';
 
 interface PlaylistGridItem {
   id: string;
@@ -27,6 +28,7 @@ interface PlaylistGridItem {
 
 interface PlaylistGridProps {
   title: string;
+  subtitle?: string;
   items: PlaylistGridItem[];
   isAlbum?: boolean;
   isCarousel?: boolean;
@@ -37,6 +39,7 @@ interface PlaylistGridProps {
 
 export function PlaylistGrid({
   title,
+  subtitle,
   items,
   isAlbum = false,
   isCarousel = false,
@@ -92,111 +95,74 @@ export function PlaylistGrid({
 
   if (!items || items.length === 0) return null;
 
-  return (
-    <section className={cn('mt-8', className)}>
-      <div className='flex items-center justify-between mb-6'>
-        <h3 className='text-3xl font-bold text-foreground flex items-center gap-2'>
-          {title}
-        </h3>
-        {onPlayPlaylist && items.length > 0 && (
-          <Button
-            variant='ghost'
-            size='sm'
-            className='text-primary hover:text-primary/80 flex items-center gap-2 group/playall'
-            onClick={() => onPlayPlaylist(items[0])}
-          >
-            <Play className='h-4 w-4 fill-current group-hover/playall:scale-110 transition-transform' />
-            <span className='text-xs font-bold'>
-              Play Featured
-            </span>
-          </Button>
+  const subtitleFor = (item: PlaylistGridItem) =>
+    isAlbum
+      ? item.artists?.[0]?.name
+      : item.owner?.display_name ||
+        item.description ||
+        (item.id.startsWith('mix:') ? 'Melofy Mix' : 'Spotify Mix');
+
+  const cards = items.map((item, index) => {
+    const artwork = item.images?.[0]?.url;
+    const count = item.tracks?.total;
+    return (
+      <motion.div
+        key={item.id + index}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: Math.min(index, 8) * 0.03, duration: 0.3, ease: 'easeOut' }}
+        className={cn(
+          'group relative cursor-pointer rounded-xl p-2 md:p-2.5 transition-colors hover:bg-foreground/[0.05]',
+          isCarousel && cn('shrink-0 snap-start', SHELF_CARD_WIDTH),
         )}
-      </div>
-      <div
-        className={
-          isCarousel
-            ? 'flex overflow-x-auto gap-6 pb-4 custom-scrollbar carousel-scrollbar snap-x snap-mandatory scroll-smooth'
-            : 'grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(160px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-6'
-        }
+        onClick={() => router.push(`/playlist/${item.id}`)}
       >
-        {items.map((item, index) => (
-          <motion.div
-            key={item.id + index}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.05 }}
-            className={`flex flex-col gap-3 group cursor-pointer ${
-              isCarousel
-                ? 'min-w-[140px] w-[140px] sm:min-w-[160px] sm:w-[160px] md:min-w-[180px] md:w-[180px] snap-start shrink-0'
-                : ''
-            }`}
-            onClick={() => router.push(`/playlist/${item.id}`)}
-          >
-            <div className='aspect-square rounded-[2rem] bg-muted relative overflow-hidden shadow-xl group-hover:shadow-primary/10 transition-all duration-500'>
-              <div className='absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-10'>
-                <Button
-                  size='icon'
-                  aria-label={`Play ${item.name || 'mix'}`}
-                  className='h-14 w-14 rounded-full bg-primary text-primary-foreground hover:scale-110 transition-all shadow-2xl'
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void handlePlayItem(item);
-                  }}
-                >
-                  <Play className='h-7 w-7 fill-current transition-colors ml-1' />
-                </Button>
-                {onImport && (
-                  <Button
-                    size='icon'
-                    variant='outline'
-                    aria-label={`Save ${item.name || 'mix'} to library`}
-                    className='h-14 w-14 rounded-full border-white/10 bg-white/5 hover:bg-white/10 text-white hover:scale-110 transition-all shadow-2xl'
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onImport(item);
-                    }}
-                  >
-                    <Plus className='h-7 w-7' />
-                  </Button>
-                )}
-              </div>
+        <div className='relative aspect-square overflow-hidden rounded-lg bg-muted shadow-[0_8px_24px_-8px_rgb(0_0_0/0.5)]'>
+          <Artwork src={artwork} className='h-full w-full' imgClassName='transition-transform duration-500 group-hover:scale-[1.03]' />
+          <div className='absolute bottom-2 right-2 flex items-center gap-1.5'>
+            {onImport && (
+              <button
+                type='button'
+                aria-label={`Save ${item.name || 'mix'} to library`}
+                title='Save to library'
+                onClick={(event) => { event.stopPropagation(); onImport(item); }}
+                className='flex h-9 w-9 translate-y-2 items-center justify-center rounded-full bg-black/55 text-white opacity-0 backdrop-blur-md transition-all duration-300 hover:bg-black/75 group-hover:translate-y-0 group-hover:opacity-100 focus-visible:translate-y-0 focus-visible:opacity-100'
+              >
+                <Plus className='h-4 w-4' />
+              </button>
+            )}
+            <button
+              type='button'
+              aria-label={`Play ${item.name || 'mix'}`}
+              onClick={(event) => { event.stopPropagation(); void handlePlayItem(item); }}
+              className='flex h-11 w-11 translate-y-2 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow-[0_8px_20px_rgb(0_0_0/0.45)] transition-all duration-300 hover:scale-105 active:scale-95 group-hover:translate-y-0 group-hover:opacity-100 focus-visible:translate-y-0 focus-visible:opacity-100'
+            >
+              <Play className='h-5 w-5 translate-x-px fill-current' />
+            </button>
+          </div>
+        </div>
+        <div className='mt-2.5 min-w-0'>
+          <p className='truncate text-sm font-semibold text-foreground'>{item.name}</p>
+          <p className='mt-0.5 line-clamp-1 text-[13px] text-muted-foreground'>
+            {count ? `${count} songs · ` : ''}{subtitleFor(item)}
+          </p>
+        </div>
+      </motion.div>
+    );
+  });
 
-              <div className='h-full w-full bg-linear-to-br from-muted to-background transition-transform duration-700 flex items-center justify-center'>
-                {item.images?.[0]?.url ? (
-                  <img
-                    src={item.images[0].url}
-                    alt={item.name}
-                    className='h-full w-full object-cover'
-                  />
-                ) : (
-                  <Disc className='h-12 w-12 text-muted-foreground/40' />
-                )}
-              </div>
+  if (isCarousel) {
+    return <Shelf title={title} subtitle={subtitle} className={className}>{cards}</Shelf>;
+  }
 
-              <div className='absolute bottom-4 right-4 bg-background/60 backdrop-blur-md px-3 py-1 rounded-full border border-border z-20'>
-                <p className='text-[10px] text-foreground font-bold uppercase'>
-                  {item.tracks?.total
-                    ? `${item.tracks.total} Tracks`
-                    : isAlbum
-                      ? 'Album'
-                      : 'Mix'}
-                </p>
-              </div>
-            </div>
-            <div className='flex flex-col px-1 mt-2'>
-              <p className='text-foreground font-bold truncate text-base group-hover:text-primary transition-colors'>
-                {item.name}
-              </p>
-              <p className='text-muted-foreground text-xs truncate uppercase tracking-tighter mt-1 font-medium font-outfit'>
-                {isAlbum
-                  ? item.artists?.[0]?.name
-                  : item.owner?.display_name ||
-                    item.description ||
-                    (item.id.startsWith('mix:') ? 'Melofy Mix' : 'Spotify Mix')}
-              </p>
-            </div>
-          </motion.div>
-        ))}
+  return (
+    <section className={cn('flex flex-col gap-3', className)}>
+      <div>
+        <h2 className='text-[1.375rem] md:text-2xl font-bold text-foreground'>{title}</h2>
+        {subtitle && <p className='mt-0.5 text-sm text-muted-foreground'>{subtitle}</p>}
+      </div>
+      <div className='-mx-2 grid grid-cols-2 gap-1 sm:grid-cols-[repeat(auto-fill,minmax(164px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(184px,1fr))] md:gap-2'>
+        {cards}
       </div>
     </section>
   );

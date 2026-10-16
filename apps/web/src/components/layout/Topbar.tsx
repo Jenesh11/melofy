@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 
-import { Search, User, X, Loader2, Play, PlusCircle, ListPlus } from 'lucide-react';
+import { Search, User, X, Loader2, Play, PlusCircle, ListPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '@/lib/firebase/auth-context';
@@ -44,6 +44,21 @@ export function Topbar() {
   const debouncedQuery = useDebounce(query, 500);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // "/" or Ctrl/Cmd+K jumps to search from anywhere, like most pro apps.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target.isContentEditable) return;
+      if (event.key === '/' || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k')) {
+        if (!inputRef.current) return;
+        event.preventDefault();
+        inputRef.current.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -150,8 +165,18 @@ export function Topbar() {
   };
 
   return (
-    <div className='h-16 flex items-center justify-between gap-4 px-6 bg-background/60 backdrop-blur-3xl border-b border-border transition-all duration-300'>
-      <div className='flex items-center gap-4 flex-1'>
+    <div className='h-16 flex items-center justify-between gap-3 px-4 md:px-6 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/55'>
+      <div className='flex items-center gap-3 flex-1 min-w-0'>
+        <div className='hidden md:flex items-center gap-1.5 shrink-0'>
+          <button type='button' aria-label='Go back' onClick={() => router.back()}
+            className='flex h-8 w-8 items-center justify-center rounded-full bg-foreground/[0.06] text-muted-foreground transition-colors hover:bg-foreground/[0.1] hover:text-foreground'>
+            <ChevronLeft className='h-4 w-4' />
+          </button>
+          <button type='button' aria-label='Go forward' onClick={() => router.forward()}
+            className='flex h-8 w-8 items-center justify-center rounded-full bg-foreground/[0.06] text-muted-foreground transition-colors hover:bg-foreground/[0.1] hover:text-foreground'>
+            <ChevronRight className='h-4 w-4' />
+          </button>
+        </div>
         {/* Mobile Logo (only shown on search page where topbar search is hidden) */}
         {pathname === '/search' && (
           <Link
@@ -181,7 +206,7 @@ export function Topbar() {
           >
             <div className='relative group'>
               <div className='absolute inset-y-0 left-3 flex items-center pointer-events-none'>
-                <Search className='h-4 w-4 md:h-5 md:w-5 text-muted-foreground group-focus-within:text-foreground transition-colors' />
+                <Search className='h-4 w-4 md:h-[18px] md:w-[18px] text-muted-foreground group-focus-within:text-foreground transition-colors' />
               </div>
               <input
                 ref={inputRef}
@@ -190,9 +215,13 @@ export function Topbar() {
                 onChange={(e) => setQuery(e.target.value)}
                 onFocus={() => setIsFocused(true)}
                 onKeyDown={handleSearchSubmit}
-                placeholder='What do you want to play?'
-                className='h-10 md:h-12 w-full bg-muted/80 focus:bg-muted hover:bg-muted border border-border/50 focus:border-border transition-colors rounded-full flex items-center pl-9 md:pl-11 pr-10 text-xs md:text-sm font-medium text-foreground placeholder:text-muted-foreground outline-none'
+                placeholder='Search songs, artists or playlists'
+                aria-label='Search'
+                className='h-10 md:h-11 w-full bg-foreground/[0.06] hover:bg-foreground/[0.08] focus:bg-background border border-transparent focus:border-primary/60 focus:ring-4 focus:ring-primary/15 transition-[background,border,box-shadow] rounded-full flex items-center pl-9 md:pl-11 pr-14 text-[13px] md:text-sm font-medium text-foreground placeholder:text-muted-foreground outline-none'
               />
+              {!query && (
+                <kbd className='pointer-events-none absolute inset-y-0 right-3 my-auto hidden h-6 items-center rounded-md border border-border bg-background/60 px-2 text-[11px] font-semibold text-muted-foreground md:flex'>/</kbd>
+              )}
               {query && (
                 <button
                   onClick={() => {
@@ -208,7 +237,7 @@ export function Topbar() {
 
             {/* Dropdown */}
             {isFocused && (query.trim() || loading) && (
-              <div className='absolute top-full left-0 right-0 mt-2 bg-card/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl overflow-hidden z-100 max-h-[60vh] overflow-y-auto custom-scrollbar'>
+              <div className='absolute top-full left-0 right-0 mt-2 bg-popover/95 backdrop-blur-xl border border-border rounded-2xl shadow-[0_24px_60px_-12px_rgb(0_0_0/0.55)] overflow-hidden z-100 max-h-[60vh] overflow-y-auto custom-scrollbar p-1.5'>
                 {loading && results.length === 0 ? (
                   <div className='flex items-center justify-center p-8'>
                     <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />
@@ -219,7 +248,7 @@ export function Topbar() {
                       <div
                         key={`${track.info?.identifier}-${i}`}
                         onClick={() => handleTrackClick(track)}
-                        className='flex items-center gap-3 w-full p-2 hover:bg-muted/50 transition-colors text-left group/item cursor-pointer'
+                        className='flex items-center gap-3 w-full p-2 rounded-xl hover:bg-foreground/[0.06] transition-colors text-left group/item cursor-pointer'
                       >
                         <div className='h-10 w-10 shrink-0 rounded-md overflow-hidden relative bg-muted flex items-center justify-center'>
                           {track.info?.artworkUrl ? (
@@ -270,9 +299,10 @@ export function Topbar() {
         <Link href='/settings'>
           <Button
             variant='ghost'
-            className='h-10 w-10 sm:w-auto rounded-full p-0 sm:px-3 sm:py-2 bg-card/40 hover:bg-card hover:scale-[0.97] active:scale-95 cursor-pointer transition-all text-foreground font-medium border border-border/50 hover:border-border flex items-center justify-center sm:gap-2'
+            aria-label='Account and settings'
+            className='h-10 w-10 sm:w-auto rounded-full p-0 sm:pl-1 sm:pr-3.5 bg-foreground/[0.06] hover:bg-foreground/[0.1] active:scale-[0.97] cursor-pointer transition-all text-foreground font-semibold flex items-center justify-center sm:flex-row-reverse sm:gap-2'
           >
-            <span className='hidden sm:block text-sm mr-1 truncate max-w-[120px]'>
+            <span className='hidden sm:block text-sm truncate max-w-[120px]'>
               {user?.displayName || 'Settings'}
             </span>
             <div className='h-7 w-7 rounded-full bg-muted flex items-center justify-center shrink-0 relative'>

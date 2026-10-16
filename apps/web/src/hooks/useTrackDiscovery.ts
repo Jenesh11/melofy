@@ -5,11 +5,16 @@ import { useHomeStore } from '@/store/useHomeStore';
 import { useLikedStore } from '@/store/useLikedStore';
 import { libraryToTrack, recommendationToTrack, seedMetadata, type RecommendationTrack } from '@/lib/discovery';
 import { toast } from 'sonner';
+import { skippedFor } from '@/store/useTasteStore';
+
+/** Radio tracks queued per refill: visible "Up next", yet refreshed often enough to adapt to skips. */
+const RADIO_BATCH = 5;
 
 export function useTrackDiscovery() {
   const { user } = useAuth();
   const [isBuffering, setIsBuffering] = useState(false);
   const currentTrack = usePlayerStore(state => state.currentTrack);
+  const isPlaying = usePlayerStore(state => state.isPlaying);
   const resolutionRef = useRef<AbortController | null>(null);
   const autoplayRef = useRef<AbortController | null>(null);
   const getAuthHeader = useCallback(async () => {
@@ -18,7 +23,7 @@ export function useTrackDiscovery() {
   }, [user]);
 
   useEffect(() => {
-    if (!currentTrack || currentTrack.url || !user) return;
+    if (!currentTrack || currentTrack.url || !user || !isPlaying) return;
     const controller = new AbortController();
     resolutionRef.current = controller;
     let timedOut = false;
@@ -47,14 +52,14 @@ export function useTrackDiscovery() {
           if (!success && (!controller.signal.aborted || timedOut) && usePlayerStore.getState().currentTrack === currentTrack) {
             const state = usePlayerStore.getState();
             if (state.partyId && !state.isPartyHost) { toast.error('Track unavailable. Waiting for the host.'); state.pause(true); }
-            else { toast.error('This track is unavailable. Skipping...'); state.playNext(true, true); }
+            else { toast.error('Couldn’t load this track. Try Play again; your queue is unchanged.'); state.pause(true); }
           }
         }
       }
     }
     void resolve();
     return () => { controller.abort(); clearTimeout(timeout); if (resolutionRef.current === controller) { resolutionRef.current = null; setIsBuffering(false); } };
-  }, [currentTrack, user, getAuthHeader]);
+  }, [currentTrack, user, isPlaying, getAuthHeader]);
 
   useEffect(() => () => { autoplayRef.current?.abort(); resolutionRef.current?.abort(); }, [user]);
 
@@ -75,15 +80,18 @@ export function useTrackDiscovery() {
       if (!stillCurrent()) return;
       const likes = useLikedStore.getState();
       const response = await fetch('/api/recommendations', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, signal: controller.signal,
-        body: JSON.stringify({ genre: useHomeStore.getState().genre, language: useHomeStore.getState().language, seed: seedMetadata(seed), history: snapshot.history.slice(-50).map(seedMetadata), liked: likes.userId === user.uid ? likes.likedTracks.slice(-50).map(libraryToTrack).map(seedMetadata) : [] }) });
+        body: JSON.stringify({ genre: useHomeStore.getState().genre, language: useHomeStore.getState().language, seed: seedMetadata(seed), history: snapshot.history.slice(-50).map(seedMetadata), liked: likes.userId === user.uid ? likes.likedTracks.slice(-50).map(libraryToTrack).map(seedMetadata) : [], skipped: skippedFor(user.uid) }) });
       if (!response.ok) throw new Error('Radio is temporarily unavailable');
       const data = await response.json() as { tracks?: RecommendationTrack[] };
       if (!stillCurrent()) return;
       const recentIds = new Set([...snapshot.history.slice(-20), seed].flatMap(t => [t.id, t.identifier]));
-      const next = data.tracks?.find(t => !recentIds.has(t.id) && !(t.title.toLowerCase() === seed.title.toLowerCase() && t.artist.toLowerCase() === seed.artist.toLowerCase()));
-      if (!next) { toast.info('No fresh recommendations found. Try another song or mix.'); return; }
+      const fresh = (data.tracks || []).filter(t => !recentIds.has(t.id) && !(t.title.toLowerCase() === seed.title.toLowerCase() && t.artist.toLowerCase() === seed.artist.toLowerCase()));
+      if (!fresh.length) { toast.info('No fresh recommendations found. Try another song or mix.'); return; }
       unsubscribe();
-      usePlayerStore.getState().play(recommendationToTrack(next));
+      const [first, ...rest] = fresh.slice(0, RADIO_BATCH).map(recommendationToTrack);
+      const player = usePlayerStore.getState();
+      player.play(first!);
+      if (rest.length) player.setQueue(rest);
     } catch { if (stillCurrent()) toast.error('Radio is temporarily unavailable. Try another song.'); }
     finally { clearTimeout(timeout); unsubscribe(); if (autoplayRef.current === controller) autoplayRef.current = null; }
   }, [user, getAuthHeader]);

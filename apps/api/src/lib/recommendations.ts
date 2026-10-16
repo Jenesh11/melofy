@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { cleanTitle } from './sourceFallback';
 
 export interface RecommendationTrack {
   id: string;
@@ -17,6 +18,8 @@ export interface TasteProfile {
   seed?: RecommendationTrack;
   history: RecommendationTrack[];
   liked: RecommendationTrack[];
+  /** Tracks the listener skipped early: a strong negative signal. */
+  skipped: RecommendationTrack[];
   genre: string;
   language: string;
 }
@@ -51,33 +54,98 @@ export function normalizeTrack(value: unknown): RecommendationTrack | null {
 export function parseProfile(value: unknown): TasteProfile {
   const raw = object(value);
   const list = (v: unknown) => Array.isArray(v) ? v.slice(-50).map(normalizeTrack).filter((t): t is RecommendationTrack => !!t) : [];
-  return { seed: normalizeTrack(raw.seed) || undefined, history: list(raw.history), liked: list(raw.liked),
+  return { seed: normalizeTrack(raw.seed) || undefined, history: list(raw.history), liked: list(raw.liked), skipped: list(raw.skipped),
     genre: genres.includes(text(raw.genre)) ? text(raw.genre) : 'pop',
     language: languages.includes(text(raw.language)) ? text(raw.language) : 'all' };
 }
-export const metadataKey = (t: Pick<RecommendationTrack, 'title' | 'artist'>) => `${t.title}|${t.artist}`.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+/** First credited artist, so "Pritam, Arijit Singh" and "Pritam" count together. */
+const primaryArtist = (artist: string) => artist.split(/\s*(?:,|&|\bfeat\.?|\bft\.?|\bx\b|\/)\s*/i)[0]!.trim().toLowerCase();
+/** Same recording across uploads: "Song (Official Video)" == "Song". */
+export const metadataKey = (t: Pick<RecommendationTrack, 'title' | 'artist'>) =>
+  `${cleanTitle(t.title) || t.title}|${primaryArtist(t.artist)}`.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}|]/gu, '');
 function ids(t: RecommendationTrack) { return [t.id, t.identifier, t.recordingMbid].filter(Boolean); }
-export function rankTracks(candidates: RecommendationTrack[], profile: TasteProfile, limit = 20): RecommendationTrack[] {
-  const excluded = [...profile.history.slice(-20), ...(profile.seed ? [profile.seed] : [])];
+
+/** Never what the listener asked for, unless the seed itself is one. */
+const JUNK_PATTERN = /\b(?:slowed|reverb|sped\s*up|speed\s*up|nightcore|8d|bass\s*boost(?:ed)?|\d+\s*hours?|hour\s*loop|loop(?:ed)?|jukebox|mash\s*up|mashup|non\s*-?\s*stop|karaoke|ringtone|whatsapp|status|reaction|tutorial|full\s*album|audiobook|podcast|trending|reels?|shorts)\b/i;
+/** Legitimate alternate versions; ranked below the original unless requested. */
+const VARIANT_PATTERN = /\b(?:remix|live|cover|lofi|lo-fi|instrumental|unplugged|acoustic\s+version|reprise|extended|edit)\b/i;
+const MIN_TRACK_MS = 95_000;
+const MAX_TRACK_MS = 9 * 60_000;
+
+export interface CandidateSignal {
+  /** Accumulated evidence from providers (rank in a radio, multi-source agreement). */
+  relevance: number;
+}
+
+function qualityFilter(profile: TasteProfile) {
+  const seedText = `${profile.seed?.title || ''} ${profile.genre}`;
+  const allowJunk = JUNK_PATTERN.test(seedText);
+  const longForm = (profile.seed?.duration || 0) > MAX_TRACK_MS || ['classical', 'jazz'].includes(profile.genre);
+  return (track: RecommendationTrack) => {
+    if (!allowJunk && JUNK_PATTERN.test(track.title)) return false;
+    if (track.duration > 0 && track.duration < MIN_TRACK_MS) return false;
+    if (track.duration > (longForm ? MAX_TRACK_MS * 2 : MAX_TRACK_MS)) return false;
+    return true;
+  };
+}
+
+/** Greedy reorder so one artist never plays twice in a row when avoidable. */
+function spreadArtists<T extends { track: RecommendationTrack }>(items: T[]): T[] {
+  const pending = [...items];
+  const ordered: T[] = [];
+  while (pending.length) {
+    const previous = ordered.length ? primaryArtist(ordered[ordered.length - 1]!.track.artist) : null;
+    const index = pending.findIndex(item => primaryArtist(item.track.artist) !== previous);
+    ordered.push(pending.splice(index >= 0 ? index : 0, 1)[0]!);
+  }
+  return ordered;
+}
+
+export function rankTracks(
+  candidates: RecommendationTrack[],
+  profile: TasteProfile,
+  limit = 20,
+  signals?: Map<RecommendationTrack, CandidateSignal>,
+): RecommendationTrack[] {
+  const excluded = [...profile.history.slice(-30), ...profile.skipped, ...(profile.seed ? [profile.seed] : [])];
   const excludedIds = new Set(excluded.flatMap(ids));
   const excludedNames = new Set(excluded.map(metadataKey));
-  const favoriteArtists = new Map<string, number>();
-  for (const [tracks, weight] of [[profile.history.slice(-15), 1], [profile.liked, 2]] as const) {
-    for (const t of tracks) favoriteArtists.set(t.artist.toLowerCase(), Math.min(10, (favoriteArtists.get(t.artist.toLowerCase()) || 0) + weight));
-  }
+
+  const affinity = new Map<string, number>();
+  const bump = (artist: string, amount: number, cap: number) => {
+    const key = primaryArtist(artist);
+    affinity.set(key, Math.max(-cap, Math.min(cap, (affinity.get(key) || 0) + amount)));
+  };
+  for (const t of profile.history.slice(-15)) bump(t.artist, 0.5, 4);
+  for (const t of profile.liked) bump(t.artist, 1.5, 4);
+  for (const t of profile.skipped.slice(-30)) bump(t.artist, -1.5, 4.5);
+
+  const seedText = `${profile.seed?.title || ''} ${profile.genre}`;
+  const wantsVariants = VARIANT_PATTERN.test(seedText);
+  const passesQuality = qualityFilter(profile);
+  const seedArtist = profile.seed ? primaryArtist(profile.seed.artist) : null;
+
+  const scored = candidates.map((track, index) => {
+    const relevance = signals?.get(track)?.relevance ?? Math.max(0, 1 - index / Math.max(candidates.length, 1));
+    let score = relevance * 2 + (affinity.get(primaryArtist(track.artist)) || 0) + (track.encoded ? 1 : 0) - index / 1000;
+    if (!wantsVariants && VARIANT_PATTERN.test(track.title)) score -= 2;
+    return { track, score };
+  }).sort((a, b) => b.score - a.score);
+
   const seenIds = new Set<string | undefined>();
   const seenNames = new Set<string>();
   const counts = new Map<string, number>();
-  return candidates.map((track, index) => ({ track, score: (favoriteArtists.get(track.artist.toLowerCase()) || 0) + (track.encoded ? 2 : 0) - index / 100 }))
-    .sort((a, b) => b.score - a.score)
-    .filter(({ track }) => {
-      const key = metadataKey(track);
-      if (ids(track).some(id => excludedIds.has(id) || seenIds.has(id)) || excludedNames.has(key) || seenNames.has(key)) return false;
-      const artist = track.artist.toLowerCase();
-      if ((counts.get(artist) || 0) >= 3) return false;
-      ids(track).forEach(id => seenIds.add(id)); seenNames.add(key); counts.set(artist, (counts.get(artist) || 0) + 1);
-      return true;
-    }).slice(0, limit).map(({ track }) => track);
+  const picked = scored.filter(({ track }) => {
+    if (!passesQuality(track)) return false;
+    const key = metadataKey(track);
+    if (ids(track).some(id => excludedIds.has(id) || seenIds.has(id)) || excludedNames.has(key) || seenNames.has(key)) return false;
+    const artist = primaryArtist(track.artist);
+    // The seed's artist dominates YouTube radio; leave room for discovery.
+    if ((counts.get(artist) || 0) >= (artist === seedArtist ? 2 : 3)) return false;
+    ids(track).forEach(id => seenIds.add(id)); seenNames.add(key); counts.set(artist, (counts.get(artist) || 0) + 1);
+    return true;
+  }).slice(0, limit);
+  return spreadArtists(picked).map(({ track }) => track);
 }
 
 export interface RecommendationDependencies {
@@ -168,27 +236,62 @@ export function createRecommendationService(deps: RecommendationDependencies) {
   async function recommend(profile: TasteProfile, limit = 20) {
     const seeds = [profile.seed, ...profile.history.slice(-6).reverse(), ...profile.liked.slice(-6).reverse()].filter((t): t is RecommendationTrack => !!t);
     const uniqueSeeds = Array.from(new Map(seeds.map(t => [metadataKey(t), t])).values()).slice(0, profile.seed ? 1 : 3);
+    // With an explicit seed, blend in radios from recent likes/history so the
+    // station stays anchored to the listener's taste rather than drifting.
+    const skippedKeys = new Set(profile.skipped.map(metadataKey));
+    const anchors = profile.seed ? Array.from(new Map(
+      [...profile.liked.slice(-10).reverse(), ...profile.history.slice(-10).reverse()]
+        .filter(t => metadataKey(t) !== metadataKey(profile.seed!) && !skippedKeys.has(metadataKey(t)))
+        .map(t => [metadataKey(t), t]),
+    ).values()).slice(0, 2) : [];
+
     const candidates: RecommendationTrack[] = [];
+    const signals = new Map<RecommendationTrack, CandidateSignal>();
+    const byKey = new Map<string, RecommendationTrack>();
     const failures: string[] = [];
-    const attempt = async (provider: string, work: () => Promise<RecommendationTrack[]>) => {
-      try { candidates.push(...await work()); } catch { failures.push(provider); }
+    // Each list contributes rank-decayed evidence; songs several radios agree
+    // on accumulate it, which is the strongest similarity signal available.
+    const add = (tracks: RecommendationTrack[], weight: number) => {
+      tracks.forEach((track, index) => {
+        const evidence = weight * (1 - index / Math.max(tracks.length, 1));
+        const key = metadataKey(track);
+        const existing = byKey.get(key);
+        // Independent lists agreeing is worth more than any single rank.
+        if (existing) { signals.get(existing)!.relevance += evidence + 0.5; return; }
+        byKey.set(key, track); candidates.push(track); signals.set(track, { relevance: evidence });
+      });
     };
-    await Promise.all(uniqueSeeds.map(seed => attempt('youtube-radio', () => {
+    const attempt = async (provider: string, weight: number, work: () => Promise<RecommendationTrack[]>) => {
+      try { add(await work(), weight); } catch { failures.push(provider); }
+    };
+    const radio = (seed: RecommendationTrack) => {
       const videoId = [seed.identifier, seed.id].find(id => id && videoPattern.test(id));
       return nodeTracks(`ytrec:${videoId || `${seed.title} ${seed.artist}`}`);
-    })));
+    };
+    // Anchors load in parallel but only count when they fit the current
+    // context (their artist shows up in the seed's own radio); otherwise a
+    // liked English pop song would leak into a Hindi romance station.
+    const anchorResults = anchors.map(anchor => radio(anchor).then(tracks => ({ anchor, tracks })).catch(() => null));
+    await Promise.all(uniqueSeeds.map(seed => attempt('youtube-radio', 1, () => radio(seed))));
+    const contextArtists = new Set(candidates.map(t => primaryArtist(t.artist)));
+    for (const result of await Promise.all(anchorResults)) {
+      if (result && contextArtists.has(primaryArtist(result.anchor.artist))) add(result.tracks, 0.45);
+    }
     if (profile.language !== 'all') {
-      await attempt('youtube-search', () => search(`${profile.language} ${profile.genre} songs`));
+      await attempt('youtube-search', 0.6, () => search(`${profile.language} ${profile.genre} songs`));
     }
-    if (rankTracks(candidates, profile, limit).length < Math.min(5, limit) && uniqueSeeds[0]) {
-      await attempt('listenbrainz', () => similar(uniqueSeeds[0]));
+    const enough = () => rankTracks(candidates, profile, limit, signals).length >= Math.min(5, limit);
+    if (!enough() && uniqueSeeds[0]) {
+      await attempt('listenbrainz', 0.8, () => similar(uniqueSeeds[0]!));
     }
-    if (rankTracks(candidates, profile, limit).length < Math.min(5, limit)) {
+    if (!enough()) {
       const language = profile.language === 'all' ? '' : profile.language;
-      await attempt('youtube-search', () => search(`${language} ${uniqueSeeds[0]?.artist || ''} ${profile.genre} songs`));
+      await attempt('youtube-search', 0.5, () => search(`${language} ${uniqueSeeds[0]?.artist || ''} ${profile.genre} songs`));
     }
-    const fresh = rankTracks(candidates, profile, limit);
-    const tracks = rankTracks([...fresh, ...profile.liked.map(t => ({ ...t, provider: 'library' })), ...profile.history.slice(0, -20).map(t => ({ ...t, provider: 'library' }))], profile, limit);
+    const fresh = rankTracks(candidates, profile, limit, signals);
+    const library = [...profile.liked.map(t => ({ ...t, provider: 'library' })), ...profile.history.slice(0, -20).map(t => ({ ...t, provider: 'library' }))];
+    // Fresh picks keep their order; the library only backfills empty slots.
+    const tracks = fresh.length >= limit ? fresh : [...fresh, ...rankTracks(library, { ...profile, history: [...profile.history, ...fresh] }, limit - fresh.length)];
     return { tracks, providers: [...new Set(tracks.map(t => t.provider))], degraded: failures.length > 0, unavailable: [...new Set(failures)] };
   }
   return { recommend, search, similar };

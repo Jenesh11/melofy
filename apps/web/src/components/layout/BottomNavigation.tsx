@@ -25,22 +25,28 @@ export function BottomNavigation() {
   ];
 
   return (
-    <div className='md:hidden fixed bottom-0 left-0 right-0 h-16 bg-black/95 backdrop-blur-3xl border-t border-white/5 z-50 flex items-center justify-around px-2 pb-2 pt-1'>
+    <nav
+      aria-label='Main'
+      className='md:hidden fixed bottom-0 left-0 right-0 z-50 flex h-16 items-stretch justify-around border-t border-border bg-background/85 px-2 backdrop-blur-xl'
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
       {routes.map((route) => (
         <Link
           key={route.href}
           href={route.href}
+          aria-current={route.active ? 'page' : undefined}
           className={cn(
-            'flex flex-col items-center justify-center gap-1 w-full h-full transition-colors',
-            route.active ? 'text-white' : 'text-zinc-500 hover:text-zinc-300',
+            'relative flex w-full flex-col items-center justify-center gap-1 transition-colors',
+            route.active ? 'text-foreground' : 'text-muted-foreground active:text-foreground',
           )}
         >
-          <route.icon className={cn('h-6 w-6', route.active && 'text-white')} />
-          <span className='text-[10px] font-medium tracking-wide'>
+          {route.active && <span className='absolute top-0 h-[3px] w-8 rounded-b-full bg-primary' />}
+          <route.icon className='h-[22px] w-[22px]' strokeWidth={route.active ? 2.4 : 1.9} />
+          <span className={cn('text-[10.5px] tracking-wide', route.active ? 'font-bold' : 'font-medium')}>
             {route.label}
           </span>
         </Link>
       ))}
-    </div>
+    </nav>
   );
 }

@@ -8,7 +8,23 @@ Melofy's home discovery, generated mixes, popular discoveries and autoplay use N
 2. If there are too few fresh candidates, look up the seed's recording on ListenBrainz Labs and request similar recordings. These metadata-only tracks resolve through the existing music search/player when selected.
 3. Fall back to NodeLink music search using artist, genre and language hints, then eligible liked tracks and older history. Recent tracks and the seed are excluded. If no fresh music is available, stop with an actionable message instead of looping the seed.
 
-Ranking favors artists in likes/history, deduplicates IDs and title/artist pairs, and caps each artist at three tracks. History represents player transitions, not verified completed listens. Language and genre guide search; they are not strict catalog classifications. No machine-learning model training, Last.fm key, Python recommendation service or paid recommendation subscription is needed.
+Ranking blends several signals:
+
+- **Consensus.** With a seed, up to two recent likes/history tracks also seed radios ("taste anchors"), but only when their artist appears in the seed's own radio, so a liked English pop song never leaks into a Hindi romance station. Each list contributes rank-decayed evidence; songs that several radios agree on get a bonus and rise to the top.
+- **Affinity.** Artists in likes (+1.5 each) and recent history (+0.5) are boosted. Early skips (user skips within 30 s or 40% of a track, recorded per account on the client) exclude that song and push its artist down (-1.5 per skip).
+- **Quality.** Slowed/reverb/8D/nightcore/loops/jukebox/mashups/karaoke/reels and clips under 95 s or over 9 min are dropped unless the seed is one. Remix/live/cover/lo-fi versions are down-ranked unless the seed or genre asks for them.
+- **Identity and flow.** Uploads of the same recording ("Song (Official Video)" vs "Song") deduplicate. The seed's artist is capped at two picks and other artists at three, and the order avoids back-to-back tracks by the same artist.
+
+Autoplay queues a batch of five so "Up next" is visible, and refills when the queue empties so it keeps adapting to skips. History represents player transitions, not verified completed listens. Language and genre guide search; they are not strict catalog classifications. No machine-learning model training, Last.fm key, Python recommendation service or paid recommendation subscription is needed.
+
+## Playback sources
+
+`/api/stream` relays the direct audio URL NodeLink resolves for the encoded track. Two failure modes are handled:
+
+- **YouTube URL gating.** Without a proof-of-origin token, YouTube serves some clients' URLs (including AndroidVR, NodeLink's upstream default) only up to ~1 MB; the browser's open-range request then gets 403, so songs never start or cut out after about a minute. `docker/nodelink/configure.mjs` puts the `TVCast` client first, whose URLs serve complete files.
+- **Source fallback.** When the primary source still fails, or returns SABR/HLS (never playable from a plain GET), the API looks up the same recording on JioSaavn (complete, seekable AAC) and streams that. Matching requires a close title *and* an artist match, so a same-named song by another artist is never substituted; with no confident match, playback fails cleanly instead. The switch is cached per track for 30 minutes so seeks go straight to the working source.
+
+Stream tickets last 30 minutes so a paused song can resume, and the Next.js rewrite proxy timeout is raised to 10 minutes so slow source resolution or paused connections are not cut at the default 30 s.
 
 ## Configuration and deployment
 

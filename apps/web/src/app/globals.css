@@ -1,4 +1,3 @@
-@import url('https://fonts.cdnfonts.com/css/product-sans');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
@@ -9,7 +8,10 @@
   --breakpoint-xs: 480px;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: 'Product Sans', 'Google Sans', var(--font-outfit), sans-serif;
+  --font-sans: var(--font-figtree), var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-figtree), ui-sans-serif, sans-serif;
+  --color-canvas: var(--canvas);
+  --color-ambient: var(--ambient);
   --font-mono: var(--font-geist-mono);
   --font-outfit: var(--font-outfit);
   --tracking-tighter: -0.01em;
@@ -52,105 +54,115 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * "Studio" design tokens. Neutrals carry a faint cool tint so artwork colour
+ * reads warmer against them; --canvas sits behind the floating panels.
+ */
 :root {
-  --background: oklch(0.985 0 0);
-  --foreground: oklch(0.145 0 0);
+  --canvas: oklch(0.93 0.004 270);
+  --background: oklch(0.985 0.002 270);
+  --foreground: oklch(0.17 0.01 270);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.17 0.01 270);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.17 0.01 270);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.94 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.94 0 0);
-  --muted-foreground: oklch(0.5 0 0);
-  --accent: oklch(0.94 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.95 0.004 270);
+  --secondary-foreground: oklch(0.205 0.01 270);
+  --muted: oklch(0.95 0.004 270);
+  --muted-foreground: oklch(0.48 0.012 270);
+  --accent: oklch(0.94 0.005 270);
+  --accent-foreground: oklch(0.205 0.01 270);
   --destructive: oklch(0.58 0.22 27);
-  --border: oklch(0.9 0 0);
-  --input: oklch(0.9 0 0);
+  --border: oklch(0.17 0.01 270 / 9%);
+  --input: oklch(0.17 0.01 270 / 12%);
   --ring: oklch(0.708 0 0);
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
-  --radius: 0.625rem;
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
+  --radius: 0.75rem;
+  --sidebar: oklch(0.985 0.002 270);
+  --sidebar-foreground: oklch(0.17 0.01 270);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.94 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.9 0 0);
+  --sidebar-accent: oklch(0.94 0.005 270);
+  --sidebar-accent-foreground: oklch(0.205 0.01 270);
+  --sidebar-border: oklch(0.17 0.01 270 / 8%);
   --sidebar-ring: oklch(0.708 0 0);
+  /* Set at runtime from the playing track's artwork (see useAmbientColor). */
+  --ambient: oklch(0.72 0.12 40);
 }
 
 .dark {
-  --background: oklch(0.20 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.24 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.24 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  --canvas: oklch(0.105 0.006 270);
+  --background: oklch(0.155 0.008 270);
+  --foreground: oklch(0.97 0.004 270);
+  --card: oklch(0.19 0.009 270);
+  --card-foreground: oklch(0.97 0.004 270);
+  --popover: oklch(0.21 0.01 270);
+  --popover-foreground: oklch(0.97 0.004 270);
   --primary: oklch(0.87 0 0);
   --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.28 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.28 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.32 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.23 0.01 270);
+  --secondary-foreground: oklch(0.97 0.004 270);
+  --muted: oklch(0.23 0.01 270);
+  --muted-foreground: oklch(0.7 0.012 270);
+  --accent: oklch(0.26 0.012 270);
+  --accent-foreground: oklch(0.97 0.004 270);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --border: oklch(1 0 0 / 7%);
+  --input: oklch(1 0 0 / 11%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.22 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar: oklch(0.155 0.008 270);
+  --sidebar-foreground: oklch(0.97 0.004 270);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.28 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-accent: oklch(0.23 0.01 270);
+  --sidebar-accent-foreground: oklch(0.97 0.004 270);
+  --sidebar-border: oklch(1 0 0 / 6%);
   --sidebar-ring: oklch(0.556 0 0);
 }
 
 .amoled {
-  --background: oklch(0 0 0);
+  --canvas: oklch(0 0 0);
+  --background: oklch(0.09 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.145 0 0);
+  --card: oklch(0.14 0 0);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.145 0 0);
+  --popover: oklch(0.16 0 0);
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.87 0 0);
   --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.205 0 0);
+  --secondary: oklch(0.18 0 0);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.205 0 0);
+  --muted: oklch(0.18 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+  --accent: oklch(0.22 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 13%);
   --ring: oklch(0.556 0 0);
-  --sidebar: oklch(0.12 0 0);
+  --sidebar: oklch(0.09 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.205 0 0);
+  --sidebar-accent: oklch(0.18 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-border: oklch(1 0 0 / 7%);
   --sidebar-ring: oklch(0.556 0 0);
 }
 
 /* Theme Essences */
+[data-essence='ember'] {
+  --primary: oklch(0.74 0.16 38);
+  --primary-foreground: oklch(0.18 0.03 38);
+  --ring: oklch(0.74 0.16 38);
+}
+
 [data-essence='emerald'] {
   --primary: oklch(0.707 0.165 140);
   --primary-foreground: oklch(0.205 0 0);
@@ -196,7 +208,16 @@
     @apply h-svh w-screen overflow-hidden;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-canvas text-foreground antialiased;
+    font-feature-settings: 'ss01', 'cv11';
+  }
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.025em;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
   html {
     @apply font-sans;
@@ -298,4 +319,56 @@
 .scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* ── Studio components ─────────────────────────────────────────────────── */
+
+/* Floating content panel on the canvas. */
+.panel {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 1.4);
+}
+
+/* Ambient wash at the top of the main panel, tinted by the playing artwork. */
+.ambient-wash {
+  background:
+    radial-gradient(120% 70% at 15% -10%, color-mix(in oklch, var(--ambient) 34%, transparent), transparent 60%),
+    radial-gradient(80% 50% at 95% -20%, color-mix(in oklch, var(--ambient) 18%, transparent), transparent 70%);
+  transition: background 1.2s ease;
+}
+
+.eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* Subtle film grain for depth on hero surfaces. */
+.grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.06;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Equalizer bars used for "now playing" indicators. */
+@keyframes eq {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+.eq-bar {
+  width: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  transform-origin: bottom;
+  animation: eq 0.9s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .eq-bar { animation: none; transform: scaleY(0.7); }
 }

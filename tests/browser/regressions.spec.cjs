@@ -24,7 +24,8 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
   await page.setViewportSize(viewport);
   await page.goto('/home');
   await expect(page.getByRole('heading', { name: 'Recommended For You' })).toBeVisible();
-  await page.getByLabel('Discovery genre').selectOption('jazz');
+  await page.getByRole('radio', { name: 'Jazz' }).click();
+  await expect(page.getByRole('radio', { name: 'Jazz' })).toHaveAttribute('aria-checked', 'true');
   await page.getByLabel('Discovery language').selectOption('Hindi');
   await expect(page.getByRole('button', { name: 'Refresh discovery' })).toBeEnabled();
   await page.getByRole('button', { name: 'Refresh discovery' }).click();

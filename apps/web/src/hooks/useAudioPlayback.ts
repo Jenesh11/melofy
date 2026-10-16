@@ -11,6 +11,8 @@ import { useSocket } from '@/lib/socket-context';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { buildStreamUrl } from '@/lib/streamUrl';
 import { Capacitor } from '@capacitor/core';
+import { toast } from 'sonner';
+import { useTasteStore } from '@/store/useTasteStore';
 
 // Sub-hooks for modular logic
 import { useMediaSession } from './useMediaSession';
@@ -19,7 +21,7 @@ import { usePartyEvents } from './usePartyEvents';
 import { useTrackDiscovery } from './useTrackDiscovery';
 import { NativePlayer } from '@/lib/capacitor/NativePlayer';
 
-const STREAM_URL_REFRESH_AFTER_MS = 4 * 60 * 1000;
+const STREAM_URL_REFRESH_AFTER_MS = 25 * 60 * 1000;
 
 interface AudioPlaybackOptions {
   refreshStreamSrc?: () => Promise<string | null>;
@@ -93,7 +95,7 @@ export function useAudioPlayback(streamSrc?: string, options: AudioPlaybackOptio
   const { refreshStreamSrc, streamSrcIssuedAt = 0, streamTrackId } = options;
 
   // Handlers for controls
-  const handleTogglePlay = useCallback(() => {
+  const handleTogglePlay = useCallback(async () => {
     if (!canControlPlayback()) return;
     const state = usePlayerStore.getState();
     const time = getCurrentPlaybackTime();
@@ -103,15 +105,27 @@ export function useAudioPlayback(streamSrc?: string, options: AudioPlaybackOptio
         socket.emit('playback_state', { type: 'pause', time, reason: 'playback_toggled', sentAt: Date.now() });
       }
     } else {
+      if (state.currentTrack?.url && refreshStreamSrc && (!streamSrc || audioRef.current?.error)) {
+        const requestedTrack = state.currentTrack;
+        const revision = state.playbackRevision;
+        const refreshed = await refreshStreamSrc();
+        const latest = usePlayerStore.getState();
+        if (!refreshed || latest.currentTrack !== requestedTrack || latest.playbackRevision !== revision) return;
+      }
       resume();
       if (socket && state.partyId) {
         socket.emit('playback_state', { type: 'resume', time, reason: 'playback_toggled', sentAt: Date.now() });
       }
     }
-  }, [isPlaying, pause, resume, socket, canControlPlayback, getCurrentPlaybackTime]);
+  }, [isPlaying, pause, resume, socket, canControlPlayback, getCurrentPlaybackTime, refreshStreamSrc, streamSrc]);
 
-  const handleSkipNext = useCallback(async () => {
+  // `reason` is only set by the ended handler; UI callers may pass an event.
+  const handleSkipNext = useCallback(async (reason?: unknown) => {
     if (!canControlPlayback()) return;
+    const skipped = usePlayerStore.getState().currentTrack;
+    if (reason !== 'ended' && skipped && !isRepeat) {
+      useTasteStore.getState().recordSkip(skipped, getCurrentPlaybackTime() * 1000);
+    }
     if (isRepeat) {
       // Repeat: replay the current track from the start.
       if (Capacitor.isNativePlatform()) {
@@ -135,12 +149,12 @@ export function useAudioPlayback(streamSrc?: string, options: AudioPlaybackOptio
     if (seed && !usePlayerStore.getState().isPlaying) {
       await triggerAutoplay(seed);
     }
-  }, [playNext, triggerAutoplay, isRepeat, canControlPlayback, socket]);
+  }, [playNext, triggerAutoplay, isRepeat, canControlPlayback, socket, getCurrentPlaybackTime]);
 
   const handleTrackEnd = useCallback(async () => {
     const state = usePlayerStore.getState();
     if (state.partyId && !state.isPartyHost) return;
-    await handleSkipNext();
+    await handleSkipNext('ended');
   }, [handleSkipNext]);
 
   // ───────────────────────────────────────────────────────────────────────
@@ -308,7 +322,15 @@ export function useAudioPlayback(streamSrc?: string, options: AudioPlaybackOptio
             }
           }
 
-          audio.play().catch(console.error);
+          if (!playableSrc || cancelled) return;
+          audio.play().catch((error: Error) => {
+            if (cancelled || error.name === 'AbortError') return;
+            if (error.name === 'NotAllowedError') {
+              usePlayerStore.getState().pause(true);
+              setIsBuffering(false);
+              toast.info('Press Play to start listening.');
+            }
+          });
         };
 
         void play();

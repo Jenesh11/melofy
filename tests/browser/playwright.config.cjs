@@ -1,7 +1,7 @@
 const { defineConfig } = require('@playwright/test');
 module.exports = defineConfig({
   testDir: __dirname,
-  testMatch: 'regressions.spec.cjs',
+  testMatch: '*.spec.cjs',
   timeout: 45000,
   workers: 1,
   reporter: 'list',

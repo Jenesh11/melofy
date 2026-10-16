@@ -203,6 +203,7 @@ export default function SettingsPage() {
   };
 
   const themes = [
+    { id: 'ember', name: 'Ember', color: 'oklch(0.74 0.16 38)' },
     { id: 'monochrome', name: 'Monochrome', color: 'var(--foreground)' },
     { id: 'emerald', name: 'Classic', color: '#10b981' },
     { id: 'golden', name: 'Golden', color: '#fbbf24' },

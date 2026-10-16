@@ -117,7 +117,7 @@ export function LyricsPanel() {
             duration: isResizing ? 0 : 0.35,
             ease: [0.22, 1, 0.36, 1]
           }}
-          className='hidden md:flex shrink-0 flex-col h-full overflow-hidden border-l border-border bg-background/80 backdrop-blur-2xl relative z-10'
+          className='hidden md:flex shrink-0 flex-col h-full overflow-hidden rounded-2xl border border-border bg-background relative z-10'
           style={{ minWidth: 280, maxWidth: 600 }}
         >
           {/* Resize Handle */}

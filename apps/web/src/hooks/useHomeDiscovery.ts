@@ -5,6 +5,7 @@ import { useHomeStore } from '@/store/useHomeStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLikedStore } from '@/store/useLikedStore';
 import { libraryToTrack, seedMetadata } from '@/lib/discovery';
+import { skippedFor } from '@/store/useTasteStore';
 
 const sections = ['trending', 'newReleases', 'recommendations', 'mixes', 'editorsPicks', 'discoveryMixes', 'featuredPlaylists'] as const;
 
@@ -39,7 +40,7 @@ export function useHomeDiscovery() {
           method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
           signal: AbortSignal.any([controller.signal, AbortSignal.timeout(25000)]),
           body: JSON.stringify({ history: history.slice(-50).map(seedMetadata),
-            liked: likedUser === uid ? likedTracks.slice(-50).map(libraryToTrack).map(seedMetadata) : [], genre, language, sections: requested }),
+            liked: likedUser === uid ? likedTracks.slice(-50).map(libraryToTrack).map(seedMetadata) : [], skipped: skippedFor(uid), genre, language, sections: requested }),
         });
         if (!response.ok) throw new Error('Discovery unavailable');
         const data = await response.json();

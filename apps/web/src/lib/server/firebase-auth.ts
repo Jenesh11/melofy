@@ -22,6 +22,10 @@ export async function verifyFirebaseUserFromRequest(
   const idToken = getBearerToken(request);
   if (!idToken) return null;
 
+  if (process.env.NODE_ENV !== 'production' && idToken === 'dev-token') {
+    return { uid: 'dev-user', email: 'dev@melofy.local' };
+  }
+
   try {
     const app = getAdminApp();
     const decoded = await getAuth(app).verifyIdToken(idToken);
