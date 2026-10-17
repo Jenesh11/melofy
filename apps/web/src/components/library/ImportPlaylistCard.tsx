@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { addPlaylist } from '@/lib/firebase/playlists';
+import { addPlaylist, playlistSourceId, PlaylistTooLargeError } from '@/lib/firebase/playlists';
 
 interface ImportPlaylistCardProps {
   onImportSuccess: () => void;
@@ -49,7 +49,7 @@ export function ImportPlaylistCard({
             data.playlistInfo?.name ||
             data.playlist?.name ||
             'Untitled Playlist',
-          userId: user.uid,
+          sourceId: playlistSourceId(importUrl),
           trackCount: data.tracks.length,
           tracks: data.tracks,
           artworkUrl: data.tracks[0]?.info?.artworkUrl || '',
@@ -72,7 +72,7 @@ export function ImportPlaylistCard({
       }
     } catch (error) {
       console.error('Import error:', error);
-      toast.error('An error occurred during import');
+      toast.error(error instanceof PlaylistTooLargeError ? error.message : 'Could not save the playlist to your library. Please try again.');
     } finally {
       setIsImporting(false);
     }

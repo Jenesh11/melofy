@@ -25,6 +25,7 @@ export function normalizeToFirebaseTrack(value: unknown): FirebaseTrack {
       sourceName: source,
       isSeekable: info.isSeekable !== false,
       isStream: info.isStream === true,
+      ...(text(info.isrc) ? { isrc: text(info.isrc) } : {}),
     },
   };
 }

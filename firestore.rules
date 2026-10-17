@@ -1,0 +1,26 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(data) {
+      return signedIn() && data.userId == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+
+    match /playlists/{playlistId} {
+      // Anyone signed in can open a playlist link; listing is limited to your own library.
+      allow get: if signedIn();
+      allow list: if isOwner(resource.data);
+      allow create: if isOwner(request.resource.data);
+      allow update: if isOwner(resource.data) && isOwner(request.resource.data);
+      allow delete: if isOwner(resource.data);
+    }
+  }
+}

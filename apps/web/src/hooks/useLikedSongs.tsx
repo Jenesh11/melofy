@@ -2,15 +2,13 @@ import { libraryTrackId } from '@/lib/library-tracks';
 /* eslint-disable @next/next/no-img-element */
 import { useCallback } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
-import { db } from '@/lib/firebase/config';
-import { doc, updateDoc, arrayUnion, arrayRemove, collection, query, where, getDocs } from 'firebase/firestore';
-import { addPlaylist, Track as FirebaseTrack } from '@/lib/firebase/playlists';
+import { LIKED_SONGS_PLAYLIST_NAME, saveLikedSongChange, Track as FirebaseTrack } from '@/lib/firebase/playlists';
 import { Track as PlayerTrack } from '@/store/usePlayerStore';
 import { useLikedStore } from '@/store/useLikedStore';
 import { toast } from 'sonner';
 import { Heart, HeartOff } from 'lucide-react';
 
-export const LIKED_SONGS_PLAYLIST_NAME = 'Liked Songs';
+export { LIKED_SONGS_PLAYLIST_NAME };
 
 // Helper to map PlayerTrack to FirebaseTrack
 export function mapPlayerTrackToFirebaseTrack(track: PlayerTrack): FirebaseTrack {
@@ -53,117 +51,46 @@ export function useLikedSongs() {
 
     const ownsAccount = () => useLikedStore.getState().userId === user.uid;
     if (!ownsAccount()) return;
+
+    const currentlyLiked = isLiked(track.id);
+    const firebaseTrack = mapPlayerTrackToFirebaseTrack(track);
+    const previousEntry = likedTracks.find(t => libraryTrackId(t) === track.id);
+
+    // Optimistic update; rolled back below if the server doesn't keep it.
+    if (currentlyLiked) removeLikedTrack(track.id);
+    else addLikedTrack(firebaseTrack);
+
     try {
-      const currentlyLiked = isLiked(track.id);
-      const firebaseTrack = mapPlayerTrackToFirebaseTrack(track);
+      const playlistId = await saveLikedSongChange(
+        user.uid,
+        likedPlaylistId,
+        currentlyLiked ? { removeId: track.id } : { add: firebaseTrack },
+      );
+      if (!ownsAccount()) return;
+      setLikedPlaylistId(playlistId);
 
-      if (currentlyLiked) {
-        // Optimistic update
-        removeLikedTrack(track.id);
-        
-        let targetPlaylistId = likedPlaylistId;
-        if (!targetPlaylistId) {
-          const q = query(
-            collection(db, 'playlists'),
-            where('userId', '==', user.uid)
-          );
-          const snap = await getDocs(q);
-          if (!ownsAccount()) return;
-          const existing = snap.docs.find(d => {
-            const data = d.data();
-            return data.isLikedSongs === true || data.name === LIKED_SONGS_PLAYLIST_NAME;
-          });
-          if (existing) {
-            targetPlaylistId = existing.id;
-            setLikedPlaylistId(existing.id);
-          }
-        }
-
-        if (targetPlaylistId) {
-          const docRef = doc(db, 'playlists', targetPlaylistId);
-          const trackToRemove = likedTracks.find(t => libraryTrackId(t) === track.id);
-          if (trackToRemove) {
-            await updateDoc(docRef, {
-              tracks: arrayRemove(trackToRemove),
-              trackCount: Math.max(0, likedTracks.length - 1)
-            });
-            toast('Removed from Liked Songs', {
-              className: 'bg-primary text-primary-foreground border-none shadow-2xl',
-              description: (
-                <div className="flex items-center gap-2 mt-1">
-                  {track.artworkUrl && (
-                    <img src={track.artworkUrl} alt="" className="h-8 w-8 rounded-md object-cover shadow-md brightness-90" />
-                  )}
-                  <div className="flex flex-col min-w-0">
-                    <span className="font-bold text-xs truncate opacity-90">{track.title}</span>
-                  </div>
-                </div>
-              ),
-              icon: <HeartOff className="h-4 w-4" />,
-              duration: 2000,
-            });
-          }
-        }
-      } else {
-        // Optimistic update
-        addLikedTrack(firebaseTrack);
-
-        let targetPlaylistId = likedPlaylistId;
-        if (!targetPlaylistId) {
-          const q = query(
-            collection(db, 'playlists'),
-            where('userId', '==', user.uid)
-          );
-          const snap = await getDocs(q);
-          if (!ownsAccount()) return;
-          const existing = snap.docs.find(d => {
-            const data = d.data();
-            return data.isLikedSongs === true || data.name === LIKED_SONGS_PLAYLIST_NAME;
-          });
-          if (existing) {
-            targetPlaylistId = existing.id;
-            setLikedPlaylistId(existing.id);
-          }
-        }
-
-        if (targetPlaylistId) {
-          const docRef = doc(db, 'playlists', targetPlaylistId);
-          await updateDoc(docRef, {
-            tracks: arrayUnion(firebaseTrack),
-            trackCount: likedTracks.length + 1,
-            isLikedSongs: true,
-          });
-        } else {
-          // Create new Liked Songs playlist
-          const res = await addPlaylist(user.uid, {
-            name: LIKED_SONGS_PLAYLIST_NAME,
-            trackCount: 1,
-            tracks: [firebaseTrack],
-            isLikedSongs: true,
-          });
-          if (!ownsAccount()) return;
-          setLikedPlaylistId(res.id);
-        }
-        toast('Added to Liked Songs', {
-          className: 'bg-primary text-primary-foreground border-none shadow-2xl',
-          description: (
-            <div className="flex items-center gap-2 mt-1">
-              {track.artworkUrl && (
-                <img src={track.artworkUrl} alt="" className="h-8 w-8 rounded-md object-cover shadow-md brightness-90" />
-              )}
-              <div className="flex flex-col min-w-0">
-                <span className="font-bold text-xs truncate opacity-90">{track.title}</span>
-              </div>
+      toast(currentlyLiked ? 'Removed from Liked Songs' : 'Added to Liked Songs', {
+        className: 'bg-primary text-primary-foreground border-none shadow-2xl',
+        description: (
+          <div className="flex items-center gap-2 mt-1">
+            {track.artworkUrl && (
+              <img src={track.artworkUrl} alt="" className="h-8 w-8 rounded-md object-cover shadow-md brightness-90" />
+            )}
+            <div className="flex flex-col min-w-0">
+              <span className="font-bold text-xs truncate opacity-90">{track.title}</span>
             </div>
-          ),
-          icon: <Heart className="fill-current h-4 w-4" />,
-          duration: 2500,
-        });
-      }
+          </div>
+        ),
+        icon: currentlyLiked ? <HeartOff className="h-4 w-4" /> : <Heart className="fill-current h-4 w-4" />,
+        duration: currentlyLiked ? 2000 : 2500,
+      });
     } catch (error) {
       if (!ownsAccount()) return;
       console.error('[useLikedSongs] Error toggling like:', error);
-      toast.error('Failed to update Liked Songs. Your changes might not be saved.');
+      // Never leave the UI showing a like state the server didn't save — it would vanish on reload.
+      if (currentlyLiked) addLikedTrack(previousEntry || firebaseTrack);
+      else removeLikedTrack(track.id);
+      toast.error('Could not update Liked Songs. Please check your connection and try again.');
     }
   }, [user, likedTracks, likedPlaylistId, isLiked, addLikedTrack, removeLikedTrack, setLikedPlaylistId]);
 

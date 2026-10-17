@@ -4,20 +4,21 @@ import { useEffect } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { db } from '@/lib/firebase/config';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Playlist } from '@/lib/firebase/playlists';
+import { isLikedSongsData, LIKED_SONGS_PLAYLIST_NAME, Playlist } from '@/lib/firebase/playlists';
 import { useLikedStore } from '@/store/useLikedStore';
 import { useTasteStore } from '@/store/useTasteStore';
-
-const LIKED_SONGS_PLAYLIST_NAME = 'Liked Songs';
 
 export { normalizeToFirebaseTrack, deduplicateFirebaseTracks } from '@/lib/library-tracks';
 import { deduplicateFirebaseTracks } from '@/lib/library-tracks';
 
 export function LikedSongsSync() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const { setLikedTracks, setLikedPlaylistId, setIsLoading } = useLikedStore();
 
   useEffect(() => {
+    // While Firebase restores the session `user` is briefly null; binding then would wipe the
+    // cached likes of the user who is about to be signed back in.
+    if (loading) return;
     useLikedStore.getState().bindUser(user?.uid || null);
     useTasteStore.getState().bindUser(user?.uid || null);
     if (!user) {
@@ -41,10 +42,7 @@ export function LikedSongsSync() {
         if (syncing) return;
 
         try {
-          const likedDocs = snapshot.docs.filter((docSnap) => {
-            const data = docSnap.data();
-            return data.isLikedSongs === true || data.name === LIKED_SONGS_PLAYLIST_NAME;
-          });
+          const likedDocs = snapshot.docs.filter((docSnap) => isLikedSongsData(docSnap.data()));
 
           if (likedDocs.length === 0) {
             // Check if we have cached liked tracks in local store that need to be synced to Firestore
@@ -130,7 +128,7 @@ export function LikedSongsSync() {
       active = false;
       unsubscribe();
     };
-  }, [user, setLikedTracks, setLikedPlaylistId, setIsLoading]);
+  }, [user, loading, setLikedTracks, setLikedPlaylistId, setIsLoading]);
 
   return null;
 }

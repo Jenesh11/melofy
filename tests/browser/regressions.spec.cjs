@@ -4,7 +4,7 @@ const path = require('node:path');
 const evidence = path.resolve(process.env.MELOFY_TEST_REPORT_DIR || 'test-results/discovery');
 fs.mkdirSync(evidence, { recursive: true });
 
-test('23 React hook and store regression scenarios', async ({ page }) => {
+test('29 React hook and store regression scenarios', async ({ page }) => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/');
@@ -12,7 +12,7 @@ test('23 React hook and store regression scenarios', async ({ page }) => {
   const tests = await page.evaluate(() => window.runResults);
   fs.writeFileSync(path.join(evidence, 'browser-regressions.json'), JSON.stringify({ tests, pageErrors: errors }, null, 2));
   expect(tests.filter(test => !test.passed)).toEqual([]);
-  expect(tests).toHaveLength(23);
+  expect(tests).toHaveLength(29);
   expect(errors).toEqual([]);
 });
 

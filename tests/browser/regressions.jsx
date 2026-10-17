@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { setUser } from './auth';
+import { setAuthLoading, setUser } from './auth';
 import { useTrackDiscovery } from '../../apps/web/src/hooks/useTrackDiscovery';
 import { useHomeDiscovery } from '../../apps/web/src/hooks/useHomeDiscovery';
 import { usePlayerSync } from '../../apps/web/src/hooks/usePlayerSync';
 import { useSpotifyCollection } from '../../apps/web/src/hooks/useSpotifyCollection';
 import { LikedSongsSync } from '../../apps/web/src/components/layout/LikedSongsSync';
+import { useLikedSongs } from '../../apps/web/src/hooks/useLikedSongs';
+import { addPlaylist, playlistSourceId } from '../../apps/web/src/lib/firebase/playlists';
 import { usePlayerStore as player } from '../../apps/web/src/store/usePlayerStore';
 import { useHomeStore as home } from '../../apps/web/src/store/useHomeStore';
 import { useLikedStore as likes } from '../../apps/web/src/store/useLikedStore';
@@ -40,13 +42,15 @@ function Sync() {
   const setTime = useCallback(time => { window.hydratedTime = time; player.getState().setProgress(time * 1000); }, []);
   const handle = usePlayerSync(audioRef, setTime); useEffect(() => publish(handle)); return <p>{handle.isHydrated ? 'Player hydrated' : 'Loading player'}</p>;
 }
+function Likes() { const handle = useLikedSongs(); useEffect(() => publish(handle)); return <p>Liked songs hook mounted</p>; }
 function Collection() { const handle = useSpotifyCollection(); useEffect(() => publish(handle)); return <p>Collection hook mounted</p>; }
 async function mount(Component) { window.handle = null; flushSync(() => root.render(<Component />)); await sleep(30); }
 async function reset() {
   flushSync(() => root.render(null));
   window.fixtureNative = false; window.fixtureToasts = []; window.fixtureWrites = []; window.fixtureDeletes = []; window.fixtureUpdate = null;
   window.fixtureSnapshot = null; window.hydratedTime = null;
-  setUser(alice); player.getState().reset(); home.getState().resetForUser('alice');
+  window.fixtureDocs = null; window.fixtureTransactionDoc = null; window.fixtureTransactionError = null;
+  setAuthLoading(false); setUser(alice); player.getState().reset(); home.getState().resetForUser('alice');
   likes.getState().bindUser('alice'); likes.setState({ likedTracks: [], likedPlaylistId: null });
   library.setState({ recentPlaylists: [] });
   window.fetch = async () => response({});
@@ -215,6 +219,7 @@ test('Generated mixes play, save their collection context and import without Spo
   await window.handle.handleImportSpotifyPlaylist(mix);
   assert(window.fixtureWrites[0].data.tracks[0].encoded === next.url);
   assert(window.fixtureWrites[0].data.tracks[0].info.sourceName === 'youtube');
+  assert(window.fixtureWrites[0].data.sourceId === mix.id);
   assert(urls.every(url => url.startsWith('/api/discovery/mixes/')));
 });
 
@@ -253,6 +258,71 @@ test('Delayed liked-song snapshot cannot update another account', async () => {
   likes.getState().bindUser('bob'); flushSync(() => setUser(bob));
   updating.resolve(); await pending;
   assert(likes.getState().likedPlaylistId === null && likes.getState().likedTracks.length === 0);
+});
+
+test('Restoring the session keeps cached likes and uploads them when no Liked Songs doc exists', async () => {
+  likes.getState().addLikedTrack(normalizeToFirebaseTrack(seed));
+  setAuthLoading(true); setUser(null);
+  await mount(LikedSongsSync);
+  assert(likes.getState().likedTracks.length === 1, 'cached likes were wiped while auth was loading');
+  flushSync(() => { setUser(alice); setAuthLoading(false); }); await sleep(30);
+  assert(likes.getState().likedTracks.length === 1, 'cached likes were wiped after auth restored');
+  await window.fixtureSnapshot({ docs: [] });
+  assert(window.fixtureWrites.length === 1 && window.fixtureWrites[0].data.tracks.length === 1);
+  assert(likes.getState().likedPlaylistId === 'imported-playlist');
+});
+
+test('Liking saves through a transaction and keeps tracks liked on other devices', async () => {
+  const other = normalizeToFirebaseTrack(manual);
+  window.fixtureTransactionDoc = () => ({ userId: 'alice', isLikedSongs: true, tracks: [other] });
+  likes.setState({ likedPlaylistId: 'alice-likes' });
+  await mount(Likes);
+  await window.handle.toggleLike(seed);
+  const write = window.fixtureWrites.find(w => w.transaction);
+  assert(write && write.data.tracks.map(t => t.info.identifier).join() === [manual.id, seed.id].join());
+  assert(likes.getState().likedTracks.some(t => t.info.identifier === seed.id));
+});
+
+test('Unliking removes only that track from the server copy', async () => {
+  window.fixtureTransactionDoc = () => ({ userId: 'alice', tracks: [normalizeToFirebaseTrack(seed), normalizeToFirebaseTrack(next)] });
+  likes.setState({ likedPlaylistId: 'alice-likes', likedTracks: [normalizeToFirebaseTrack(seed)] });
+  await mount(Likes);
+  await window.handle.toggleLike(seed);
+  const write = window.fixtureWrites.find(w => w.transaction);
+  assert(write.data.tracks.length === 1 && write.data.tracks[0].info.identifier === next.id && write.data.trackCount === 1);
+});
+
+test('A like that fails to save is rolled back instead of vanishing later', async () => {
+  window.fixtureTransactionError = Error('simulated offline');
+  likes.setState({ likedPlaylistId: 'alice-likes' });
+  await mount(Likes);
+  await window.handle.toggleLike(seed);
+  assert(likes.getState().likedTracks.length === 0);
+  assert(window.fixtureToasts.some(([kind]) => kind === 'error'));
+});
+
+test('A stale Liked Songs id falls back to the existing playlist', async () => {
+  window.fixtureDocs = [{ id: 'real-likes', data: () => ({ userId: 'alice', isLikedSongs: true, tracks: [] }) }];
+  window.fixtureTransactionDoc = ref => ref[2] === 'real-likes' ? { userId: 'alice', tracks: [] } : undefined;
+  likes.setState({ likedPlaylistId: 'merged-away' });
+  await mount(Likes);
+  await window.handle.toggleLike(seed);
+  assert(likes.getState().likedPlaylistId === 'real-likes' && likes.getState().likedTracks.length === 1);
+});
+
+test('Importing a playlist never overwrites a different playlist that shares its name', async () => {
+  window.fixtureUpdate = async (ref, data) => { window.fixtureWrites.push({ ref, data, update: true }); };
+  window.fixtureDocs = [{ id: 'chill-a', data: () => ({ userId: 'alice', name: 'Chill', sourceId: 'spotify:' + 'a'.repeat(22) }) }];
+  const url = 'https://open.spotify.com/playlist/' + 'b'.repeat(22) + '?si=x';
+  assert(playlistSourceId(url) === 'spotify:' + 'b'.repeat(22));
+  assert(playlistSourceId('https://www.youtube.com/playlist?list=PL123_abc') === 'youtube:PL123_abc');
+  const created = await addPlaylist('alice', { name: 'Chill', sourceId: playlistSourceId(url), trackCount: 0, tracks: [] });
+  assert(!created.updated && !window.fixtureWrites.some(w => w.update));
+  const refreshed = await addPlaylist('alice', { name: 'Renamed', sourceId: 'spotify:' + 'a'.repeat(22), trackCount: 1, tracks: [normalizeToFirebaseTrack(seed)] });
+  assert(refreshed.updated && refreshed.id === 'chill-a');
+  window.fixtureDocs = [{ id: 'likes', data: () => ({ userId: 'alice', isLikedSongs: true, tracks: [normalizeToFirebaseTrack(seed)] }) }];
+  const liked = await addPlaylist('alice', { name: 'Liked Songs', isLikedSongs: true, trackCount: 0, tracks: [] });
+  assert(liked.id === 'likes' && window.fixtureWrites.filter(w => w.update).length === 1, 'existing likes were overwritten');
 });
 
 window.runResults = [];

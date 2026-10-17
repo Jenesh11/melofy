@@ -15,7 +15,7 @@ import { PlaylistGrid } from '@/components/home/PlaylistGrid';
 import { useSpotifyCollection } from '@/hooks/useSpotifyCollection';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { usePlayerStore } from '@/store/usePlayerStore';
-import { addPlaylist } from '@/lib/firebase/playlists';
+import { addPlaylist, PlaylistTooLargeError } from '@/lib/firebase/playlists';
 import { getFirebaseAuthHeaders } from '@/lib/firebase/client-auth';
 import { toast } from 'sonner';
 import type { SpotifyTrackLike } from '@/lib/track-mappers';
@@ -259,6 +259,7 @@ export default function SearchPage() {
 
       await addPlaylist(user.uid, {
         name: fullData.name,
+        sourceId: `spotify:${playlist.id}`,
         trackCount: fullData.trackCount || fullData.tracks?.length || 0,
         artworkUrl: fullData.artworkUrl || fullData.images?.[0]?.url,
         tracks: tracksForDb
@@ -267,7 +268,7 @@ export default function SearchPage() {
       toast.success('Playlist imported to your library!', { id: toastId });
     } catch (err) {
       console.error('Import error:', err);
-      toast.error('Failed to import playlist', { id: toastId });
+      toast.error(err instanceof PlaylistTooLargeError ? err.message : 'Failed to import playlist', { id: toastId });
     } finally {
       setIsImporting(false);
     }
@@ -295,6 +296,7 @@ export default function SearchPage() {
 
       await addPlaylist(user.uid, {
         name: detectedPlaylist.name,
+        sourceId: detectedPlaylist.spotifyId ? `spotify:${detectedPlaylist.spotifyId}` : detectedPlaylist.youtubeId ? `youtube:${detectedPlaylist.youtubeId}` : undefined,
         trackCount: detectedPlaylist.tracks.length,
         artworkUrl: detectedPlaylist.tracks[0]?.artworkUrl,
         tracks: tracksForDb
@@ -302,7 +304,7 @@ export default function SearchPage() {
       toast.success('Playlist imported to your library!', { id: toastId });
     } catch (err) {
       console.error('Import error:', err);
-      toast.error('Failed to import playlist', { id: toastId });
+      toast.error(err instanceof PlaylistTooLargeError ? err.message : 'Failed to import playlist', { id: toastId });
     } finally {
       setIsImporting(false);
     }

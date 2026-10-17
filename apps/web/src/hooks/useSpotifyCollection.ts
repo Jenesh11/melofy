@@ -9,7 +9,7 @@ import {
   mapSpotifyTrackToPlayerTrack,
   type SpotifyTrackLike,
 } from '@/lib/track-mappers';
-import { addPlaylist, getPlaylistById, type Playlist } from '@/lib/firebase/playlists';
+import { addPlaylist, getPlaylistById, PlaylistTooLargeError, type Playlist } from '@/lib/firebase/playlists';
 import { useLibraryStore } from '@/store/useLibraryStore';
 
 interface SpotifyCollection {
@@ -168,6 +168,7 @@ export function useSpotifyCollection() {
 
       await addPlaylist(user.uid, {
         name: fullData.name,
+        sourceId: isMix ? playlist.id : `spotify:${playlist.id}`,
         trackCount: fullData.trackCount || fullData.tracks?.length || 0,
         artworkUrl: fullData.artworkUrl || fullData.images?.[0]?.url,
         tracks: tracksForDb,
@@ -176,7 +177,7 @@ export function useSpotifyCollection() {
       toast.success('Playlist imported to your library!', { id: toastId });
     } catch (err) {
       console.error('Import error:', err);
-      toast.error('Failed to import playlist', { id: toastId });
+      toast.error(err instanceof PlaylistTooLargeError ? err.message : 'Failed to import playlist', { id: toastId });
     } finally {
       setIsImporting(false);
     }
